@@ -507,7 +507,7 @@ const Index = () => {
                 Welcome to ShotLogic
               </h1>
               <p className="text-muted-foreground">
-                Screenplay story analysis and shot list kickstarter
+                Screenplay story analysis and sample shot list kickstarter
               </p>
             </div>
 
@@ -517,7 +517,7 @@ const Index = () => {
               <div className="group h-full min-h-[280px] border-2 border-dashed border-muted-foreground/30 rounded-lg bg-card/50 hover:bg-zinc-900 hover:border-netflix-red hover:shadow-[0_0_20px_rgba(229,9,20,0.3)] transition-all duration-300 flex flex-col items-center justify-center p-8">
                 <FileText className="w-20 h-20 text-muted-foreground/40 group-hover:text-netflix-red group-hover:scale-110 transition-all duration-300 mb-6" />
                 <h3 className="text-xl font-semibold text-foreground mb-2 group-hover:text-netflix-red transition-colors duration-300">
-                  Upload Screenplay
+                  Upload Your Screenplay
                 </h3>
                 <p className="text-sm text-muted-foreground text-center mb-2">
                   Drop your script here or click to browse
