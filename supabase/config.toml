@@ -1,0 +1,13 @@
+project_id = "ccdgtzmfhnupqqxfyfwr"
+
+[functions.analyze-scene]
+verify_jwt = false
+
+[functions.analyze-scene-with-progress]
+verify_jwt = false
+
+[functions.parse-with-ai]
+verify_jwt = false
+
+[functions.claim-project-ownership]
+verify_jwt = false
