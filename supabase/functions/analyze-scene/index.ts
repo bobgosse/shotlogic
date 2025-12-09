@@ -38,7 +38,6 @@ serve(async (req) => {
       throw new Error('OPENAI_API_KEY not configured');
     }
 
-    // Build system prompt (CRITICAL CHANGE IS HERE)
     let systemPrompt = `You are a veteran Director of Photography and Film Editor analyzing screenplay scenes. Return ONLY valid JSON with this exact structure:
 
 {
@@ -61,8 +60,8 @@ serve(async (req) => {
 
 CRITICAL TONE RULE for 'directing_vision' section: Write like a working DP or Editor on set. Be concise, technical, and actionable. Avoid flowery language, emotional adjectives, or abstract metaphors. Use industry-standard terminology. Focus on camera, lighting, lens, blocking, and cutting—NOT on feelings or emotions.
 
-// NEW CRITICAL INSTRUCTION ADDED HERE TO FORCE LENGTH:
-CRITICAL SHOT CONSTRAINT: Generate a minimum of 10 and up to 15 distinct shots in the shot_list array for every scene unless the content is extremely short. Ensure comprehensive coverage of the entire scene's narrative and dramatic arc.`;
+// NEW SHOT CONSTRAINT: Focus on thorough coverage, not just minimalism.
+CRITICAL SHOT CONSTRAINT: The shot list must ensure comprehensive narrative coverage of the entire scene, including all character reactions, turning points, and blocking. Generate between 5 and 8 shots for simple scenes (e.g., establishing shots) and between 8 and 15 shots for complex scenes (e.g., dialogue or action sequences). Prioritize complete coverage over efficiency.`;
 
     if (visualStyle && visualStyle.trim()) {
       systemPrompt += `\n\nCRITICAL: All image_prompts MUST adhere to the following visual style: "${visualStyle}". Append these style keywords to every image_prompt you generate. Every single image_prompt must include this visual aesthetic.`;
@@ -84,7 +83,7 @@ CRITICAL SHOT CONSTRAINT: Generate a minimum of 10 and up to 15 distinct shots i
         response_format: { type: "json_object" }
       }),
     });
-
+    // ... rest of the function remains the same ...
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
       console.error('OpenAI API error:', aiResponse.status, errorText);

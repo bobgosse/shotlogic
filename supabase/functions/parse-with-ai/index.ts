@@ -22,13 +22,11 @@ serve(async (req) => {
 
     console.log('Parsing screenplay text with AI, length:', rawText.length);
 
-    // CHANGED: Use OpenAI Key directly
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     if (!OPENAI_API_KEY) {
       throw new Error('OPENAI_API_KEY is not configured');
     }
 
-    // CHANGED: Call OpenAI directly instead of Lovable gateway
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -36,18 +34,24 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o', // Using standard OpenAI model
+        model: 'gpt-4o',
         messages: [
           {
             role: 'system',
-            content: `You are a Screenplay Formatter. The input text has broken formatting (extra spaces like "P H O N E", missing newlines, mashed numbers like "DAY 1 1"). Your job is to extract the scenes and clean the formatting.
+            content: `You are a Screenplay Formatter. Your job is to extract the scenes from the raw script text.
+
+CRITICAL NUMBERING CONSTRAINT: The 'scene_number' in the JSON output MUST be sequentially re-numbered starting from 1 (1, 2, 3, 4, ...).
+
+CRITICAL VERBATIM HEADER RULE (ABSOLUTE): The 'header' field MUST be an exact, VERBATIM copy of the slugline found in the raw text. You MUST NOT alter, combine, abbreviate, or invent any part of the scene header.
+
+CRITICAL SEGMENTATION RULE: A new scene begins ONLY when a valid slugline (INT./EXT. location - TIME) is encountered. Any text that looks like a new header but does not start with INT./EXT. (e.g., 'CONTINUED', 'TITLES MONTAGE') must be treated as action text and consolidated into the preceding scene unit.
 
 Return a JSON object with a "scenes" array where each item has:
-- scene_number (integer): The scene number from the screenplay
-- header (string): Cleaned scene header (e.g., "INT. CLASSROOM - DAY")
+- scene_number (integer): The sequentially re-numbered scene number (1, 2, 3, etc.)
+- header (string): Exact, VERBATIM copy of the slugline.
 - content (string): The dialogue and action for that scene
 
-Fix spacing issues, reconstruct proper headers, and ignore title pages or headers containing "SCRIPT TITLE".`
+Fix spacing issues and ignore page numbers/titles.`
           },
           {
             role: 'user',
@@ -57,10 +61,10 @@ Fix spacing issues, reconstruct proper headers, and ignore title pages or header
         response_format: { type: 'json_object' }
       }),
     });
-
+    
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('OpenAI API error:', response.status, errorText);
+      console.error('OpenAI error:', response.status, errorText);
       throw new Error(`OpenAI API error: ${response.status}`);
     }
 
