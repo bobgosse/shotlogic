@@ -1,8 +1,77 @@
-// pages/Index.tsx
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { parseScreenplay, validateParse, ParsedScene } from '@/lib/screenplayParser';
-import { useToast } from '@/hooks/use-toast';
+// NOTE: Assuming useToast is available in your project structure
+// import { useToast } from '@/hooks/use-toast'; 
+
+// Placeholder for useToast if not available
+const useToast = () => ({
+  toast: (options: { title: string, description: string, variant?: 'default' | 'destructive' }) => {
+    console.log(`[TOAST] ${options.title}: ${options.description}`);
+  }
+});
+
+
+/**
+ * Core function to read the file content based on its type
+ * This is the crucial fix for FDX file loading
+ */
+async function readFileContent(file: File): Promise<string> {
+    const fileExtension = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+
+    if (fileExtension === '.txt' || fileExtension === '.fountain') {
+        return file.text();
+    } 
+    
+    // --- FDX/XML Handling ---
+    if (fileExtension === '.fdx') {
+        const fileText = await file.text();
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(fileText, 'text/xml');
+        
+        // This logic extracts text nodes from the FDX/XML structure
+        const paragraphs = xmlDoc.querySelectorAll('Paragraph');
+        const extractedLines: string[] = [];
+        paragraphs.forEach(paragraph => {
+            const content = paragraph.textContent?.trim();
+            // We only need the text content, the main parser handles formatting
+            if (content) {
+                extractedLines.push(content);
+            }
+        });
+        
+        // Return the raw text, which will be cleaned by the parser next
+        return extractedLines.join('\n');
+    }
+    
+    // --- PDF Handling ---
+    if (fileExtension === '.pdf') {
+        // NOTE: PDF parsing is highly complex and requires external libraries.
+        throw new Error("PDF parsing is not yet fully implemented. Please use TXT, FDX, or Fountain formats.");
+    }
+
+    throw new Error(`Unsupported file type: ${fileExtension}`);
+}
+
+
+/**
+ * Call Supabase Edge Function to analyze a single scene
+ */
+const analyzeScene = async (scene: ParsedScene, scriptTitle: string) => {
+    // NOTE: This calls the new, stable 'analyze-scene' function
+    const { data, error } = await supabase.functions.invoke('analyze-scene', {
+        body: {
+            sceneNumber: scene.sceneNumber,
+            header: scene.header,
+            content: scene.content,
+            scriptTitle,
+        },
+    });
+
+    if (error) throw error;
+    return data;
+};
+
 
 export default function Index() {
   const [file, setFile] = useState<File | null>(null);
@@ -13,7 +82,7 @@ export default function Index() {
   const { toast } = useToast();
 
   /**
-   * Handle file upload
+   * Handle file selection
    */
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -53,11 +122,11 @@ export default function Index() {
       setParsing(true);
       setProgress({ current: 0, total: 0 });
 
-      // Step 1: Read file content
-      const text = await file.text();
-      
-      if (!text || text.trim().length === 0) {
-        throw new Error('File is empty or could not be read');
+      // Step 1: Read file content using the robust FDX/PDF handling function
+      const text = await readFileContent(file);
+
+      if (!text || text.trim().length < 50) { 
+        throw new Error('File content is empty or too short after extraction.');
       }
 
       toast({
@@ -65,7 +134,7 @@ export default function Index() {
         description: 'Using rule-based parser',
       });
 
-      // Step 2: Parse screenplay locally (NO AI)
+      // Step 2: Parse screenplay locally (The reliable parser in lib/screenplayParser.ts)
       const parsed = parseScreenplay(text);
 
       // Step 3: Validate parse
@@ -100,7 +169,8 @@ export default function Index() {
         setProgress({ current: i + 1, total: parsed.scenes.length });
 
         try {
-          const analysis = await analyzeScene(scene, parsed.title);
+          // Send only the clean scene data to the stable remote function
+          const analysis = await analyzeScene(scene, parsed.title); 
           analyzedScenes.push({
             ...scene,
             analysis,
@@ -140,23 +210,6 @@ export default function Index() {
       setParsing(false);
       setAnalyzing(false);
     }
-  };
-
-  /**
-   * Call Supabase Edge Function to analyze a single scene
-   */
-  const analyzeScene = async (scene: ParsedScene, scriptTitle: string) => {
-    const { data, error } = await supabase.functions.invoke('analyze-scene', {
-      body: {
-        sceneNumber: scene.sceneNumber,
-        header: scene.header,
-        content: scene.content,
-        scriptTitle,
-      },
-    });
-
-    if (error) throw error;
-    return data;
   };
 
   return (
