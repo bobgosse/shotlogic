@@ -1,123 +1,134 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+// supabase/functions/analyze-scene/index.ts
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { corsHeaders } from '../_shared/cors.ts';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+
+interface AnalyzeRequest {
+  sceneNumber: number;
+  header: string;
+  content: string;
+  scriptTitle: string;
+}
 
 serve(async (req) => {
+  // Handle CORS
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    const { sceneContent, sceneNumber, projectId, visualStyle } = await req.json();
-    
-    console.log(`Analyzing scene ${sceneNumber} for project ${projectId}`);
+    const { sceneNumber, header, content, scriptTitle }: AnalyzeRequest = await req.json();
 
-    // Validation: Skip if scene is empty
-    if (!sceneContent || sceneContent.trim().length < 5) {
-      console.log(`Scene ${sceneNumber} is too short, marking as SKIPPED`);
+    // Validation
+    if (!header || !content) {
       return new Response(
-        JSON.stringify({ 
-          error: 'Scene too short', 
-          status: 'SKIPPED',
-          analysis: JSON.stringify({
-            story_analysis: { stakes: 'N/A', ownership: 'N/A', breaking_point: 'N/A', key_props: 'N/A' },
-            producing_logistics: { red_flags: [], resource_impact: 'Low', departments_affected: [] },
-            directing_vision: { visual_metaphor: 'N/A', editorial_intent: 'N/A', shot_motivation: 'N/A' },
-            shot_list: []
-          })
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: 'Missing required fields: header and content' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     if (!OPENAI_API_KEY) {
-      throw new Error('OPENAI_API_KEY not configured');
+      throw new Error('OpenAI API key not configured');
     }
 
-    let systemPrompt = `You are a veteran Director of Photography and Film Editor analyzing screenplay scenes. Return ONLY valid JSON with this exact structure:
-
-{
-  "story_analysis": { "stakes": "string", "ownership": "string", "breaking_point": "string", "key_props": "string" },
-  "producing_logistics": { "red_flags": ["string"], "resource_impact": "Low|Medium|High", "departments_affected": ["string"] },
-  "directing_vision": { 
-    "visual_metaphor": "Technical visual approach (lighting, lens, color). NO abstract emotions.",
-    "editorial_intent": "Pacing and cut strategy.",
-    "shot_motivation": "Why move from shot A to B?"
-  },
-  "shot_list": [
-    {
-      "shot_type": "Wide|MCU|CU|etc",
-      "visual": "Description",
-      "rationale": "Why this shot?",
-      "image_prompt": "Detailed AI prompt: [Shot Size] of [Subject] [Action], [Lighting], [Angle], cinematic, 8k, --ar 16:9"
-    }
-  ]
-}
-
-CRITICAL TONE RULE for 'directing_vision' section: Write like a working DP or Editor on set. Be concise, technical, and actionable. Avoid flowery language, emotional adjectives, or abstract metaphors. Use industry-standard terminology. Focus on camera, lighting, lens, blocking, and cutting—NOT on feelings or emotions.
-
-// NEW SHOT CONSTRAINT: Focus on thorough coverage, not just minimalism.
-CRITICAL SHOT CONSTRAINT: The shot list must ensure comprehensive narrative coverage of the entire scene, including all character reactions, turning points, and blocking. Generate between 5 and 8 shots for simple scenes (e.g., establishing shots) and between 8 and 15 shots for complex scenes (e.g., dialogue or action sequences). Prioritize complete coverage over efficiency.`;
-
-    if (visualStyle && visualStyle.trim()) {
-      systemPrompt += `\n\nCRITICAL: All image_prompts MUST adhere to the following visual style: "${visualStyle}". Append these style keywords to every image_prompt you generate. Every single image_prompt must include this visual aesthetic.`;
-    }
-
-    // Call OpenAI
-    const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Analyze this screenplay scene:\n\n${sceneContent}` }
-        ],
-        response_format: { type: "json_object" }
-      }),
-    });
-    // ... rest of the function remains the same ...
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error('OpenAI API error:', aiResponse.status, errorText);
-      throw new Error(`AI analysis failed: ${aiResponse.status}`);
-    }
-
-    const aiData = await aiResponse.json();
-    let analysisText = aiData.choices?.[0]?.message?.content || '{}';
-    
-    console.log('Raw OpenAI response:', analysisText);
-
-    // Sanitize and Parse
-    if (analysisText.startsWith('```')) {
-      analysisText = analysisText.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/, '');
-    }
-    
-    const analysisJson = JSON.parse(analysisText);
+    // Call OpenAI for analysis ONLY (not parsing)
+    const analysis = await analyzeSceneWithAI(header, content, scriptTitle);
 
     return new Response(
-      JSON.stringify({ 
-        analysis: JSON.stringify(analysisJson), 
-        status: 'COMPLETED'
+      JSON.stringify({
+        sceneNumber,
+        header,
+        ...analysis,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
-  } catch (error) {
-    console.error('Error in analyze-scene:', error);
+  } catch (error: any) {
+    console.error('Analysis error:', error);
     return new Response(
-      JSON.stringify({ 
-        error: error instanceof Error ? error.message : 'Unknown error',
-        status: 'ERROR'
-      }),
+      JSON.stringify({ error: error.message || 'Analysis failed' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
+
+/**
+ * Analyze a single scene with OpenAI
+ * This function receives pre-parsed, clean scene content
+ */
+async function analyzeSceneWithAI(header: string, content: string, scriptTitle: string) {
+  const prompt = `You are analyzing a single scene from the screenplay "${scriptTitle}".
+
+SCENE HEADER: ${header}
+
+SCENE CONTENT:
+${content}
+
+Your task is to analyze this scene and provide:
+
+1. **Stakes**: What is at stake in this scene? What could be won or lost? (1-2 sentences)
+
+2. **Shot List**: Break down this scene into individual shots. For each shot, provide:
+   - Shot number (sequential within this scene)
+   - Shot type (e.g., "Wide Shot", "Close-Up", "Medium Shot", "Over-the-Shoulder")
+   - Subject (who/what is being filmed)
+   - Description (what happens in this shot)
+
+Respond ONLY with valid JSON in this exact format:
+{
+  "stakes": "string",
+  "shots": [
+    {
+      "shotNumber": 1,
+      "type": "string",
+      "subject": "string",
+      "description": "string"
+    }
+  ]
+}
+
+Do not include any text before or after the JSON. Do not use markdown code blocks.`;
+
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${OPENAI_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a professional script supervisor and cinematographer. You analyze screenplay scenes and break them into detailed shot lists. You respond only with valid JSON.',
+        },
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+      temperature: 0.3,
+      response_format: { type: 'json_object' },
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`OpenAI API error: ${response.status} - ${error}`);
+  }
+
+  const data = await response.json();
+  const content_text = data.choices[0]?.message?.content;
+
+  if (!content_text) {
+    throw new Error('No response from OpenAI');
+  }
+
+  try {
+    return JSON.parse(content_text);
+  } catch (e) {
+    console.error('Failed to parse OpenAI response:', content_text);
+    throw new Error('Invalid JSON response from AI');
+  }
+}

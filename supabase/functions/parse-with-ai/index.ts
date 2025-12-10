@@ -38,20 +38,20 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are a Screenplay Formatter. Your job is to extract the scenes from the raw script text.
+            content: `You are a Screenplay Formatter. Your job is to extract the scenes from the raw script text. The goal is general compatibility with standard screenplay formatting.
 
-CRITICAL NUMBERING CONSTRAINT: The 'scene_number' in the JSON output MUST be sequentially re-numbered starting from 1 (1, 2, 3, 4, ...).
+CRITICAL NUMBERING CONSTRAINT: The 'scene_number' in the JSON output MUST be sequentially re-numbered starting from 1 (1, 2, 3, 4, ...). Ignore any scene numbers found in the raw text.
 
-CRITICAL VERBATIM HEADER RULE (ABSOLUTE): The 'header' field MUST be an exact, VERBATIM copy of the slugline found in the raw text. You MUST NOT alter, combine, abbreviate, or invent any part of the scene header.
-
-CRITICAL SEGMENTATION RULE: A new scene begins ONLY when a valid slugline (INT./EXT. location - TIME) is encountered. Any text that looks like a new header but does not start with INT./EXT. (e.g., 'CONTINUED', 'TITLES MONTAGE') must be treated as action text and consolidated into the preceding scene unit.
+CRITICAL SEGMENTATION RULE: A new scene begins ONLY when a valid slugline (INT./EXT. location - TIME) is encountered.
+    1. STRICTNESS: Only create a new scene record when the LOCATION or TIME (DAY/NIGHT) changes.
+    2. CONSOLIDATION: Any text following a valid slugline, including headers that do not start with INT./EXT., must be consolidated into the preceding scene unit until a fundamentally different slugline is found.
 
 Return a JSON object with a "scenes" array where each item has:
 - scene_number (integer): The sequentially re-numbered scene number (1, 2, 3, etc.)
-- header (string): Exact, VERBATIM copy of the slugline.
+- header (string): Cleaned scene header (e.g., "INT. CLASSROOM - DAY")
 - content (string): The dialogue and action for that scene
 
-Fix spacing issues and ignore page numbers/titles.`
+Fix spacing issues, reconstruct proper headers, and ignore title pages.`
           },
           {
             role: 'user',
