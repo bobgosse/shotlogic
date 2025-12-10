@@ -14,7 +14,7 @@ const useToast = () => ({
 
 /**
  * Core function to read the file content based on its type
- * This is the crucial fix for FDX file loading
+ * Includes the crucial fix for FDX file loading
  */
 async function readFileContent(file: File): Promise<string> {
     const fileExtension = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
@@ -286,14 +286,10 @@ export default function Index() {
                       <div>
                         <span className="font-semibold">Shots:</span>
                         <ul className="list-disc list-inside ml-4 mt-1">
-                          {scene.analysis.shots.slice(0, 3).map((shot: any, i: number) => (
+                          {/* FIX: Display ALL shots (up to 99) */}
+                          {scene.analysis.shots.slice(0, 99).map((shot: any, i: number) => (
                             <li key={i}>{shot.description}</li>
                           ))}
-                          {scene.analysis.shots.length > 3 && (
-                            <li className="text-gray-500">
-                              ... and {scene.analysis.shots.length - 3} more
-                            </li>
-                          )}
                         </ul>
                       </div>
                     )}
