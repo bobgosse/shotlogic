@@ -41,3 +41,5 @@ const analyzeScene = async (scene: ParsedScene, totalScenes: number) => {
     const result = await response.json();
     return result.data;
 };
+// FINAL, ABSOLUTE LAST LINE OF pages/Index.tsx:
+export { Index };
