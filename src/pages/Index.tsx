@@ -77,7 +77,7 @@ function Index() {
     const uploadedFile = event.target.files?.[0]
     if (!uploadedFile) return
 
-    const extension = uploadedFile.name.split('.pop')()?.toLowerCase()
+    const extension = uploadedFile.name.split('.').pop()?.toLowerCase()
 
     if (!['txt'].includes(extension || '')) {
       showToast(
@@ -505,7 +505,8 @@ function Index() {
                   }`}
                 >
                   <div className="flex items-start justify-between mb-2">
-                    <h3 className="font-semibold flex items-center gap-2">
+                    {/* The FIX is HERE: text-gray-900 is added to the h3 tag */}
+                    <h3 className="font-semibold flex items-center gap-2 text-gray-900">
                       Scene {scene.number}
                       {scene.status === 'complete' && <CheckCircle2 className="w-5 h-5 text-green-600" />}
                       {scene.status === 'error' && <AlertCircle className="w-5 h-5 text-red-600" />}
