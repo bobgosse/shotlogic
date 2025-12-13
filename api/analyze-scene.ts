@@ -1,10 +1,54 @@
 // api/analyze-scene.ts
 // PRODUCTION: Intelligent screenplay scene analysis with shot planning
-// CRITICAL FIX: Enhanced OpenAI API key validation and error reporting
+// CRITICAL FIX: Robust Vercel environment variable access with fallback handling
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
-const DEPLOY_TIMESTAMP = "2024-12-13T05:00:00Z_ENHANCED_AUTH_CHECK"
+const DEPLOY_TIMESTAMP = "2024-12-13T06:00:00Z_FINAL_ENV_FIX"
+
+// ═══════════════════════════════════════════════════════════════
+// HELPER: SAFE ENVIRONMENT VARIABLE ACCESS
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Safely retrieves an environment variable from process.env
+ * Handles cases where process.env access might fail in serverless environments
+ * @param name - The environment variable name
+ * @returns The environment variable value or undefined
+ */
+function getEnvironmentVariable(name: string): string | undefined {
+  try {
+    // Attempt direct access
+    if (process.env && typeof process.env === 'object') {
+      const value = process.env[name]
+      if (value !== undefined && value !== null) {
+        return value
+      }
+    }
+    
+    // Fallback: try bracket notation
+    const env = process.env as { [key: string]: string | undefined }
+    if (env[name]) {
+      return env[name]
+    }
+    
+    // Fallback: try case-insensitive lookup (some platforms)
+    const envKeys = Object.keys(process.env)
+    const matchingKey = envKeys.find(k => k.toLowerCase() === name.toLowerCase())
+    if (matchingKey && process.env[matchingKey]) {
+      return process.env[matchingKey]
+    }
+    
+    return undefined
+  } catch (error) {
+    console.error(`Failed to access environment variable "${name}":`, error)
+    return undefined
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TYPE DEFINITIONS
+// ═══════════════════════════════════════════════════════════════
 
 interface AnalyzeSceneRequest {
   sceneText: string
@@ -38,6 +82,10 @@ export const config = {
   maxDuration: 30,
 }
 
+// ═══════════════════════════════════════════════════════════════
+// MAIN HANDLER
+// ═══════════════════════════════════════════════════════════════
+
 export default async function handler(
   req: VercelRequest,
   res: VercelResponse
@@ -49,6 +97,7 @@ export default async function handler(
   console.log(`📅 Timestamp: ${new Date().toISOString()}`)
   console.log(`🏷️  Deploy: ${DEPLOY_TIMESTAMP}`)
   console.log(`📍 Method: ${req.method}`)
+  console.log(`🌍 Environment: ${getEnvironmentVariable('VERCEL_ENV') || 'unknown'}`)
   
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -77,69 +126,113 @@ export default async function handler(
     // ═══════════════════════════════════════════════════════════════
     
     console.log(`🔑 [${invocationId}] ═══ AUTHENTICATION CHECK ═══`)
-    console.log(`🔑 [${invocationId}] Checking environment variables...`)
+    console.log(`🔑 [${invocationId}] Attempting to load environment variables...`)
     
-    // Step 1: Check if environment variable exists
-    let openaiKey: string | undefined
-    
+    // Step 1: Check process.env accessibility
     try {
-      openaiKey = process.env.OPENAI_API_KEY
-      console.log(`🔑 [${invocationId}] process.env.OPENAI_API_KEY: ${openaiKey ? 'EXISTS' : 'UNDEFINED'}`)
-    } catch (envError) {
-      console.error(`❌ [${invocationId}] Failed to access process.env:`, envError)
+      const envTest = process.env
+      console.log(`🔑 [${invocationId}] process.env is accessible: ${typeof envTest === 'object'}`)
+      console.log(`🔑 [${invocationId}] Total env vars available: ${Object.keys(envTest).length}`)
+    } catch (envAccessError) {
+      console.error(`❌ [${invocationId}] CRITICAL: Cannot access process.env:`, envAccessError)
       return res.status(500).json({
         error: 'Server Configuration Error',
-        message: 'Unable to access server environment variables',
-        technicalDetails: 'process.env access failed',
-        troubleshooting: 'This is a server configuration issue. Contact support.',
+        message: 'Cannot access server environment',
+        technicalDetails: 'process.env object is not accessible',
+        troubleshooting: 'This is a critical server configuration issue. Please contact Vercel support.',
         deployMarker: DEPLOY_TIMESTAMP
       })
     }
     
-    // Step 2: Check if key exists
+    // Step 2: Attempt to retrieve OpenAI API key using helper function
+    console.log(`🔑 [${invocationId}] Retrieving OPENAI_API_KEY...`)
+    const openaiKey = getEnvironmentVariable('OPENAI_API_KEY')
+    
+    console.log(`🔑 [${invocationId}] OPENAI_API_KEY status: ${openaiKey ? 'FOUND' : 'NOT FOUND'}`)
+    
     if (!openaiKey) {
       console.error(`❌ [${invocationId}] OPENAI_API_KEY is not set in environment`)
-      console.error(`❌ [${invocationId}] Available env vars: ${Object.keys(process.env).filter(k => !k.includes('SECRET') && !k.includes('KEY')).join(', ')}`)
+      
+      // Debug: List all available environment variables (excluding sensitive ones)
+      try {
+        const availableEnvVars = Object.keys(process.env)
+          .filter(k => !k.toLowerCase().includes('secret') && 
+                      !k.toLowerCase().includes('key') && 
+                      !k.toLowerCase().includes('token'))
+          .sort()
+        
+        console.error(`❌ [${invocationId}] Available (non-sensitive) env vars (${availableEnvVars.length}):`)
+        console.error(`   ${availableEnvVars.slice(0, 20).join(', ')}${availableEnvVars.length > 20 ? '...' : ''}`)
+        
+        // Check if any OpenAI-related vars exist
+        const openaiRelated = Object.keys(process.env)
+          .filter(k => k.toLowerCase().includes('openai'))
+        
+        if (openaiRelated.length > 0) {
+          console.error(`❌ [${invocationId}] OpenAI-related vars found: ${openaiRelated.join(', ')}`)
+        } else {
+          console.error(`❌ [${invocationId}] No OpenAI-related environment variables found`)
+        }
+      } catch (debugError) {
+        console.error(`❌ [${invocationId}] Cannot enumerate environment variables:`, debugError)
+      }
       
       return res.status(500).json({ 
         error: 'Server Configuration Error',
-        message: 'OpenAI API Key is missing',
-        technicalDetails: 'OPENAI_API_KEY environment variable is not set',
-        troubleshooting: 'The OpenAI API key must be configured in Vercel environment variables under Settings > Environment Variables',
+        message: 'OpenAI API Key is not configured',
+        technicalDetails: 'OPENAI_API_KEY environment variable is not set or not accessible in this Vercel deployment',
+        troubleshooting: [
+          '1. Go to Vercel Dashboard > Your Project > Settings > Environment Variables',
+          '2. Add OPENAI_API_KEY with your OpenAI API key',
+          '3. Ensure it is enabled for Production, Preview, and Development environments',
+          '4. Redeploy your application after saving the environment variable',
+          '5. If the variable is already set, try removing and re-adding it'
+        ],
+        vercelDocs: 'https://vercel.com/docs/concepts/projects/environment-variables',
         deployMarker: DEPLOY_TIMESTAMP,
         timestamp: new Date().toISOString()
       })
     }
     
-    // Step 3: Check key length (minimum valid length)
+    // Step 3: Validate key length
     if (openaiKey.length < 20) {
       console.error(`❌ [${invocationId}] OPENAI_API_KEY too short: ${openaiKey.length} characters`)
-      console.error(`❌ [${invocationId}] Key preview: ${openaiKey}`)
+      console.error(`❌ [${invocationId}] Key preview (first 20 chars): ${openaiKey.substring(0, 20)}`)
       
       return res.status(500).json({
         error: 'Server Configuration Error',
         message: 'OpenAI API Key appears to be invalid (too short)',
-        technicalDetails: `Key length: ${openaiKey.length} characters (expected 50+)`,
-        troubleshooting: 'Please verify the complete API key was copied correctly in Vercel environment variables',
+        technicalDetails: `Actual key length: ${openaiKey.length} characters (expected 50+ characters)`,
+        troubleshooting: [
+          'The API key stored in Vercel may be incomplete or corrupted',
+          'Please verify the complete API key was copied correctly',
+          'OpenAI API keys are typically 51+ characters long',
+          'Try removing and re-adding the environment variable in Vercel'
+        ],
         deployMarker: DEPLOY_TIMESTAMP,
         timestamp: new Date().toISOString()
       })
     }
     
-    // Step 4: Check valid key prefix (sk- or sk-proj-)
+    // Step 4: Validate key prefix
     const hasValidPrefix = openaiKey.startsWith('sk-proj-') || openaiKey.startsWith('sk-')
     
     if (!hasValidPrefix) {
+      const keyStart = openaiKey.substring(0, Math.min(15, openaiKey.length))
       console.error(`❌ [${invocationId}] OPENAI_API_KEY has invalid prefix`)
-      console.error(`❌ [${invocationId}] Key starts with: ${openaiKey.substring(0, 10)}...`)
+      console.error(`❌ [${invocationId}] Key starts with: ${keyStart}`)
       console.error(`❌ [${invocationId}] Expected prefix: "sk-" or "sk-proj-"`)
       
       return res.status(500).json({
         error: 'Server Configuration Error',
         message: 'OpenAI API Key format is invalid',
-        technicalDetails: `Key does not start with required prefix (sk- or sk-proj-)`,
-        keyPrefix: openaiKey.substring(0, 5) + '...',
-        troubleshooting: 'OpenAI API keys must start with "sk-" or "sk-proj-". Please verify you copied the correct key from OpenAI dashboard.',
+        technicalDetails: `Key does not start with required prefix (sk- or sk-proj-). Instead starts with: ${keyStart}`,
+        troubleshooting: [
+          'OpenAI API keys must start with "sk-" (legacy) or "sk-proj-" (project keys)',
+          'Please verify you copied the correct key from platform.openai.com/api-keys',
+          'Make sure you did not accidentally copy a different credential or token',
+          'Regenerate the API key on OpenAI and update it in Vercel'
+        ],
         deployMarker: DEPLOY_TIMESTAMP,
         timestamp: new Date().toISOString()
       })
@@ -306,15 +399,24 @@ Return ONLY valid JSON. Do not include markdown formatting or explanations outsi
       
       // Check for specific error types
       if (openaiResponse.status === 401) {
-        console.error(`❌ [${invocationId}] AUTHENTICATION FAILED`)
-        console.error(`❌ [${invocationId}] This indicates the API key is invalid or revoked`)
+        console.error(`❌ [${invocationId}] AUTHENTICATION FAILED WITH OPENAI`)
+        console.error(`❌ [${invocationId}] The API key was rejected by OpenAI servers`)
+        console.error(`❌ [${invocationId}] Key used: ${keyPreview}`)
         
         return res.status(500).json({ 
           error: 'OpenAI Authentication Failed',
           message: 'The OpenAI API key was rejected by OpenAI servers',
           technicalDetails: `HTTP ${openaiResponse.status}: ${errorText}`,
-          troubleshooting: 'The API key in Vercel environment variables may be invalid, expired, or revoked. Please verify the key at platform.openai.com and update it in Vercel.',
+          troubleshooting: [
+            'The API key in Vercel environment variables was rejected by OpenAI',
+            'This could mean the key is invalid, expired, revoked, or has no credits',
+            'Go to platform.openai.com/api-keys to verify the key status',
+            'Check platform.openai.com/account/usage to verify you have credits/quota',
+            'Try regenerating the API key and updating it in Vercel',
+            'Ensure the key has proper permissions for GPT-4 access'
+          ],
           httpStatus: openaiResponse.status,
+          keyUsed: keyPreview,
           deployMarker: DEPLOY_TIMESTAMP
         })
       } else if (openaiResponse.status === 429) {
@@ -324,7 +426,17 @@ Return ONLY valid JSON. Do not include markdown formatting or explanations outsi
           error: 'Rate Limit Exceeded',
           message: 'OpenAI API rate limit reached',
           technicalDetails: errorText,
-          troubleshooting: 'Please wait a moment before trying again',
+          troubleshooting: 'Your OpenAI account has exceeded its rate limits. Please wait before trying again or upgrade your plan.',
+          deployMarker: DEPLOY_TIMESTAMP
+        })
+      } else if (openaiResponse.status === 403) {
+        console.error(`❌ [${invocationId}] FORBIDDEN - Insufficient permissions or quota`)
+        
+        return res.status(500).json({
+          error: 'OpenAI Access Denied',
+          message: 'Access to OpenAI API denied',
+          technicalDetails: errorText,
+          troubleshooting: 'Your API key may not have permission to access GPT-4, or your account may be out of credits. Check platform.openai.com/account/usage',
           deployMarker: DEPLOY_TIMESTAMP
         })
       } else {
