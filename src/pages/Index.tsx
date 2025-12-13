@@ -648,24 +648,24 @@ function Index() {
                 )}
               </div>
               
-              {/* NEW: Visual Style Input (Moved outside main status box) */}
-              {file && !isParsing && (
-                <div className="space-y-2 p-4 bg-slate-50 rounded-lg">
-                  <label className="block text-sm font-medium text-slate-700">
-                    Visual Style (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={visualStyle}
-                    onChange={(e) => setVisualStyle(e.target.value)}
-                    placeholder="e.g., 1918 period piece, grainy stock, Film noir"
-                    className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    disabled={isProcessing}
-                  />
-                  <p className="text-xs text-slate-500">
-                    This style will be incorporated into all AI image prompts for shot planning.
-                  </p>
-                </div>
+{/* Visual Style Input - FIXED: Force black text color */}
+<div className="space-y-2">
+  <label className="block text-sm font-medium text-slate-700">
+    Visual Style (Optional)
+  </label>
+  <input
+    type="text"
+    value={visualStyle}
+    onChange={(e) => setVisualStyle(e.target.value)}
+    placeholder="e.g., 1918 period piece, grainy stock, Vittorio Storaro lighting"
+    className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+    style={{ color: '#000000', backgroundColor: '#ffffff' }}
+    disabled={isProcessing}
+  />
+  <p className="text-xs text-slate-500">
+    This style will be incorporated into all AI image prompts for pre-visualization
+  </p>
+</div>
               )}
             </div>
           )}
