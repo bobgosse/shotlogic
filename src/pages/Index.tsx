@@ -375,35 +375,35 @@ function Index() {
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
                         <p className="font-medium text-slate-700">Location</p>
-                        <p>{scene.analysis.location}</p>
+                        <p className="text-gray-900">{scene.analysis.location}</p>
                       </div>
                       <div>
                         <p className="font-medium text-slate-700">Time of Day</p>
-                        <p>{scene.analysis.timeOfDay}</p>
+                        <p className="text-gray-900">{scene.analysis.timeOfDay}</p>
                       </div>
                       <div>
                         <p className="font-medium text-slate-700">Characters</p>
-                        <p>{scene.analysis.characters.join(', ') || 'None'}</p>
+                        <p className="text-gray-900">{scene.analysis.characters.join(', ') || 'None'}</p>
                       </div>
                       <div>
                         <p className="font-medium text-slate-700">Props</p>
-                        <p>{scene.analysis.props.join(', ') || 'None'}</p>
+                        <p className="text-gray-900">{scene.analysis.props.join(', ') || 'None'}</p>
                       </div>
                       {scene.analysis.vehicles.length > 0 && (
                         <div>
                           <p className="font-medium text-slate-700">Vehicles</p>
-                          <p>{scene.analysis.vehicles.join(', ')}</p>
+                          <p className="text-gray-900">{scene.analysis.vehicles.join(', ')}</p>
                         </div>
                       )}
                       {scene.analysis.specialEquipment.length > 0 && (
                         <div>
                           <p className="font-medium text-slate-700">Special Equipment</p>
-                          <p>{scene.analysis.specialEquipment.join(', ')}</p>
+                          <p className="text-gray-900">{scene.analysis.specialEquipment.join(', ')}</p>
                         </div>
                       )}
                       <div>
                         <p className="font-medium text-slate-700">Setup Time</p>
-                        <p>{scene.analysis.estimatedSetupTime}</p>
+                        <p className="text-gray-900">{scene.analysis.estimatedSetupTime}</p>
                       </div>
                     </div>
                   )}
