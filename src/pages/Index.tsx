@@ -45,8 +45,7 @@ const analyzeScene = useCallback(async (scene: Scene, totalScenes: number): Prom
 
     } catch (e) {
         console.error(`❌ Scene ${scene.number} JSON parsing failed:`, e)
-        throw new Error('Invalid JSON response from server')
-    }
-}, []) // End useCallback
-
+throw new Error('Invalid JSON response from server')
+}
+export default Index
 // ... the rest of your Index.tsx component ...
