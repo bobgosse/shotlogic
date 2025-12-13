@@ -395,31 +395,41 @@ function Index() {
   const [storyAnalysisError, setStoryAnalysisError] = useState<string | null>(null)
   
 
-  // File upload handler - UPDATED FOR PDF/FDX/TXT
+  // File upload handler - FINAL STABLE LOGIC
   const handleFileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const uploadedFile = event.target.files?.[0]
     if (!uploadedFile) return
 
     const extension = uploadedFile.name.split('.').pop()?.toLowerCase()
 
-    if (!['txt', 'pdf', 'fdx'].includes(extension || '')) {
+    // CRITICAL FRONTEND CHECK: Reject PDF immediately
+    if (extension === 'pdf') {
+        showToast(
+            "PDF Format Not Supported",
+            "PDF files cannot be processed due to technical limitations. Please export your screenplay as .txt or .fdx (Final Draft) format.",
+            "destructive"
+        )
+        return
+    }
+
+    if (!['txt', 'fdx'].includes(extension || '')) {
       showToast(
         "Unsupported File Type",
-        `${extension?.toUpperCase()} files are not supported. Please upload .txt, .pdf, or .fdx files.`,
+        `${extension?.toUpperCase()} files are not supported. Please upload .txt or .fdx files.`,
         "destructive"
       )
       return
     }
 
     setIsParsing(true)
-    setFile(null); // Clear previous file display
-    setScenes([]); // Clear previous scenes
-    setScreenplayText(''); // Clear text
+    setFile(null); 
+    setScenes([]);
+    setScreenplayText('');
 
     try {
       let extractedText = ''
 
-      // Use the dedicated parsing API for ALL file types to standardize the pipeline
+      // Use the dedicated parsing API for ALL file types
       const base64Data = await fileToBase64(uploadedFile)
         
       // Call parsing API
@@ -435,24 +445,12 @@ function Index() {
         })
       })
 
-      const responseBody = await response.json().catch(() => ({})); // Parse JSON, gracefully handle if not JSON
+      const responseBody = await response.json().catch(() => ({})); 
 
       if (!response.ok || !responseBody.screenplayText) {
         
-        // --- START: CRITICAL NEW ERROR HANDLING ---
-        // Check for specific PDF unavailability error
-        if (responseBody.isPdfUnavailable) {
-            showToast(
-                "PDF Support Temporarily Unavailable",
-                responseBody.message || "Please use .txt or .fdx format instead.",
-                "destructive"
-            )
-            return;
-        }
-        
-        // Handle generic errors (including FDX parsing failure or other errors)
-        throw new Error(responseBody.error || `Failed to parse ${extension?.toUpperCase() || 'file'}: ${responseBody.message || 'Unknown Server Error'}`)
-        // --- END: CRITICAL NEW ERROR HANDLING ---
+        // Handle explicit server error messages
+        throw new Error(responseBody.message || responseBody.error || `Failed to parse ${extension?.toUpperCase() || 'file'}: Unknown Server Error`)
       }
 
       extractedText = responseBody.screenplayText
@@ -654,13 +652,13 @@ function Index() {
             Upload Screenplay
           </h2>
           <p className="text-sm text-slate-600">
-            Upload a **.txt, .pdf, or .fdx** screenplay file to begin analysis.
+            Upload a **.txt or .fdx (Final Draft)** screenplay file to begin analysis.
           </p>
           
           <div className="flex items-center gap-4">
             <input
               type="file"
-              accept=".txt,.pdf,.fdx"
+              accept=".txt,.fdx" // UPDATED to only allow stable formats
               onChange={handleFileUpload}
               disabled={isProcessing || isStoryAnalyzing || isParsing}
               className="flex-1 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer disabled:opacity-50"
