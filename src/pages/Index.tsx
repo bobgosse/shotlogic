@@ -267,7 +267,7 @@ function Index() {
             ShotLogic
           </h1>
           <p className="text-xl text-slate-600">
-            AI-Powered Screenplay Analysis for Production Planning
+            Screenplay Story Analysis and Initial Shot List Generator
           </p>
         </div>
 
