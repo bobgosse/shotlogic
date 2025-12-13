@@ -1,83 +1,180 @@
-import { VercelRequest, VercelResponse } from '@vercel/node'
-import OpenAI from 'openai'
+// api/analyze-story.ts
+// Vercel Serverless Function for analyzing overall screenplay story structure
 
-// Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+import type { VercelRequest, VercelResponse } from '@vercel/node'
 
-// Define the JSON structure we want the AI to return
-interface StoryAnalysisResponse {
-  logline: string
-  mainConflict: string
-  characterArcsSummary: string
-  themes: string[]
-  genreClassification: string
+const DEPLOY_TIMESTAMP = "2024-12-13T01:00:00Z_STORY_ANALYZER"
+const MAX_TEXT_LENGTH = 100000 // 100k characters max
+
+interface StoryAnalysisRequest {
+  screenplayText: string
+  title?: string
 }
 
-const ANALYZE_STORY_PROMPT = (screenplayText: string): string => `
-You are an expert story analyst and film professional. Your task is to perform a high-level narrative analysis of the provided screenplay text.
+// CRITICAL FIX: Set maxDuration to prevent Vercel timeouts for large analysis tasks
+export const config = {
+  maxDuration: 60, // Allow up to 60 seconds for story analysis
+}
 
-Analyze the entire screenplay provided below and extract the following:
-1. Logline: A concise, one-sentence summary (25 words max).
-2. Main Conflict: The central, driving struggle of the story.
-3. Character Arcs Summary: A brief summary of the emotional/developmental journeys for the main 3-5 characters.
-4. Themes: A list of 3-5 key thematic elements explored in the story.
-5. Genre Classification: The primary and secondary genre (e.g., "Neo-Noir Thriller").
-
-Return the analysis STRICTLY as a single JSON object that conforms to the StoryAnalysisResponse TypeScript interface. DO NOT include any text outside the JSON object.
-
-Screenplay Text:
----
-${screenplayText}
----
-`
-
-export default async (request: VercelRequest, response: VercelResponse) => {
-  if (request.method !== 'POST') {
-    return response.status(405).json({ error: 'Method Not Allowed' })
+export default async function handler(
+  req: VercelRequest,
+  res: VercelResponse
+) {
+  const invocationId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  const startTime = Date.now()
+  
+  console.log(`\n📚 [${invocationId}] ═══════════════════════════════`)
+  console.log(`📅 Timestamp: ${new Date().toISOString()}`)
+  console.log(`🏷️  Deploy: ${DEPLOY_TIMESTAMP}`)
+  
+  // CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+  
+  // Handle OPTIONS preflight
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end()
   }
-
-  // Basic validation
-  const { screenplayText } = request.body
-  if (!screenplayText || typeof screenplayText !== 'string') {
-    return response.status(400).json({ error: 'Missing or invalid screenplayText in request body.' })
-  }
-
-  // Check for API key
-  if (!process.env.OPENAI_API_KEY) {
-    return response.status(500).json({ error: 'OPENAI_API_KEY is not set in environment variables.' })
+  
+  // Only accept POST
+  if (req.method !== 'POST') {
+    return res.status(405).json({ 
+      error: 'Method not allowed. Use POST.',
+      deployMarker: DEPLOY_TIMESTAMP 
+    })
   }
 
   try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini", // Using a powerful, cost-effective model for text analysis
-      messages: [{ 
-        role: "user", 
-        content: ANALYZE_STORY_PROMPT(screenplayText) 
-      }],
-      response_format: { type: "json_object" },
-      temperature: 0.2,
-    })
-
-    const analysisJson = completion.choices[0].message.content
+    // CRITICAL FIX: Get OpenAI API key INSIDE the handler and check explicitly
+    let openaiKey: string | undefined
     
-    if (!analysisJson) {
-      throw new Error("AI returned an empty response.")
+    try {
+      openaiKey = process.env.OPENAI_API_KEY || process.env.OPENAI_KEY
+    } catch (envError) {
+      console.error(`❌ [${invocationId}] Environment access error:`, envError)
+    }
+    
+    if (!openaiKey) {
+      console.error(`❌ [${invocationId}] OPENAI_API_KEY not found`)
+      return res.status(500).json({ 
+        error: 'Server configuration error: OPENAI_API_KEY not set',
+        details: 'The OpenAI API key must be configured in Vercel environment variables',
+        deployMarker: DEPLOY_TIMESTAMP
+      })
+    }
+    
+    // Parse request body
+    let requestBody: StoryAnalysisRequest
+    try {
+      requestBody = req.body
+    } catch (jsonError) {
+      console.error(`❌ [${invocationId}] Failed to parse request JSON:`, jsonError)
+      return res.status(400).json({ 
+        error: 'Invalid request body',
+        details: 'Request body must be valid JSON',
+        deployMarker: DEPLOY_TIMESTAMP
+      })
+    }
+    
+    const { screenplayText, title } = requestBody
+    
+    // Validate inputs
+    if (!screenplayText) {
+      return res.status(400).json({ 
+        error: 'Missing required field: screenplayText',
+        deployMarker: DEPLOY_TIMESTAMP
+      })
     }
 
-    const storyAnalysis: StoryAnalysisResponse = JSON.parse(analysisJson)
+    if (screenplayText.length > MAX_TEXT_LENGTH) {
+      return res.status(400).json({ 
+        error: 'Screenplay text too long',
+        maxLength: MAX_TEXT_LENGTH,
+        receivedLength: screenplayText.length,
+        deployMarker: DEPLOY_TIMESTAMP
+      })
+    }
 
-    response.status(200).json({ 
-      status: 'success',
-      data: storyAnalysis
+    if (screenplayText.trim().length < 500) {
+      return res.status(400).json({ 
+        error: 'Screenplay text too short for story analysis',
+        deployMarker: DEPLOY_TIMESTAMP
+      })
+    }
+
+    // Call OpenAI API - USING FETCH (NOT SDK) for maximum compatibility on Vercel
+    const prompt = `Analyze this ${title ? `screenplay titled "${title}"` : 'screenplay'}:\n\n${screenplayText}\n\nReturn a JSON object with these keys:\n- logline (string): One-sentence story summary\n- genre (string): Primary genre\n- themes (array of strings): Major themes\n- protagonist (string): Main character name and brief description\n- antagonist (string): Main opposing force\n- acts (object): Three-act structure breakdown with act1, act2, act3 keys, each containing a brief summary\n- tone (string): Overall tone/mood\n- estimatedBudget (string): Rough budget category (low/medium/high)\n- targetAudience (string): Primary demographic\n- uniqueSellingPoint (string): What makes this story distinctive`
+    
+    const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openaiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o', // Use a robust model for comprehensive analysis
+          messages: [
+            {
+              role: 'system',
+              content: 'You are an expert screenplay analyst. Analyze the overall story structure, themes, and narrative arc of the screenplay. Return ONLY valid JSON with no markdown formatting.'
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          temperature: 0.5,
+          max_tokens: 2000,
+          response_format: { type: 'json_object' }
+        }),
+    })
+
+    if (!openaiResponse.ok) {
+      const errorText = await openaiResponse.text()
+      return res.status(500).json({ 
+        error: `OpenAI API error: ${openaiResponse.status}`,
+        details: errorText,
+        deployMarker: DEPLOY_TIMESTAMP
+      })
+    }
+
+    const aiResult = await openaiResponse.json()
+    const messageContent = aiResult.choices?.[0]?.message.content
+    
+    if (!messageContent) {
+      throw new Error('OpenAI returned no valid message content')
+    }
+    
+    let storyAnalysis
+    try {
+      storyAnalysis = JSON.parse(messageContent)
+    } catch (parseError) {
+      throw new Error(`Invalid JSON from OpenAI: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`)
+    }
+    
+    // Return success
+    const totalDuration = Date.now() - startTime
+    return res.status(200).json({
+      data: storyAnalysis,
+      meta: {
+        title: title || 'Untitled',
+        textLength: screenplayText.length,
+        processingTime: totalDuration,
+        deployMarker: DEPLOY_TIMESTAMP,
+        platform: 'vercel-serverless'
+      }
     })
 
   } catch (error) {
-    console.error('OpenAI Story Analysis Error:', error)
-    response.status(500).json({ 
-      error: 'Failed to generate story analysis.', 
-      details: error instanceof Error ? error.message : 'Unknown error'
+    const totalDuration = Date.now() - startTime
+    
+    return res.status(500).json({ 
+      error: error instanceof Error ? error.message : 'Story analysis failed',
+      errorType: error instanceof Error ? error.constructor.name : 'Unknown',
+      deployMarker: DEPLOY_TIMESTAMP,
+      processingTime: totalDuration,
+      platform: 'vercel-serverless'
     })
   }
 }
