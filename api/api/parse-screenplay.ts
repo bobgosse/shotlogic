@@ -1,11 +1,20 @@
 // api/parse-screenplay.ts
 // Vercel Serverless Function for parsing screenplay files (PDF, FDX)
+// PRODUCTION FIX: PDF parsing wrapped in safe guard due to native binding issues
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import pdf from 'pdf-parse'
 import { XMLParser } from 'fast-xml-parser'
 
-const DEPLOY_TIMESTAMP = "2024-12-13T00:00:00Z_SCREENPLAY_PARSER"
+// Conditionally import pdf-parse to prevent initialization errors
+let pdfParse: any = null
+try {
+  pdfParse = require('pdf-parse')
+  console.log('✅ pdf-parse loaded successfully')
+} catch (error) {
+  console.warn('⚠️  pdf-parse failed to load:', error)
+}
+
+const DEPLOY_TIMESTAMP = "2024-12-13T02:00:00Z_PDF_SAFEGUARD"
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB limit
 
 interface ParseRequest {
@@ -14,12 +23,17 @@ interface ParseRequest {
   fileType: 'txt' | 'pdf' | 'fdx'
 }
 
-// Parse PDF file and extract text
+// Parse PDF file and extract text - WRAPPED IN SAFE GUARD
 async function parsePDF(buffer: Buffer): Promise<string> {
-  console.log(`📄 Parsing PDF (${buffer.length} bytes)...`)
+  console.log(`📄 Attempting PDF parse (${buffer.length} bytes)...`)
+  
+  // Check if pdf-parse is available
+  if (!pdfParse) {
+    throw new Error('PDF_LIBRARY_UNAVAILABLE')
+  }
   
   try {
-    const data = await pdf(buffer)
+    const data = await pdfParse(buffer)
     
     console.log(`✅ PDF parsed successfully`)
     console.log(`   - Pages: ${data.numpages}`)
@@ -38,12 +52,22 @@ async function parsePDF(buffer: Buffer): Promise<string> {
     return cleanText
     
   } catch (error) {
-    console.error('PDF parsing error:', error)
+    console.error('PDF parsing internal error:', error)
+    
+    // Re-throw with library unavailable flag if it's a native binding issue
+    if (error instanceof Error && 
+        (error.message.includes('Canvas') || 
+         error.message.includes('node-gyp') ||
+         error.message.includes('binding') ||
+         error.message.includes('MODULE_NOT_FOUND'))) {
+      throw new Error('PDF_LIBRARY_UNAVAILABLE')
+    }
+    
     throw new Error(`Failed to parse PDF: ${error instanceof Error ? error.message : 'Unknown error'}`)
   }
 }
 
-// Parse FDX (Final Draft XML) file and extract screenplay text
+// Parse FDX (Final Draft XML) file and extract screenplay text - UNCHANGED
 async function parseFDX(buffer: Buffer): Promise<string> {
   console.log(`📝 Parsing FDX (${buffer.length} bytes)...`)
   
@@ -62,7 +86,6 @@ async function parseFDX(buffer: Buffer): Promise<string> {
     const xmlDoc = parser.parse(xmlText)
     
     // Navigate Final Draft XML structure
-    // Typical structure: FinalDraft -> Content -> Paragraph[]
     const finalDraft = xmlDoc.FinalDraft
     if (!finalDraft) {
       throw new Error('Invalid FDX file: Missing FinalDraft root element')
@@ -161,6 +184,7 @@ export default async function handler(
   console.log(`📅 Timestamp: ${new Date().toISOString()}`)
   console.log(`🏷️  Deploy: ${DEPLOY_TIMESTAMP}`)
   console.log(`📍 Method: ${req.method}`)
+  console.log(`🔧 PDF Library Status: ${pdfParse ? 'LOADED' : 'UNAVAILABLE'}`)
   
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -208,6 +232,18 @@ export default async function handler(
       })
     }
     
+    // CRITICAL: Check if PDF parsing is requested but library unavailable
+    if (fileType === 'pdf' && !pdfParse) {
+      console.error(`❌ [${invocationId}] PDF parsing requested but library unavailable`)
+      return res.status(503).json({
+        error: 'PDF support temporarily disabled',
+        message: 'PDF file processing is currently unavailable due to server environment limitations. Please convert your screenplay to .txt or .fdx format, or try again later.',
+        supportedFormats: ['txt', 'fdx'],
+        isPdfUnavailable: true,
+        deployMarker: DEPLOY_TIMESTAMP
+      })
+    }
+    
     // Decode base64 to buffer
     const buffer = Buffer.from(fileData, 'base64')
     console.log(`📦 [${invocationId}] Decoded buffer size: ${buffer.length} bytes`)
@@ -232,11 +268,52 @@ export default async function handler(
     } 
     else if (fileType === 'pdf') {
       console.log(`📄 [${invocationId}] Processing PDF file...`)
-      screenplayText = await parsePDF(buffer)
+      
+      // CRITICAL: PDF parsing wrapped in specific error handling
+      try {
+        screenplayText = await parsePDF(buffer)
+        console.log(`✅ [${invocationId}] PDF processed successfully`)
+      } catch (pdfError) {
+        console.error(`❌ [${invocationId}] PDF parsing failed:`, pdfError)
+        
+        // Check if it's a library unavailability error
+        if (pdfError instanceof Error && pdfError.message === 'PDF_LIBRARY_UNAVAILABLE') {
+          return res.status(503).json({
+            error: 'PDF support temporarily disabled',
+            message: 'PDF file processing is currently unavailable due to server environment limitations. Please convert your screenplay to .txt or .fdx format, or try again later.',
+            technicalDetails: 'The PDF parsing library has native dependencies that are not compatible with the current serverless environment.',
+            supportedFormats: ['txt', 'fdx'],
+            isPdfUnavailable: true,
+            deployMarker: DEPLOY_TIMESTAMP
+          })
+        }
+        
+        // Other PDF errors
+        return res.status(500).json({
+          error: 'PDF parsing failed',
+          message: 'Failed to extract text from the PDF file. The file may be corrupted, password-protected, or contain only images.',
+          details: pdfError instanceof Error ? pdfError.message : 'Unknown error',
+          suggestion: 'Please try converting your screenplay to .txt or .fdx format.',
+          supportedFormats: ['txt', 'fdx'],
+          deployMarker: DEPLOY_TIMESTAMP
+        })
+      }
     } 
     else if (fileType === 'fdx') {
       console.log(`📝 [${invocationId}] Processing FDX file...`)
-      screenplayText = await parseFDX(buffer)
+      try {
+        screenplayText = await parseFDX(buffer)
+        console.log(`✅ [${invocationId}] FDX processed successfully`)
+      } catch (fdxError) {
+        console.error(`❌ [${invocationId}] FDX parsing failed:`, fdxError)
+        return res.status(500).json({
+          error: 'FDX parsing failed',
+          message: 'Failed to parse the Final Draft file. The file may be corrupted or use an unsupported FDX version.',
+          details: fdxError instanceof Error ? fdxError.message : 'Unknown error',
+          suggestion: 'Please export your screenplay from Final Draft as .txt format.',
+          deployMarker: DEPLOY_TIMESTAMP
+        })
+      }
     }
     
     // Validate result

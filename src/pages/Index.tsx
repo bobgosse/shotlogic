@@ -32,6 +32,7 @@ async function fileToBase64(file: File): Promise<string> {
 
 // Utility: Extract scenes from screenplay text
 function extractScenes(screenplayText: string): Scene[] {
+  // Regex to split on INT. or EXT. while keeping the marker in the scene text
   const sceneMarkers = screenplayText.split(/(?=(?:INT\.|EXT\.))/i)
   
   const scenes: Scene[] = sceneMarkers
@@ -434,10 +435,24 @@ function Index() {
         })
       })
 
-      const responseBody = await response.json()
+      const responseBody = await response.json().catch(() => ({})); // Parse JSON, gracefully handle if not JSON
 
       if (!response.ok || !responseBody.screenplayText) {
-        throw new Error(responseBody.error || `Failed to parse ${extension?.toUpperCase() || 'file'}`)
+        
+        // --- START: CRITICAL NEW ERROR HANDLING ---
+        // Check for specific PDF unavailability error
+        if (responseBody.isPdfUnavailable) {
+            showToast(
+                "PDF Support Temporarily Unavailable",
+                responseBody.message || "Please use .txt or .fdx format instead.",
+                "destructive"
+            )
+            return;
+        }
+        
+        // Handle generic errors (including FDX parsing failure or other errors)
+        throw new Error(responseBody.error || `Failed to parse ${extension?.toUpperCase() || 'file'}: ${responseBody.message || 'Unknown Server Error'}`)
+        // --- END: CRITICAL NEW ERROR HANDLING ---
       }
 
       extractedText = responseBody.screenplayText
