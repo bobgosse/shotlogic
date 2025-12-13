@@ -377,14 +377,16 @@ function Index() {
           </div>
 
           {file && (
-            <div className="flex items-center gap-2 p-4 bg-slate-50 rounded-lg">
-              <FileText className="w-5 h-5 text-blue-600" />
-              <div className="flex-1">
-                <p className="font-medium">{file.name}</p>
-                <p className="text-sm text-slate-600">
-                  {scenes.length} scene{scenes.length !== 1 ? 's' : ''} detected
-                </p>
-              </div>
+          <div className="flex items-center gap-2 p-4 bg-slate-50 rounded-lg text-gray-900">
+  <FileText className="w-5 h-5 text-blue-600" />
+  <div className="flex-1">
+    <p className="font-medium">{file.name}</p>
+    <p className="text-sm text-slate-600">
+      {scenes.length} scene{scenes.length !== 1 ? 's' : ''} detected
+    </p>
+  </div>
+  {/* ... rest of the buttons ... */}
+</div>
               
               {/* Story Analysis Button */}
               {scenes.length > 0 && !isProcessing && !storyAnalysis && (
