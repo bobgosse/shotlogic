@@ -121,13 +121,22 @@ function AnalysisDisplay({
     })
 
     const totalLocations = locations.size
-    const totalCharacters = new Set(completedScenes.flatMap(s => s.analysis?.characters || [])).size
+    // Use Array.prototype.flat() and Set for unique characters across all completed scenes
+    const allCharacters = completedScenes.flatMap(s => s.analysis?.characters || [])
+    const totalCharacters = new Set(allCharacters).size
+    
+    // Calculate character frequency for the Producing tab
+    const characterFrequency = allCharacters.reduce((counts, char) => {
+      counts[char] = (counts[char] || 0) + 1;
+      return counts;
+    }, {} as Record<string, number>)
 
     return {
       totalLocations,
       totalCharacters,
       totalSetupTimeHours: (totalSetupTimeMinutes / 60).toFixed(1),
       avgSetupPerScene: completedScenes.length > 0 ? (totalSetupTimeMinutes / completedScenes.length).toFixed(0) : 0,
+      characterFrequency,
     }
   }, [completedScenes])
 
@@ -148,39 +157,52 @@ function AnalysisDisplay({
 
   const renderContent = () => {
     // --- Story Analysis Tab (using RichStoryAnalysis data) ---
-    if (activeTab === 'story' && storyAnalysis) {
+    if (activeTab === 'story') {
+      if (!storyAnalysis) {
+        return (
+          <div className="text-center p-10 bg-slate-50 rounded-lg">
+            <AlertCircle className="w-8 h-8 text-red-500 mx-auto mb-4" />
+            <p className="text-xl font-semibold text-red-700">Story Analysis Not Available</p>
+            <p className="text-slate-600">Please click "Analyze Story" or check if the analysis encountered an error.</p>
+          </div>
+        )
+      }
+      
+      // DEFENSISE RENDERING ADDED HERE
+      const sa = storyAnalysis; // Alias for cleaner access
+
       return (
         <div className="space-y-6">
           <div className="bg-blue-50 border-l-4 border-blue-400 p-4">
             <p className="text-xl font-semibold text-blue-800 mb-2">Logline</p>
-            <p className="text-lg italic text-gray-900">{storyAnalysis.logline}</p>
+            <p className="text-lg italic text-gray-900">{sa.logline || 'N/A'}</p>
           </div>
 
           <div className="grid grid-cols-2 gap-6">
             <div>
               <p className="font-medium text-slate-700 mb-1">Genre Classification</p>
-              <p className="text-gray-900">{storyAnalysis.genre}</p>
+              <p className="text-gray-900">{sa.genre || 'N/A'}</p>
             </div>
             <div>
               <p className="font-medium text-slate-700 mb-1">Target Audience</p>
-              <p className="text-gray-900">{storyAnalysis.targetAudience}</p>
+              <p className="text-gray-900">{sa.targetAudience || 'N/A'}</p>
             </div>
           </div>
           
           <div>
             <p className="font-medium text-slate-700 mb-1">Protagonist & Antagonist</p>
             <p className="text-gray-900">
-              **Protagonist:** {storyAnalysis.protagonist}
+              **Protagonist:** {sa.protagonist || 'N/A'}
             </p>
             <p className="text-gray-900">
-              **Antagonist:** {storyAnalysis.antagonist}
+              **Antagonist:** {sa.antagonist || 'N/A'}
             </p>
           </div>
 
           <div>
             <p className="font-medium text-slate-700 mb-1">Key Themes & Tone</p>
-            <p className="text-gray-900">**Themes:** {storyAnalysis.themes.join(', ')}</p>
-            <p className="text-gray-900">**Tone:** {storyAnalysis.tone}</p>
+            <p className="text-gray-900">**Themes:** {(sa.themes && Array.isArray(sa.themes) ? sa.themes.join(', ') : sa.themes || 'N/A')}</p>
+            <p className="text-gray-900">**Tone:** {sa.tone || 'N/A'}</p>
           </div>
 
           <div className="space-y-4 pt-4 border-t border-slate-200">
@@ -188,22 +210,22 @@ function AnalysisDisplay({
             <div className="grid grid-cols-3 gap-4 text-sm">
               <div className="p-3 bg-slate-50 rounded-lg">
                 <p className="font-bold mb-1">ACT I</p>
-                <p className="text-gray-700">{storyAnalysis.acts.act1}</p>
+                <p className="text-gray-700">{sa.acts?.act1 || 'N/A'}</p>
               </div>
               <div className="p-3 bg-slate-50 rounded-lg">
                 <p className="font-bold mb-1">ACT II</p>
-                <p className="text-gray-700">{storyAnalysis.acts.act2}</p>
+                <p className="text-gray-700">{sa.acts?.act2 || 'N/A'}</p>
               </div>
               <div className="p-3 bg-slate-50 rounded-lg">
                 <p className="font-bold mb-1">ACT III</p>
-                <p className="text-gray-700">{storyAnalysis.acts.act3}</p>
+                <p className="text-gray-700">{sa.acts?.act3 || 'N/A'}</p>
               </div>
             </div>
           </div>
 
           <div>
             <p className="font-medium text-slate-700 mb-1">Unique Selling Point</p>
-            <p className="text-gray-900">{storyAnalysis.uniqueSellingPoint}</p>
+            <p className="text-gray-900">{sa.uniqueSellingPoint || 'N/A'}</p>
           </div>
         </div>
       )
@@ -211,6 +233,17 @@ function AnalysisDisplay({
 
     // --- Directing Overview Tab ---
     if (activeTab === 'directing') {
+      // Defensive check for scene data
+      if (scenes.length === 0) {
+         return (
+          <div className="text-center p-10 bg-slate-50 rounded-lg">
+            <AlertCircle className="w-8 h-8 text-red-500 mx-auto mb-4" />
+            <p className="text-xl font-semibold text-red-700">Scene Breakdown Not Run</p>
+            <p className="text-slate-600">Please click "Process Scene Breakdown" to generate directing data.</p>
+          </div>
+        )
+      }
+      
       return (
         <div className="space-y-6">
           <div className="grid grid-cols-3 gap-6 text-center">
@@ -246,7 +279,7 @@ function AnalysisDisplay({
               >
                 <div className="flex items-start justify-between mb-2">
                   <h4 className="font-semibold flex items-center gap-2 text-gray-900">
-                    Scene {scene.number}: {scene.analysis?.location} ({scene.analysis?.timeOfDay})
+                    Scene {scene.number}: {scene.analysis?.location || 'N/A'} ({scene.analysis?.timeOfDay || 'N/A'})
                     {scene.status === 'complete' && <CheckCircle2 className="w-4 h-4 text-green-600" />}
                     {scene.status === 'error' && <AlertCircle className="w-4 h-4 text-red-600" />}
                   </h4>
@@ -255,17 +288,18 @@ function AnalysisDisplay({
                 {scene.analysis && (
                   <div className="grid grid-cols-2 gap-2 text-sm text-gray-700">
                     <p>
-                      **Characters:** {scene.analysis.characters.join(', ') || 'None'}
+                      **Characters:** {(scene.analysis.characters || []).join(', ') || 'None'}
                     </p>
                     <p>
-                      **Key Props:** {scene.analysis.props.join(', ') || 'None'}
+                      **Key Props:** {(scene.analysis.props || []).join(', ') || 'None'}
                     </p>
                     <p className="col-span-2">
-                      **Estimated Setup:** {scene.analysis.estimatedSetupTime}
+                      **Estimated Setup:** {scene.analysis.estimatedSetupTime || 'N/A'}
                     </p>
                   </div>
                 )}
                 {scene.error && <p className="text-red-600 text-sm mt-2">Error: {scene.error}</p>}
+                {scene.status === 'pending' && <p className="text-slate-500 text-sm mt-2">Pending Analysis</p>}
               </div>
             ))}
           </div>
@@ -275,12 +309,23 @@ function AnalysisDisplay({
     
     // --- Producing Requirements Tab ---
     if (activeTab === 'producing') {
+      // Defensive check for scene data
+      if (scenes.length === 0) {
+         return (
+          <div className="text-center p-10 bg-slate-50 rounded-lg">
+            <AlertCircle className="w-8 h-8 text-red-500 mx-auto mb-4" />
+            <p className="text-xl font-semibold text-red-700">Scene Breakdown Not Run</p>
+            <p className="text-slate-600">Please click "Process Scene Breakdown" to generate producing data.</p>
+          </div>
+        )
+      }
+      
       return (
         <div className="space-y-6">
            {storyAnalysis && (
             <div className="bg-orange-50 border-l-4 border-orange-400 p-4 mb-4">
               <p className="text-xl font-semibold text-orange-800 mb-2">Estimated Budget</p>
-              <p className="text-lg italic text-gray-900">{storyAnalysis.estimatedBudget}</p>
+              <p className="text-lg italic text-gray-900">{storyAnalysis.estimatedBudget || 'N/A'}</p>
             </div>
            )}
 
@@ -318,10 +363,7 @@ function AnalysisDisplay({
                 <p className="font-bold text-slate-700 mb-1">Casting Impact</p>
                 <p className="text-sm text-gray-700">
                   Total Characters: {aggregatedData.totalCharacters} | 
-                  Major Characters: ({completedScenes.flatMap(s => s.analysis?.characters || []).reduce((counts, char) => {
-                    counts[char] = (counts[char] || 0) + 1;
-                    return counts;
-                  }, {} as Record<string, number>) || 'N/A'})
+                  Major Characters: {Object.keys(aggregatedData.characterFrequency).map(char => `${char} (${aggregatedData.characterFrequency[char]})`).join(', ') || 'N/A'}
                 </p>
             </div>
           </div>
@@ -345,9 +387,9 @@ function AnalysisDisplay({
               {completedScenes.map((scene) => (
                 <tr key={scene.number} className="hover:bg-slate-50">
                   <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">{scene.number}</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-700">{scene.analysis?.location}</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-700">{scene.analysis?.timeOfDay}</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-700">{scene.analysis?.estimatedSetupTime}</td>
+                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-700">{scene.analysis?.location || 'N/A'}</td>
+                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-700">{scene.analysis?.timeOfDay || 'N/A'}</td>
+                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-700">{scene.analysis?.estimatedSetupTime || 'N/A'}</td>
                 </tr>
               ))}
             </tbody>
@@ -630,7 +672,8 @@ function Index() {
 
   // Check if both the basic scene breakdown and the story analysis are done
   const analysisComplete = scenes.filter(s => s.status === 'complete' || s.status === 'error').length === scenes.length;
-  const readyToDisplayTabs = analysisComplete && storyAnalysis;
+  // NOTE: We only display the tabs if the scene analysis is done AND story analysis has been ATTEMPTED
+  const readyToDisplayTabs = analysisComplete && (storyAnalysis || storyAnalysisError);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-8">
@@ -658,7 +701,7 @@ function Index() {
           <div className="flex items-center gap-4">
             <input
               type="file"
-              accept=".txt,.fdx" // UPDATED to only allow stable formats
+              accept=".txt,.fdx" 
               onChange={handleFileUpload}
               disabled={isProcessing || isStoryAnalyzing || isParsing}
               className="flex-1 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer disabled:opacity-50"
@@ -699,7 +742,7 @@ function Index() {
                   {/* Story Analysis Button */}
                   <button
                     onClick={handleAnalyzeStory}
-                    disabled={isStoryAnalyzing}
+                    disabled={isStoryAnalyzing || analysisComplete} // Disable if scene analysis is running/done
                     className="px-4 py-2 rounded-md bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 flex items-center gap-1"
                   >
                     {isStoryAnalyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <BookOpen className="w-4 h-4" />}
