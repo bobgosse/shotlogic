@@ -42,6 +42,7 @@ interface StoryAnalysis {
 
 // Utility: Extract scenes from screenplay text
 function extractScenes(screenplayText: string): Scene[] {
+  // Regex to split on INT. or EXT. while keeping the marker in the scene text
   const sceneMarkers = screenplayText.split(/(?=(?:INT\.|EXT\.))/i)
   
   const scenes: Scene[] = sceneMarkers
@@ -61,12 +62,12 @@ function extractScenes(screenplayText: string): Scene[] {
 function Index() {
   const [file, setFile] = useState<File | null>(null)
   const [scenes, setScenes] = useState<Scene[]>([])
-  const [screenplayText, setScreenplayText] = useState('') // New state to hold full text
+  const [screenplayText, setScreenplayText] = useState('') 
   const [isProcessing, setIsProcessing] = useState(false)
   const [progress, setProgress] = useState(0)
   const [currentScene, setCurrentScene] = useState(0)
   
-  // NEW STATE for Story Analysis
+  // State for Story Analysis
   const [storyAnalysis, setStoryAnalysis] = useState<StoryAnalysis | null>(null)
   const [isStoryAnalyzing, setIsStoryAnalyzing] = useState(false)
   const [storyAnalysisError, setStoryAnalysisError] = useState<string | null>(null)
@@ -112,9 +113,9 @@ function Index() {
       }
 
       setFile(uploadedFile)
-      setScreenplayText(text) // Save full text here
+      setScreenplayText(text)
       setScenes(extractedScenes)
-      setStoryAnalysis(null) // Clear old analysis
+      setStoryAnalysis(null)
       setStoryAnalysisError(null)
       setProgress(0)
       setCurrentScene(0)
@@ -262,7 +263,7 @@ function Index() {
   }, [scenes, analyzeScene])
 
 
-  // NEW LOGIC: Analyze full story
+  // Analyze full story
   const handleAnalyzeStory = useCallback(async () => {
     if (!screenplayText) {
       showToast(
@@ -302,7 +303,18 @@ function Index() {
         throw new Error('No story analysis data returned')
       }
 
-      setStoryAnalysis(result.data)
+      // Map the robust AI response structure to the local StoryAnalysis interface
+      const rawAnalysis = result.data;
+      const finalAnalysis: StoryAnalysis = {
+          logline: rawAnalysis.logline || rawAnalysis.acts?.logline || 'Logline not provided by AI.',
+          mainConflict: `Protagonist: ${rawAnalysis.protagonist || 'N/A'}\nAntagonist: ${rawAnalysis.antagonist || 'N/A'}`,
+          characterArcsSummary: rawAnalysis.acts?.act1 || 'Full Act Breakdown is not yet available.', // Using act1 as a temporary placeholder for summary until we build a dedicated UI section
+          themes: Array.isArray(rawAnalysis.themes) ? rawAnalysis.themes : (rawAnalysis.themes ? [rawAnalysis.themes] : []),
+          genreClassification: rawAnalysis.genre || 'N/A',
+      };
+
+
+      setStoryAnalysis(finalAnalysis)
       showToast("Story Analysis Complete!", "High-level summary generated.")
 
     } catch (error) {
@@ -317,7 +329,7 @@ function Index() {
       setIsStoryAnalyzing(false)
     }
 
-  }, [screenplayText]) // Added dependency: screenplayText
+  }, [screenplayText])
 
 
   const handleReset = useCallback(() => {
@@ -327,7 +339,7 @@ function Index() {
     setProgress(0)
     setCurrentScene(0)
     setIsProcessing(false)
-    setStoryAnalysis(null) // Reset story analysis
+    setStoryAnalysis(null)
     setStoryAnalysisError(null)
     setIsStoryAnalyzing(false)
   }, [])
@@ -377,16 +389,15 @@ function Index() {
           </div>
 
           {file && (
-          <div className="flex items-center gap-2 p-4 bg-slate-50 rounded-lg text-gray-900">
-  <FileText className="w-5 h-5 text-blue-600" />
-  <div className="flex-1">
-    <p className="font-medium">{file.name}</p>
-    <p className="text-sm text-slate-600">
-      {scenes.length} scene{scenes.length !== 1 ? 's' : ''} detected
-    </p>
-  </div>
-  {/* ... rest of the buttons ... */}
-</div>
+            // FIX HERE: Added text-gray-900 to make the file name and scene count readable
+            <div className="flex items-center gap-2 p-4 bg-slate-50 rounded-lg text-gray-900"> 
+              <FileText className="w-5 h-5 text-blue-600" />
+              <div className="flex-1">
+                <p className="font-medium">{file.name}</p>
+                <p className="text-sm text-slate-600">
+                  {scenes.length} scene{scenes.length !== 1 ? 's' : ''} detected
+                </p>
+              </div>
               
               {/* Story Analysis Button */}
               {scenes.length > 0 && !isProcessing && !storyAnalysis && (
@@ -414,7 +425,7 @@ function Index() {
           )}
         </div>
         
-        {/* Story Analysis Results Card (NEW SECTION) */}
+        {/* Story Analysis Results Card */}
         {storyAnalysis && (
           <div className="bg-white rounded-lg border shadow-xl p-6">
             <h2 className="text-2xl font-semibold mb-4 flex items-center gap-2 text-purple-700">
@@ -433,7 +444,7 @@ function Index() {
               {/* Main Conflict */}
               <div>
                 <p className="font-medium text-slate-700">Main Conflict</p>
-                <p className="text-gray-900">{storyAnalysis.mainConflict}</p>
+                <p className="text-gray-900 whitespace-pre-line">{storyAnalysis.mainConflict}</p>
               </div>
               
               {/* Genre */}
@@ -448,9 +459,9 @@ function Index() {
                 <p className="text-gray-900">{storyAnalysis.themes.join(', ')}</p>
               </div>
               
-              {/* Character Arcs */}
+              {/* Character Arcs (Placeholder for Act 1 summary) */}
               <div>
-                <p className="font-medium text-slate-700">Character Arcs Summary</p>
+                <p className="font-medium text-slate-700">Act Summary (Placeholder)</p>
                 <p className="text-gray-900 whitespace-pre-line">{storyAnalysis.characterArcsSummary}</p>
               </div>
             </div>
@@ -465,7 +476,7 @@ function Index() {
           </div>
         )}
 
-        {/* Processing Status (Existing Logic) */}
+        {/* Processing Status */}
         {isProcessing && (
           <div className="bg-white rounded-lg border shadow-xl p-6 space-y-4">
             <h2 className="text-2xl font-semibold flex items-center gap-2">
@@ -487,7 +498,7 @@ function Index() {
           </div>
         )}
 
-        {/* Scene Analysis Results (Existing Logic) */}
+        {/* Scene Analysis Results */}
         {analysisCompleted && (
           <div className="bg-white rounded-lg border shadow-xl p-6">
             <h2 className="text-2xl font-semibold mb-2">Scene Analysis Results</h2>
@@ -507,7 +518,7 @@ function Index() {
                   }`}
                 >
                   <div className="flex items-start justify-between mb-2">
-                    {/* The FIX is HERE: text-gray-900 is added to the h3 tag */}
+                    {/* Scene Number is dark and readable */}
                     <h3 className="font-semibold flex items-center gap-2 text-gray-900">
                       Scene {scene.number}
                       {scene.status === 'complete' && <CheckCircle2 className="w-5 h-5 text-green-600" />}
