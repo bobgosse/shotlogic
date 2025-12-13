@@ -1,16 +1,16 @@
 // api/analyze-scene.ts
 // PRODUCTION: Intelligent screenplay scene analysis with shot planning
-// Provides narrative breakdown and actionable shot list for directors
+// CRITICAL FIX: Enhanced OpenAI API key validation and error reporting
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
-const DEPLOY_TIMESTAMP = "2024-12-13T04:00:00Z_INTELLIGENT_SHOT_PLANNING"
+const DEPLOY_TIMESTAMP = "2024-12-13T05:00:00Z_ENHANCED_AUTH_CHECK"
 
 interface AnalyzeSceneRequest {
   sceneText: string
   sceneNumber: number
   totalScenes: number
-  visualStyle?: string // Optional visual style to inject into image prompts
+  visualStyle?: string
 }
 
 interface Shot {
@@ -66,35 +66,100 @@ export default async function handler(
     console.error(`❌ [${invocationId}] Method not allowed: ${req.method}`)
     return res.status(405).json({ 
       error: 'Method not allowed',
+      message: 'This endpoint only accepts POST requests',
       deployMarker: DEPLOY_TIMESTAMP 
     })
   }
 
   try {
-    // Get OpenAI API key
-    console.log(`🔑 [${invocationId}] Checking for OpenAI API key...`)
-    const openaiKey = process.env.OPENAI_API_KEY
+    // ═══════════════════════════════════════════════════════════════
+    // CRITICAL: ENHANCED OPENAI API KEY VALIDATION
+    // ═══════════════════════════════════════════════════════════════
     
+    console.log(`🔑 [${invocationId}] ═══ AUTHENTICATION CHECK ═══`)
+    console.log(`🔑 [${invocationId}] Checking environment variables...`)
+    
+    // Step 1: Check if environment variable exists
+    let openaiKey: string | undefined
+    
+    try {
+      openaiKey = process.env.OPENAI_API_KEY
+      console.log(`🔑 [${invocationId}] process.env.OPENAI_API_KEY: ${openaiKey ? 'EXISTS' : 'UNDEFINED'}`)
+    } catch (envError) {
+      console.error(`❌ [${invocationId}] Failed to access process.env:`, envError)
+      return res.status(500).json({
+        error: 'Server Configuration Error',
+        message: 'Unable to access server environment variables',
+        technicalDetails: 'process.env access failed',
+        troubleshooting: 'This is a server configuration issue. Contact support.',
+        deployMarker: DEPLOY_TIMESTAMP
+      })
+    }
+    
+    // Step 2: Check if key exists
     if (!openaiKey) {
-      console.error(`❌ [${invocationId}] OPENAI_API_KEY not found`)
+      console.error(`❌ [${invocationId}] OPENAI_API_KEY is not set in environment`)
+      console.error(`❌ [${invocationId}] Available env vars: ${Object.keys(process.env).filter(k => !k.includes('SECRET') && !k.includes('KEY')).join(', ')}`)
+      
       return res.status(500).json({ 
-        error: 'Server configuration error: OPENAI_API_KEY not set',
-        deployMarker: DEPLOY_TIMESTAMP
+        error: 'Server Configuration Error',
+        message: 'OpenAI API Key is missing',
+        technicalDetails: 'OPENAI_API_KEY environment variable is not set',
+        troubleshooting: 'The OpenAI API key must be configured in Vercel environment variables under Settings > Environment Variables',
+        deployMarker: DEPLOY_TIMESTAMP,
+        timestamp: new Date().toISOString()
       })
     }
     
-    if (!openaiKey.startsWith('sk-')) {
-      console.error(`❌ [${invocationId}] Invalid API key format`)
-      return res.status(500).json({ 
-        error: 'Server configuration error: Invalid API key format',
-        deployMarker: DEPLOY_TIMESTAMP
+    // Step 3: Check key length (minimum valid length)
+    if (openaiKey.length < 20) {
+      console.error(`❌ [${invocationId}] OPENAI_API_KEY too short: ${openaiKey.length} characters`)
+      console.error(`❌ [${invocationId}] Key preview: ${openaiKey}`)
+      
+      return res.status(500).json({
+        error: 'Server Configuration Error',
+        message: 'OpenAI API Key appears to be invalid (too short)',
+        technicalDetails: `Key length: ${openaiKey.length} characters (expected 50+)`,
+        troubleshooting: 'Please verify the complete API key was copied correctly in Vercel environment variables',
+        deployMarker: DEPLOY_TIMESTAMP,
+        timestamp: new Date().toISOString()
       })
     }
+    
+    // Step 4: Check valid key prefix (sk- or sk-proj-)
+    const hasValidPrefix = openaiKey.startsWith('sk-proj-') || openaiKey.startsWith('sk-')
+    
+    if (!hasValidPrefix) {
+      console.error(`❌ [${invocationId}] OPENAI_API_KEY has invalid prefix`)
+      console.error(`❌ [${invocationId}] Key starts with: ${openaiKey.substring(0, 10)}...`)
+      console.error(`❌ [${invocationId}] Expected prefix: "sk-" or "sk-proj-"`)
+      
+      return res.status(500).json({
+        error: 'Server Configuration Error',
+        message: 'OpenAI API Key format is invalid',
+        technicalDetails: `Key does not start with required prefix (sk- or sk-proj-)`,
+        keyPrefix: openaiKey.substring(0, 5) + '...',
+        troubleshooting: 'OpenAI API keys must start with "sk-" or "sk-proj-". Please verify you copied the correct key from OpenAI dashboard.',
+        deployMarker: DEPLOY_TIMESTAMP,
+        timestamp: new Date().toISOString()
+      })
+    }
+    
+    // Step 5: Success - log sanitized key info
+    const keyPrefix = openaiKey.startsWith('sk-proj-') ? 'sk-proj-' : 'sk-'
+    const keyPreview = `${openaiKey.substring(0, 12)}...${openaiKey.substring(openaiKey.length - 4)}`
+    const keyLength = openaiKey.length
+    
+    console.log(`✅ [${invocationId}] API Key validation PASSED`)
+    console.log(`🔑 [${invocationId}] Key format: ${keyPrefix}`)
+    console.log(`🔑 [${invocationId}] Key length: ${keyLength} characters`)
+    console.log(`🔑 [${invocationId}] Key preview: ${keyPreview}`)
+    console.log(`🔑 [${invocationId}] ═══════════════════════════════`)
 
-    const keyPreview = `${openaiKey.substring(0, 7)}...${openaiKey.substring(openaiKey.length - 4)}`
-    console.log(`🔑 [${invocationId}] Key found: ${keyPreview}`)
-
-    // Parse request body
+    // ═══════════════════════════════════════════════════════════════
+    // PARSE AND VALIDATE REQUEST BODY
+    // ═══════════════════════════════════════════════════════════════
+    
     const requestBody = req.body as AnalyzeSceneRequest
     const { sceneText, sceneNumber, totalScenes, visualStyle } = requestBody
     
@@ -108,6 +173,7 @@ export default async function handler(
       console.error(`❌ [${invocationId}] Missing required fields`)
       return res.status(400).json({ 
         error: 'Missing required fields',
+        message: 'Request must include sceneText, sceneNumber, and totalScenes',
         required: ['sceneText', 'sceneNumber', 'totalScenes'],
         received: { 
           hasSceneText: !!sceneText, 
@@ -119,14 +185,19 @@ export default async function handler(
     }
 
     if (sceneText.trim().length < 10) {
-      console.error(`❌ [${invocationId}] Scene text too short`)
+      console.error(`❌ [${invocationId}] Scene text too short: ${sceneText.length} chars`)
       return res.status(400).json({ 
         error: 'Scene text too short',
+        message: 'Scene text must be at least 10 characters',
+        receivedLength: sceneText.length,
         deployMarker: DEPLOY_TIMESTAMP
       })
     }
 
-    // Build comprehensive prompt for intelligent analysis
+    // ═══════════════════════════════════════════════════════════════
+    // BUILD ANALYSIS PROMPTS
+    // ═══════════════════════════════════════════════════════════════
+    
     const systemPrompt = `You are an expert film director and cinematographer with decades of experience breaking down screenplays into actionable shot lists. Your analysis combines deep narrative understanding with practical visual storytelling techniques.
 
 Your task is to analyze screenplay scenes and provide:
@@ -177,59 +248,111 @@ ${visualStyle ? `CRITICAL: Every aiImagePrompt MUST incorporate "${visualStyle}"
 
 Return ONLY valid JSON. Do not include markdown formatting or explanations outside the JSON structure.`
 
-    // Call OpenAI API
-    console.log(`🤖 [${invocationId}] Calling OpenAI for intelligent scene analysis...`)
+    // ═══════════════════════════════════════════════════════════════
+    // CALL OPENAI API WITH ENHANCED ERROR HANDLING
+    // ═══════════════════════════════════════════════════════════════
+    
+    console.log(`🤖 [${invocationId}] Calling OpenAI API...`)
+    console.log(`🤖 [${invocationId}] Model: gpt-4o`)
+    console.log(`🤖 [${invocationId}] Max tokens: 3000`)
+    
     const openaiStartTime = Date.now()
     
-    const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openaiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'system',
-            content: systemPrompt
-          },
-          {
-            role: 'user',
-            content: userPrompt
-          }
-        ],
-        temperature: 0.7, // Higher for creativity in shot planning
-        max_tokens: 3000, // More tokens for detailed shot lists
-        response_format: { type: 'json_object' }
-      }),
-    })
+    let openaiResponse
+    try {
+      openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openaiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          messages: [
+            {
+              role: 'system',
+              content: systemPrompt
+            },
+            {
+              role: 'user',
+              content: userPrompt
+            }
+          ],
+          temperature: 0.7,
+          max_tokens: 3000,
+          response_format: { type: 'json_object' }
+        }),
+      })
+    } catch (fetchError) {
+      console.error(`❌ [${invocationId}] Network error calling OpenAI:`, fetchError)
+      return res.status(500).json({
+        error: 'Network Error',
+        message: 'Failed to connect to OpenAI API',
+        technicalDetails: fetchError instanceof Error ? fetchError.message : 'Unknown network error',
+        troubleshooting: 'This may be a temporary network issue. Please try again.',
+        deployMarker: DEPLOY_TIMESTAMP
+      })
+    }
 
     const openaiDuration = Date.now() - openaiStartTime
     console.log(`⏱️  [${invocationId}] OpenAI responded in ${openaiDuration}ms`)
     console.log(`📡 [${invocationId}] Status: ${openaiResponse.status}`)
 
+    // Enhanced error handling for OpenAI API responses
     if (!openaiResponse.ok) {
       const errorText = await openaiResponse.text()
-      console.error(`❌ [${invocationId}] OpenAI error (${openaiResponse.status}):`, errorText)
-      return res.status(500).json({ 
-        error: `OpenAI API error: ${openaiResponse.status}`,
-        details: errorText,
-        deployMarker: DEPLOY_TIMESTAMP
-      })
+      console.error(`❌ [${invocationId}] OpenAI API error (${openaiResponse.status})`)
+      console.error(`❌ [${invocationId}] Response: ${errorText}`)
+      
+      // Check for specific error types
+      if (openaiResponse.status === 401) {
+        console.error(`❌ [${invocationId}] AUTHENTICATION FAILED`)
+        console.error(`❌ [${invocationId}] This indicates the API key is invalid or revoked`)
+        
+        return res.status(500).json({ 
+          error: 'OpenAI Authentication Failed',
+          message: 'The OpenAI API key was rejected by OpenAI servers',
+          technicalDetails: `HTTP ${openaiResponse.status}: ${errorText}`,
+          troubleshooting: 'The API key in Vercel environment variables may be invalid, expired, or revoked. Please verify the key at platform.openai.com and update it in Vercel.',
+          httpStatus: openaiResponse.status,
+          deployMarker: DEPLOY_TIMESTAMP
+        })
+      } else if (openaiResponse.status === 429) {
+        console.error(`❌ [${invocationId}] RATE LIMIT EXCEEDED`)
+        
+        return res.status(429).json({
+          error: 'Rate Limit Exceeded',
+          message: 'OpenAI API rate limit reached',
+          technicalDetails: errorText,
+          troubleshooting: 'Please wait a moment before trying again',
+          deployMarker: DEPLOY_TIMESTAMP
+        })
+      } else {
+        return res.status(500).json({ 
+          error: `OpenAI API Error (${openaiResponse.status})`,
+          message: 'OpenAI API returned an error',
+          technicalDetails: errorText,
+          httpStatus: openaiResponse.status,
+          deployMarker: DEPLOY_TIMESTAMP
+        })
+      }
     }
 
     const aiResult = await openaiResponse.json()
     
     if (!aiResult.choices || aiResult.choices.length === 0) {
       console.error(`❌ [${invocationId}] No choices in OpenAI response`)
+      console.error(`❌ [${invocationId}] Full response:`, JSON.stringify(aiResult))
       throw new Error('OpenAI returned no choices')
     }
 
     const messageContent = aiResult.choices[0].message.content
     console.log(`📄 [${invocationId}] Response length: ${messageContent.length} chars`)
     
-    // Parse the analysis
+    // ═══════════════════════════════════════════════════════════════
+    // PARSE AND VALIDATE ANALYSIS
+    // ═══════════════════════════════════════════════════════════════
+    
     let analysis: SceneAnalysis
     try {
       analysis = JSON.parse(messageContent)
@@ -243,8 +366,6 @@ Return ONLY valid JSON. Do not include markdown formatting or explanations outsi
     // Validate structure
     if (!analysis.narrativeAnalysis || !analysis.shotList) {
       console.error(`❌ [${invocationId}] Missing required fields in analysis`)
-      console.error(`   Has narrativeAnalysis: ${!!analysis.narrativeAnalysis}`)
-      console.error(`   Has shotList: ${!!analysis.shotList}`)
       throw new Error('Analysis missing required fields: narrativeAnalysis or shotList')
     }
 
@@ -256,28 +377,25 @@ Return ONLY valid JSON. Do not include markdown formatting or explanations outsi
     console.log(`✅ [${invocationId}] Narrative Analysis:`)
     console.log(`   - Conflict: ${analysis.narrativeAnalysis.centralConflict}`)
     console.log(`   - Tone: ${analysis.narrativeAnalysis.emotionalTone}`)
-    console.log(`   - Synopsis: ${analysis.narrativeAnalysis.synopsis?.substring(0, 60)}...`)
     console.log(`✅ [${invocationId}] Shot List:`)
     console.log(`   - Total shots: ${analysis.shotList.length}`)
-    
-    // Log shot types for debugging
-    const shotTypes = analysis.shotList.map(s => s.shotType).join(', ')
-    console.log(`   - Shot types: ${shotTypes}`)
 
-    // Validate each shot has required fields
+    // Validate each shot
     for (let i = 0; i < analysis.shotList.length; i++) {
       const shot = analysis.shotList[i]
       if (!shot.shotType || !shot.visualDescription || !shot.rationale || !shot.editorialIntent || !shot.aiImagePrompt) {
         console.error(`❌ [${invocationId}] Shot ${i + 1} missing required fields`)
-        console.error(`   Shot data:`, shot)
         throw new Error(`Shot ${i + 1} is missing required fields`)
       }
     }
 
-    // Return success
+    // ═══════════════════════════════════════════════════════════════
+    // RETURN SUCCESS
+    // ═══════════════════════════════════════════════════════════════
+    
     const totalDuration = Date.now() - startTime
     console.log(`⏱️  [${invocationId}] Total: ${totalDuration}ms`)
-    console.log(`✅ [${invocationId}] SUCCESS - Intelligent analysis complete`)
+    console.log(`✅ [${invocationId}] SUCCESS - Scene analysis complete`)
     console.log(`═══════════════════════════════════════════════════════\n`)
 
     return res.status(200).json({
@@ -305,7 +423,8 @@ Return ONLY valid JSON. Do not include markdown formatting or explanations outsi
     console.error(`═══════════════════════════════════════════════════════\n`)
     
     return res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Scene analysis failed',
+      error: 'Scene Analysis Failed',
+      message: error instanceof Error ? error.message : 'An unexpected error occurred',
       errorType: error instanceof Error ? error.constructor.name : 'Unknown',
       deployMarker: DEPLOY_TIMESTAMP,
       processingTime: totalDuration
