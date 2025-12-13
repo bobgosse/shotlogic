@@ -1,8 +1,5 @@
 import { useState, useCallback } from 'react'
-import { Upload, FileText, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
-
-// WARNING: Placeholder components for simplicity. Ensure actual UI components 
-// (like Button, Card, useToast) are available in your components/ui folder.
+import { Upload, FileText, CheckCircle2, AlertCircle, Loader2, BookOpen } from 'lucide-react'
 
 // Simple toast replacement for Vite (no shadcn dependency)
 const showToast = (title: string, description?: string, variant?: 'default' | 'destructive') => {
@@ -16,7 +13,7 @@ const showToast = (title: string, description?: string, variant?: 'default' | 'd
     }
 }
 
-// Types
+// --- Types ---
 interface SceneAnalysis {
   location: string
   timeOfDay: string
@@ -33,6 +30,14 @@ interface Scene {
   analysis?: SceneAnalysis
   status: 'pending' | 'processing' | 'complete' | 'error'
   error?: string
+}
+
+interface StoryAnalysis {
+  logline: string
+  mainConflict: string
+  characterArcsSummary: string
+  themes: string[]
+  genreClassification: string
 }
 
 // Utility: Extract scenes from screenplay text
@@ -56,16 +61,23 @@ function extractScenes(screenplayText: string): Scene[] {
 function Index() {
   const [file, setFile] = useState<File | null>(null)
   const [scenes, setScenes] = useState<Scene[]>([])
+  const [screenplayText, setScreenplayText] = useState('') // New state to hold full text
   const [isProcessing, setIsProcessing] = useState(false)
   const [progress, setProgress] = useState(0)
   const [currentScene, setCurrentScene] = useState(0)
+  
+  // NEW STATE for Story Analysis
+  const [storyAnalysis, setStoryAnalysis] = useState<StoryAnalysis | null>(null)
+  const [isStoryAnalyzing, setIsStoryAnalyzing] = useState(false)
+  const [storyAnalysisError, setStoryAnalysisError] = useState<string | null>(null)
+
 
   // File upload handler
   const handleFileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const uploadedFile = event.target.files?.[0]
     if (!uploadedFile) return
 
-    const extension = uploadedFile.name.split('.').pop()?.toLowerCase()
+    const extension = uploadedFile.name.split('.pop')()?.toLowerCase()
 
     if (!['txt'].includes(extension || '')) {
       showToast(
@@ -100,7 +112,10 @@ function Index() {
       }
 
       setFile(uploadedFile)
+      setScreenplayText(text) // Save full text here
       setScenes(extractedScenes)
+      setStoryAnalysis(null) // Clear old analysis
+      setStoryAnalysisError(null)
       setProgress(0)
       setCurrentScene(0)
 
@@ -117,9 +132,9 @@ function Index() {
         "destructive"
       )
     }
-  }, []) // Removed dependency: showToast
+  }, [])
 
-  // Analyze single scene
+  // Analyze single scene (Existing Logic)
   const analyzeScene = useCallback(async (scene: Scene, totalScenes: number): Promise<SceneAnalysis> => {
     console.log(`🎬 Analyzing scene ${scene.number}/${totalScenes}`)
     
@@ -136,25 +151,21 @@ function Index() {
         })
       })
       
-      // CRITICAL FIX: Read the body ONLY ONCE and store it
       const responseBody = await response.text()
 
       if (!response.ok) {
         let errorMessage = `HTTP ${response.status}`
         try {
-            // Try to parse the error message from the body we already read
             const errorData = JSON.parse(responseBody) 
             errorMessage = errorData.error || errorMessage
             console.error(`Scene ${scene.number} API error:`, errorData)
         } catch (e) {
-            // Use the raw text if JSON parsing fails
             errorMessage = responseBody || errorMessage
         }
         throw new Error(errorMessage)
       }
 
       try {
-        // Parse the successful result from the body we already read
         const result = JSON.parse(responseBody)
         
         if (!result.data) {
@@ -176,7 +187,7 @@ function Index() {
     }
   }, [])
 
-  // Process all scenes
+  // Process all scenes (Existing Logic)
   const handleProcessScreenplay = useCallback(async () => {
     if (scenes.length === 0) {
       showToast(
@@ -227,12 +238,12 @@ function Index() {
 
       if (completedScenes === totalScenes) {
         showToast(
-          "Analysis Complete!",
+          "Scene Analysis Complete!",
           `Successfully analyzed all ${totalScenes} scenes.`
         )
       } else {
         showToast(
-          "Analysis Finished with Errors",
+          "Scene Analysis Finished with Errors",
           `Completed: ${completedScenes}/${totalScenes} scenes. ${errorScenes} scenes failed.`,
           "destructive"
         )
@@ -248,15 +259,80 @@ function Index() {
     } finally {
       setIsProcessing(false)
     }
-  }, [scenes, analyzeScene]) // Removed dependency: showToast
+  }, [scenes, analyzeScene])
+
+
+  // NEW LOGIC: Analyze full story
+  const handleAnalyzeStory = useCallback(async () => {
+    if (!screenplayText) {
+      showToast(
+        "No Screenplay Loaded",
+        "Please upload a screenplay file first.",
+        "destructive"
+      )
+      return
+    }
+    
+    setStoryAnalysis(null)
+    setStoryAnalysisError(null)
+    setIsStoryAnalyzing(true)
+
+    try {
+      const response = await fetch('/api/analyze-story', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ screenplayText }),
+      })
+
+      const responseBody = await response.text()
+
+      if (!response.ok) {
+        let errorMessage = `HTTP ${response.status}`
+        try {
+            const errorData = JSON.parse(responseBody)
+            errorMessage = errorData.error || errorMessage
+        } catch (e) {
+            errorMessage = responseBody || errorMessage
+        }
+        throw new Error(errorMessage)
+      }
+      
+      const result = JSON.parse(responseBody)
+      if (!result.data) {
+        throw new Error('No story analysis data returned')
+      }
+
+      setStoryAnalysis(result.data)
+      showToast("Story Analysis Complete!", "High-level summary generated.")
+
+    } catch (error) {
+      console.error('Story Analysis Error:', error)
+      setStoryAnalysisError(error instanceof Error ? error.message : 'Unknown error during story analysis.')
+      showToast(
+        "Story Analysis Failed",
+        error instanceof Error ? error.message : "An unexpected error occurred during story analysis.",
+        "destructive"
+      )
+    } finally {
+      setIsStoryAnalyzing(false)
+    }
+
+  }, [screenplayText]) // Added dependency: screenplayText
+
 
   const handleReset = useCallback(() => {
     setFile(null)
     setScenes([])
+    setScreenplayText('')
     setProgress(0)
     setCurrentScene(0)
     setIsProcessing(false)
+    setStoryAnalysis(null) // Reset story analysis
+    setStoryAnalysisError(null)
+    setIsStoryAnalyzing(false)
   }, [])
+
+  const analysisCompleted = scenes.some(s => s.status === 'complete' || s.status === 'error')
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-8">
@@ -271,7 +347,7 @@ function Index() {
           </p>
         </div>
 
-        {/* Upload Card - Using basic div/button structure instead of shadcn components */}
+        {/* Upload Card */}
         <div className="bg-white rounded-lg border shadow-xl p-6 space-y-4">
           <h2 className="text-2xl font-semibold flex items-center gap-2">
             <Upload className="w-6 h-6" />
@@ -286,13 +362,13 @@ function Index() {
               type="file"
               accept=".txt"
               onChange={handleFileUpload}
-              disabled={isProcessing}
+              disabled={isProcessing || isStoryAnalyzing}
               className="flex-1 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer disabled:opacity-50"
             />
             {file && (
               <button
                 onClick={handleReset}
-                disabled={isProcessing}
+                disabled={isProcessing || isStoryAnalyzing}
                 className="px-4 py-2 rounded-md border border-slate-300 hover:bg-slate-100 disabled:opacity-50"
               >
                 Clear
@@ -309,24 +385,90 @@ function Index() {
                   {scenes.length} scene{scenes.length !== 1 ? 's' : ''} detected
                 </p>
               </div>
+              
+              {/* Story Analysis Button */}
+              {scenes.length > 0 && !isProcessing && !storyAnalysis && (
+                <button
+                  onClick={handleAnalyzeStory}
+                  disabled={isStoryAnalyzing}
+                  className="px-4 py-2 rounded-md bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 flex items-center gap-1"
+                >
+                  {isStoryAnalyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <BookOpen className="w-4 h-4" />}
+                  {isStoryAnalyzing ? 'Analyzing Story...' : 'Analyze Story'}
+                </button>
+              )}
+
+              {/* Scene Analysis Button */}
               {scenes.length > 0 && !isProcessing && (
                 <button
                   onClick={handleProcessScreenplay}
-                  className="px-4 py-2 rounded-md bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700"
+                  className="px-4 py-2 rounded-md bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 disabled:opacity-50"
+                  disabled={isStoryAnalyzing}
                 >
-                  Process Screenplay
+                  Process Scene Breakdown
                 </button>
               )}
             </div>
           )}
         </div>
+        
+        {/* Story Analysis Results Card (NEW SECTION) */}
+        {storyAnalysis && (
+          <div className="bg-white rounded-lg border shadow-xl p-6">
+            <h2 className="text-2xl font-semibold mb-4 flex items-center gap-2 text-purple-700">
+              <BookOpen className="w-6 h-6" /> Story Analysis Summary
+            </h2>
+            
+            <div className="space-y-4">
+              {/* Logline */}
+              <div>
+                <p className="font-medium text-slate-700">Logline</p>
+                <p className="text-lg italic text-gray-900 border-l-4 border-purple-300 pl-3 py-1">
+                  {storyAnalysis.logline}
+                </p>
+              </div>
 
-        {/* Processing Status */}
+              {/* Main Conflict */}
+              <div>
+                <p className="font-medium text-slate-700">Main Conflict</p>
+                <p className="text-gray-900">{storyAnalysis.mainConflict}</p>
+              </div>
+              
+              {/* Genre */}
+              <div>
+                <p className="font-medium text-slate-700">Genre Classification</p>
+                <p className="text-gray-900">{storyAnalysis.genreClassification}</p>
+              </div>
+
+              {/* Themes */}
+              <div>
+                <p className="font-medium text-slate-700">Key Themes</p>
+                <p className="text-gray-900">{storyAnalysis.themes.join(', ')}</p>
+              </div>
+              
+              {/* Character Arcs */}
+              <div>
+                <p className="font-medium text-slate-700">Character Arcs Summary</p>
+                <p className="text-gray-900 whitespace-pre-line">{storyAnalysis.characterArcsSummary}</p>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Story Analysis Error */}
+        {storyAnalysisError && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
+            <strong className="font-bold">Story Analysis Error: </strong>
+            <span className="block sm:inline">{storyAnalysisError}</span>
+          </div>
+        )}
+
+        {/* Processing Status (Existing Logic) */}
         {isProcessing && (
           <div className="bg-white rounded-lg border shadow-xl p-6 space-y-4">
             <h2 className="text-2xl font-semibold flex items-center gap-2">
               <Loader2 className="w-6 h-6 animate-spin" />
-              Processing Screenplay
+              Processing Scene Breakdown
             </h2>
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
@@ -343,10 +485,10 @@ function Index() {
           </div>
         )}
 
-        {/* Results */}
-        {scenes.length > 0 && scenes.some(s => s.status === 'complete' || s.status === 'error') && (
+        {/* Scene Analysis Results (Existing Logic) */}
+        {analysisCompleted && (
           <div className="bg-white rounded-lg border shadow-xl p-6">
-            <h2 className="text-2xl font-semibold mb-2">Analysis Results</h2>
+            <h2 className="text-2xl font-semibold mb-2">Scene Analysis Results</h2>
             <p className="text-sm text-slate-600 mb-4">
               {scenes.filter(s => s.status === 'complete').length} of {scenes.length} scenes analyzed
             </p>
