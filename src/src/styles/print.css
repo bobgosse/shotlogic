@@ -1,27 +1,49 @@
-/* Print Styles for PDF Export */
+/* src/styles/print.css - ENHANCED FIX */
 @media print {
-  /* Hide toolbar when printing */
-  .no-print {
+  /* Hide the header/toolbar/non-essential elements */
+  .no-print,
+  header,
+  .max-w-6xl > .space-y-8 > div:nth-child(1), /* Hide the upload column */
+  .text-center {
     display: none !important;
   }
-
-  /* Ensure proper page breaks */
-  .scene-analysis {
-    page-break-inside: avoid;
+  
+  /* Make the content take up the whole page */
+  .max-w-6xl {
+      max-width: 100% !important;
   }
 
-  /* Remove background colors for printing */
+  /* Reset body background */
+  body {
+    background: white !important;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Ensure proper page breaks for scene boxes */
+  .scene-analysis {
+    page-break-inside: avoid;
+    border: 1px solid #ccc; /* Add border for print clarity */
+    padding: 15px;
+    margin-bottom: 20px;
+    box-shadow: none;
+  }
+
+  /* Remove background colors and shadows */
   * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
   }
 
-  /* Set proper margins */
+  /* Set proper margins for print output */
   @page {
-    margin: 20mm;
+    margin: 20mm 15mm;
   }
 
-  body {
-    background: white;
+  /* Hide scene status icons (Checkmark, Loader, etc.) */
+  .text-green-600, .text-red-600, .text-blue-600.animate-spin {
+      display: none !important;
   }
 }
