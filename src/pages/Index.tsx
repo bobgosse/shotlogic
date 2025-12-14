@@ -1,135 +1,401 @@
-// src/pages/Index.tsx - COMPLETE FILE CONTENT (FINAL FIX)
-// All required imports for file handling, UI, and new export features
-import React, { useState, useCallback, useMemo } from 'react';
-import { Upload, FileText, Printer, FileDown, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
-import html2pdf from 'html2pdf.js';
-import axios from 'axios';
+import { useState, useCallback } from 'react'
+import { Upload, FileText, CheckCircle2, AlertCircle, Loader2, Printer, FileDown, FileText as FileTextIcon } from 'lucide-react'
+import html2pdf from 'html2pdf.js'
 
-// CRITICAL FIX: Changed path to '../src/styles/print.css' based on terminal feedback
-import '../src/styles/print.css'; 
+// ═══════════════════════════════════════════════════════════════
+// TYPE DEFINITIONS
+// ═══════════════════════════════════════════════════════════════
 
-// --- TYPE DEFINITIONS ---
 interface Shot {
-  shotType: 'WIDE' | 'MEDIUM' | 'CLOSE_UP' | 'INSERT' | 'TRACKING' | 'CRANE' | 'OTHER';
-  visualDescription: string;
-  rationale: string;
-  editorialIntent: string;
-  aiImagePrompt: string;
+  shotType: 'WIDE' | 'MEDIUM' | 'CLOSE_UP' | 'INSERT' | 'TRACKING' | 'CRANE' | 'OTHER'
+  visualDescription: string
+  rationale: string
+  editorialIntent: string
+  aiImagePrompt: string
 }
 
 interface NarrativeAnalysis {
-  synopsis: string;
-  centralConflict: 'Argument' | 'Seduction' | 'Negotiation' | 'Confrontation' | 'Revelation' | 'Other';
-  sceneTurn: string;
-  emotionalTone: string;
-  stakes: string;
+  synopsis: string
+  centralConflict: 'Argument' | 'Seduction' | 'Negotiation' | 'Confrontation' | 'Revelation' | 'Other'
+  sceneTurn: string
+  emotionalTone: string
+  stakes: string
 }
 
 interface SceneAnalysis {
-  narrativeAnalysis: NarrativeAnalysis;
-  shotList: Shot[];
+  narrativeAnalysis: NarrativeAnalysis
+  shotList: Shot[]
 }
 
 interface Scene {
-  number: number;
-  text: string;
-  status: 'pending' | 'processing' | 'complete' | 'error';
-  analysis: SceneAnalysis | null;
-  error: string | null;
+  number: number
+  text: string
+  analysis?: SceneAnalysis
+  status: 'pending' | 'processing' | 'complete' | 'error'
+  error?: string
 }
 
-// Placeholder for your toast notification function (assuming it exists)
-const showToast = (title: string, message: string, type?: 'default' | 'destructive') => {
-  console.log(`[TOAST - ${type || 'default'}] ${title}: ${message}`);
-  alert(`${title}: ${message}`); 
-};
+// ═══════════════════════════════════════════════════════════════
+// UTILITY FUNCTIONS
+// ═══════════════════════════════════════════════════════════════
 
-// --- MAIN COMPONENT ---
-export default function Index() {
-  // --- STATE (VARIABLES) SECTION ---
-  const [file, setFile] = useState<File | null>(null);
-  const [scenes, setScenes] = useState<Scene[]>([]);
-  // Setting default style to test the guaranteed black fix better on refresh
-  const [visualStyle, setVisualStyle] = useState('Cinematic still from 1918 silent film, shot on orthochromatic black and white film stock with period motion picture camera. Early 20th century optical lens characteristics: soft focus, moderate chromatic aberration, natural vignetting. High contrast cinematography with deep crushed blacks and overexposed highlights. Limited tonal range typical of orthochromatic emulsion - blues and greens render lighter, reds and oranges appear darker. Visible film grain, subtle halation around bright light sources. Shallow depth of field with bokeh characteristic of vintage brass lenses. 4:3 aspect ratio. Atmospheric diffusion, slight image softness from hand-cranked camera operation. Documentary realism aesthetic. Dust specks, light scratches, and subtle aging artifacts on negative. Natural lighting or early tungsten/arc lamp cinematography. Composition and framing influenced by theatrical staging conventions of early cinema. Nitrate film stock characteristics. Sharp geometric architecture contrasts with soft organic elements. Period-accurate mise-en-scène, costumes, and props from 1915-1920 era.'); 
-  const [isParsing, setIsParsing] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [currentScene, setCurrentScene] = useState(0);
+// Extract scenes from screenplay text
+function extractScenes(screenplayText: string): Scene[] {
+  const sceneMarkers = screenplayText.split(/(?=(?:INT\.|EXT\.))/i)
+  
+  const scenes: Scene[] = sceneMarkers
+    .map((sceneText) => sceneText.trim())
+    .filter(text => text.length > 20)
+    .map((text, index) => ({
+      number: index + 1,
+      text,
+      status: 'pending' as const
+    }))
+  
+  console.log(`📝 Extracted ${scenes.length} scenes from screenplay`)
+  return scenes
+}
 
+// Convert file to base64
+async function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const base64 = reader.result as string
+      const base64Data = base64.split(',')[1]
+      resolve(base64Data)
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
 
-  // --- HANDLER (FUNCTION) SECTION ---
+// ═══════════════════════════════════════════════════════════════
+// MAIN COMPONENT
+// ═══════════════════════════════════════════════════════════════
 
-  const handleReset = useCallback(() => {
-    setFile(null)
-    setScenes([])
-    setProgress(0)
-    setCurrentScene(0)
-    setIsProcessing(false)
-    setVisualStyle('Cinematic still from 1918 silent film, shot on orthochromatic black and white film stock with period motion picture camera. Early 20th century optical lens characteristics: soft focus, moderate chromatic aberration, natural vignetting. High contrast cinematography with deep crushed blacks and overexposed highlights. Limited tonal range typical of orthochromatic emulsion - blues and greens render lighter, reds and oranges appear darker. Visible film grain, subtle halation around bright light sources. Shallow depth of field with bokeh characteristic of vintage brass lenses. 4:3 aspect ratio. Atmospheric diffusion, slight image softness from hand-cranked camera operation. Documentary realism aesthetic. Dust specks, light scratches, and subtle aging artifacts on negative. Natural lighting or early tungsten/arc lamp cinematography. Composition and framing influenced by theatrical staging conventions of early cinema. Nitrate film stock characteristics. Sharp geometric architecture contrasts with soft organic elements. Period-accurate mise-en-scène, costumes, and props from 1915-1920 era.')
+function Index() {
+  const [file, setFile] = useState<File | null>(null)
+  const [scenes, setScenes] = useState<Scene[]>([])
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [isParsing, setIsParsing] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [currentScene, setCurrentScene] = useState(0)
+  const [visualStyle, setVisualStyle] = useState<string>('')
+
+  // Simple toast replacement
+  const showToast = useCallback((title: string, description?: string, variant?: 'default' | 'destructive') => {
+    const message = description ? `${title}\n${description}` : title
+    if (variant === 'destructive') {
+      console.error(message)
+      alert(`❌ ${message}`)
+    } else {
+      console.log(message)
+    }
   }, [])
-  // Function to handle file upload and initial parsing (Placeholder, assuming robust version is in place)
-  const handleFileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
-    // Simplified placeholder for analysis
-    const selectedFile = event.target.files?.[0];
-    if (!selectedFile) return;
 
-    setFile(selectedFile);
-    setIsParsing(true);
-    setScenes([]);
+  // ═══════════════════════════════════════════════════════════════
+  // FILE UPLOAD HANDLER
+  // ═══════════════════════════════════════════════════════════════
+
+  const handleFileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const uploadedFile = event.target.files?.[0]
+    if (!uploadedFile) return
+
+    const extension = uploadedFile.name.split('.').pop()?.toLowerCase()
+
+    // Validate file type - ONLY TXT and FDX supported
+    if (extension === 'pdf') {
+      showToast(
+        "PDF Format Not Supported",
+        "PDF files cannot be processed. Please export your screenplay as .txt or .fdx (Final Draft) format.",
+        "destructive"
+      )
+      return
+    }
+
+    if (!['txt', 'fdx'].includes(extension || '')) {
+      showToast(
+        "Unsupported File Type",
+        `${extension?.toUpperCase()} files are not supported. Please upload .txt or .fdx files.`,
+        "destructive"
+      )
+      return
+    }
+
+    setIsParsing(true)
 
     try {
-      const text = await selectedFile.text();
-      const sceneBlocks = text.split(/(^[\d]+\s+\w.*)/gm).filter(s => s.trim() !== '');
-      const newScenes = sceneBlocks.filter((_, i) => i % 2 === 0).map((text, index) => ({
-        number: index + 1,
-        text: text + (sceneBlocks[index * 2 + 1] || ''),
-        status: 'pending' as const,
-        analysis: null,
-        error: null,
-      }));
+      let screenplayText = ''
+
+      // Handle .txt files directly
+      if (extension === 'txt') {
+        screenplayText = await uploadedFile.text()
+      } 
+      // Handle .fdx files via parsing API
+      else if (extension === 'fdx') {
+        console.log(`📄 Parsing FDX file via API...`)
+        
+        const base64Data = await fileToBase64(uploadedFile)
+        
+        const response = await fetch('/api/parse-screenplay', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            fileData: base64Data,
+            fileName: uploadedFile.name,
+            fileType: extension
+          })
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.error || errorData.message || `Failed to parse FDX file`)
+        }
+
+        const result = await response.json()
+        screenplayText = result.screenplayText
+
+        if (!screenplayText) {
+          throw new Error(`No text extracted from FDX file`)
+        }
+
+        console.log(`✅ Successfully parsed FDX file (${screenplayText.length} characters)`)
+      }
+
+      // Validate extracted text
+      if (!screenplayText || screenplayText.length < 100) {
+        showToast(
+          "Invalid File",
+          "The file appears to be empty or too short to be a screenplay.",
+          "destructive"
+        )
+        setIsParsing(false)
+        return
+      }
+
+      // Extract scenes from the parsed text
+      const extractedScenes = extractScenes(screenplayText)
       
-      setScenes(newScenes);
-      showToast("File Loaded", `${newScenes.length} scenes detected.`);
+      if (extractedScenes.length === 0) {
+        showToast(
+          "No Scenes Found",
+          "Could not find any scene headers (INT. or EXT.) in the screenplay.",
+          "destructive"
+        )
+        setIsParsing(false)
+        return
+      }
+
+      setFile(uploadedFile)
+      setScenes(extractedScenes)
+      setProgress(0)
+      setCurrentScene(0)
+
+      console.log(`✅ File loaded: ${extractedScenes.length} scenes extracted`)
 
     } catch (error) {
-      showToast("Error", "Failed to read file content.", "destructive");
+      console.error('File upload error:', error)
+      showToast(
+        "Upload Failed",
+        error instanceof Error ? error.message : "Failed to read file",
+        "destructive"
+      )
     } finally {
-      setIsParsing(false);
+      setIsParsing(false)
     }
-  }, [showToast]);
+  }, [showToast])
 
-  // Function to initiate the analysis process for all scenes (Placeholder, assuming robust version is in place)
+  // ═══════════════════════════════════════════════════════════════
+  // ANALYZE SCENE - CALLS REAL API
+  // ═══════════════════════════════════════════════════════════════
+
+  const analyzeScene = useCallback(async (scene: Scene, totalScenes: number): Promise<SceneAnalysis> => {
+    console.log(`🎬 [API CALL] Analyzing scene ${scene.number}/${totalScenes}`)
+    console.log(`   Text length: ${scene.text.length} chars`)
+    console.log(`   Visual style: ${visualStyle || 'none'}`)
+    
+    try {
+      const requestBody = {
+        sceneText: scene.text,
+        sceneNumber: scene.number,
+        totalScenes: totalScenes,
+        visualStyle: visualStyle || undefined
+      }
+
+      console.log(`   Sending request to /api/analyze-scene...`)
+
+      const response = await fetch('/api/analyze-scene', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
+      })
+
+      console.log(`   Response status: ${response.status}`)
+
+      if (!response.ok) {
+        let errorMessage = `HTTP ${response.status}`
+        try {
+          const errorData = await response.json()
+          errorMessage = errorData.error || errorData.message || errorMessage
+          console.error(`   Error data:`, errorData)
+        } catch (e) {
+          const errorText = await response.text()
+          errorMessage = errorText || errorMessage
+          console.error(`   Error text:`, errorText)
+        }
+        throw new Error(errorMessage)
+      }
+
+      const result = await response.json()
+      console.log(`   Response received, parsing...`)
+      
+      if (!result.data) {
+        console.error(`   No data in response:`, result)
+        throw new Error('No analysis data returned from API')
+      }
+
+      const analysis = result.data as SceneAnalysis
+
+      // Validate the analysis structure
+      if (!analysis.narrativeAnalysis || !analysis.shotList) {
+        console.error(`   Invalid analysis structure:`, analysis)
+        throw new Error('Invalid analysis structure received from API')
+      }
+
+      console.log(`✅ Scene ${scene.number} analyzed successfully`)
+      console.log(`   - Conflict: ${analysis.narrativeAnalysis.centralConflict}`)
+      console.log(`   - Shots: ${analysis.shotList.length}`)
+
+      return analysis
+
+    } catch (error) {
+      console.error(`❌ Scene ${scene.number} analysis failed:`, error)
+      throw error
+    }
+  }, [visualStyle])
+
+  // ═══════════════════════════════════════════════════════════════
+  // PROCESS ALL SCENES - REAL API CALLS
+  // ═══════════════════════════════════════════════════════════════
+
   const handleProcessScreenplay = useCallback(async () => {
     if (scenes.length === 0) {
-      showToast("No Scenes", "Please upload a screenplay file first.");
-      return;
+      showToast(
+        "No Screenplay Loaded",
+        "Please upload a screenplay file first.",
+        "destructive"
+      )
+      return
     }
 
-    setIsProcessing(true);
-    showToast("Analysis Started", `Processing ${scenes.length} scenes. This may take a few minutes.`);
+    console.log(`\n🎬 ══════════════════════════════════════`)
+    console.log(`   Starting screenplay analysis`)
+    console.log(`   Total scenes: ${scenes.length}`)
+    console.log(`   Visual style: ${visualStyle || 'none'}`)
+    console.log(`══════════════════════════════════════\n`)
 
-    const newScenes = scenes.map(s => ({...s, status: 'complete', analysis: s.analysis || (s.number === 1 ? { narrativeAnalysis: { synopsis: 'Test Synopsis', centralConflict: 'Other', sceneTurn: 'Test Turn', emotionalTone: 'Foreboding', stakes: 'Test Stakes' }, shotList: [{ shotType: 'WIDE', visualDescription: 'Test Visual', rationale: 'Test Rationale', editorialIntent: 'Test Intent', aiImagePrompt: 'Test Prompt' }] } : null), error: null }));
-    
-    // Simulate API call and completion
-    for (let i = 0; i < newScenes.length; i++) {
-        setCurrentScene(i + 1);
-        setProgress(Math.round(((i + 1) / newScenes.length) * 100));
-        await new Promise(resolve => setTimeout(resolve, 50)); // Fast simulation
+    setIsProcessing(true)
+    setProgress(0)
+    setCurrentScene(0)
+
+    const totalScenes = scenes.length
+    const updatedScenes = [...scenes]
+
+    try {
+      for (let i = 0; i < totalScenes; i++) {
+        setCurrentScene(i + 1)
+        
+        console.log(`\n📍 Processing scene ${i + 1}/${totalScenes}`)
+        
+        // Update scene status to processing
+        updatedScenes[i] = { ...updatedScenes[i], status: 'processing' }
+        setScenes([...updatedScenes])
+
+        try {
+          // CRITICAL: Call the REAL API to analyze the scene
+          const analysis = await analyzeScene(updatedScenes[i], totalScenes)
+          
+          // Update scene with REAL analysis data
+          updatedScenes[i] = {
+            ...updatedScenes[i],
+            analysis,
+            status: 'complete'
+          }
+          
+          console.log(`✅ Scene ${i + 1} complete`)
+          
+        } catch (error) {
+          console.error(`❌ Scene ${i + 1} failed:`, error)
+          
+          updatedScenes[i] = {
+            ...updatedScenes[i],
+            status: 'error',
+            error: error instanceof Error ? error.message : 'Analysis failed'
+          }
+        }
+
+        // Update UI with latest results
+        setScenes([...updatedScenes])
+        setProgress(Math.round(((i + 1) / totalScenes) * 100))
+
+        // Small delay between API calls to avoid rate limiting
+        if (i < totalScenes - 1) {
+          await new Promise(resolve => setTimeout(resolve, 100))
+        }
+      }
+
+      // Final summary
+      const completedScenes = updatedScenes.filter(s => s.status === 'complete').length
+      const errorScenes = updatedScenes.filter(s => s.status === 'error').length
+
+      console.log(`\n✅ ══════════════════════════════════════`)
+      console.log(`   Analysis complete`)
+      console.log(`   Successful: ${completedScenes}/${totalScenes}`)
+      console.log(`   Failed: ${errorScenes}`)
+      console.log(`══════════════════════════════════════\n`)
+
+      if (completedScenes === totalScenes) {
+        showToast(
+          "Analysis Complete!",
+          `Successfully analyzed all ${totalScenes} scenes.`
+        )
+      } else {
+        showToast(
+          "Analysis Finished with Errors",
+          `Completed: ${completedScenes}/${totalScenes} scenes. ${errorScenes} scenes failed.`,
+          "destructive"
+        )
+      }
+
+    } catch (error) {
+      console.error('Processing error:', error)
+      showToast(
+        "Processing Failed",
+        error instanceof Error ? error.message : "An unexpected error occurred",
+        "destructive"
+      )
+    } finally {
+      setIsProcessing(false)
+      console.log(`🏁 Processing complete\n`)
     }
-    
-    setScenes(newScenes);
-    setIsProcessing(false);
-    showToast("Analysis Complete", "All scenes have been processed.");
+  }, [scenes, analyzeScene, showToast, visualStyle])
 
-  }, [scenes, showToast]);
+  // ═══════════════════════════════════════════════════════════════
+  // EXPORT HANDLERS
+  // ═══════════════════════════════════════════════════════════════
 
-  // --- EXPORT FUNCTIONS (CRITICAL FIX) ---
-
-  // Export to PDF handler - FIXED BLANK PDF ISSUE WITH TIMEOUT
   const handleExportPDF = useCallback(() => {
+    console.log('📄 Starting PDF export...')
+    
     const element = document.getElementById('analysis-content')
     
     if (!element) {
+      console.error('❌ Could not find #analysis-content element')
       showToast(
         "Export Failed",
         "Unable to find analysis content to export",
@@ -147,7 +413,9 @@ export default function Index() {
       html2canvas: { 
         scale: 2,
         useCORS: true,
-        logging: false
+        logging: false,
+        windowWidth: element.scrollWidth,
+        windowHeight: element.scrollHeight
       },
       jsPDF: { 
         unit: 'mm', 
@@ -157,43 +425,59 @@ export default function Index() {
       pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
     }
 
-    showToast("Generating PDF", "Please wait while your PDF is being created...")
+    console.log(`   Filename: ${filename}`)
+    console.log(`   Options:`, options)
 
-    // CRITICAL FIX: Use setTimeout to ensure the DOM is fully ready before capture
+    // Use setTimeout to ensure UI is ready
     setTimeout(() => {
-        html2pdf()
-            .set(options)
-            .from(element)
-            .save()
-            .then(() => {
-                showToast("PDF Exported", "Your analysis has been downloaded successfully")
-            })
-            .catch((error: Error) => {
-                console.error('PDF export error:', error)
-                showToast(
-                    "Export Failed",
-                    "Failed to generate PDF. Please try again. Check console for details.",
-                    "destructive"
-                )
-            })
-    }, 100); // 100ms delay to allow final rendering
+      html2pdf()
+        .set(options)
+        .from(element)
+        .save()
+        .then(() => {
+          console.log('✅ PDF exported successfully')
+        })
+        .catch((error: Error) => {
+          console.error('❌ PDF export error:', error)
+          showToast(
+            "Export Failed",
+            "Failed to generate PDF. Please try again.",
+            "destructive"
+          )
+        })
+    }, 100)
+  }, [file, showToast])
 
-  }, [file, showToast]);
-
-  // Print handler
   const handlePrint = useCallback(() => {
+    console.log('🖨️ Opening print dialog...')
     window.print()
-  }, []);
+  }, [])
 
-  // DOCX export handler (placeholder)
   const handleExportDOCX = useCallback(() => {
+    console.log('📝 DOCX export requested (not yet implemented)')
     showToast(
       "Coming Soon",
       "DOCX export functionality will be available in the next update!"
     )
-  }, [showToast]);
+  }, [showToast])
 
-  // --- RENDERING (JSX) SECTION ---
+  // ═══════════════════════════════════════════════════════════════
+  // RESET HANDLER
+  // ═══════════════════════════════════════════════════════════════
+
+  const handleReset = useCallback(() => {
+    console.log('🔄 Resetting application state')
+    setFile(null)
+    setScenes([])
+    setProgress(0)
+    setCurrentScene(0)
+    setIsProcessing(false)
+    setVisualStyle('')
+  }, [])
+
+  // ═══════════════════════════════════════════════════════════════
+  // RENDER
+  // ═══════════════════════════════════════════════════════════════
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-8">
@@ -224,13 +508,13 @@ export default function Index() {
               accept=".txt,.fdx"
               onChange={handleFileUpload}
               disabled={isProcessing || isParsing}
-              className="flex-1 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer disabled:opacity-50"
+              className="flex-1 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             />
             {file && (
               <button
                 onClick={handleReset}
                 disabled={isProcessing || isParsing}
-                className="px-4 py-2 rounded-md border border-slate-300 hover:bg-slate-100 disabled:opacity-50"
+                className="px-4 py-2 rounded-md border border-slate-300 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 Clear
               </button>
@@ -256,7 +540,7 @@ export default function Index() {
                 </div>
               </div>
               
-              {/* Visual Style Input - FIXED: Force black text color (Guaranteed Fix) */}
+              {/* Visual Style Input - FIXED: Force black text color */}
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-slate-700">
                   Visual Style (Optional)
@@ -266,8 +550,8 @@ export default function Index() {
                   value={visualStyle}
                   onChange={(e) => setVisualStyle(e.target.value)}
                   placeholder="e.g., 1918 period piece, grainy stock, Vittorio Storaro lighting"
-                  className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
-                  style={{ color: '#000000 !important', backgroundColor: '#ffffff' }} // Added !important
+                  className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  style={{ color: '#000000', backgroundColor: '#ffffff' }}
                   disabled={isProcessing}
                 />
                 <p className="text-xs text-slate-500">
@@ -278,7 +562,7 @@ export default function Index() {
               {scenes.length > 0 && !isProcessing && (
                 <button
                   onClick={handleProcessScreenplay}
-                  className="w-full px-4 py-2 rounded-md bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 font-medium"
+                  className="w-full px-4 py-2 rounded-md bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 font-medium transition-all"
                 >
                   Analyze Screenplay
                 </button>
@@ -316,7 +600,6 @@ export default function Index() {
             <div className="p-4 border-b bg-slate-50 flex items-center justify-between no-print">
               <h2 className="text-2xl font-semibold">Analysis Results</h2>
               <div className="flex items-center gap-2">
-                
                 <button
                   onClick={handlePrint}
                   className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-md hover:bg-slate-50 transition-colors"
@@ -325,7 +608,6 @@ export default function Index() {
                   <Printer className="w-4 h-4" />
                   Print
                 </button>
-                
                 <button
                   onClick={handleExportPDF}
                   className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors"
@@ -334,16 +616,14 @@ export default function Index() {
                   <FileDown className="w-4 h-4" />
                   Export PDF
                 </button>
-                
                 <button
                   onClick={handleExportDOCX}
                   className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-md hover:bg-slate-50 transition-colors"
                   title="Export to DOCX"
                 >
-                  <FileText className="w-4 h-4" />
+                  <FileTextIcon className="w-4 h-4" />
                   Export DOCX
                 </button>
-
               </div>
             </div>
 
@@ -358,10 +638,10 @@ export default function Index() {
                   <div
                     key={scene.number}
                     className={`p-6 border-2 rounded-lg scene-analysis ${
-                      scene.status === 'complete' ? 'bg-green-50 border-green-200 scene-analysis' :
-                      scene.status === 'error' ? 'bg-red-50 border-red-200 scene-analysis' :
-                      scene.status === 'processing' ? 'bg-blue-50 border-blue-200 scene-analysis' :
-                      'bg-slate-50 border-slate-200 scene-analysis'
+                      scene.status === 'complete' ? 'bg-green-50 border-green-200' :
+                      scene.status === 'error' ? 'bg-red-50 border-red-200' :
+                      scene.status === 'processing' ? 'bg-blue-50 border-blue-200' :
+                      'bg-slate-50 border-slate-200'
                     }`}
                   >
                     <div className="flex items-start justify-between mb-4">
@@ -458,5 +738,7 @@ export default function Index() {
         )}
       </div>
     </div>
-  );
+  )
 }
+
+export default Index
