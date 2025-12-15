@@ -1,10 +1,11 @@
 // src/pages/Index.tsx - COMPLETE FINAL PRODUCTION FILE
+// Includes: Save/Load, Edit/Copy, Real Analysis Call, FDX/PDF Enablement, and DASHBOARD LINK
 import { useState, useCallback, useEffect } from 'react'
+import { Link } from 'react-router-dom' // <-- NEW IMPORT
 import { Upload, FileText, CheckCircle2, AlertCircle, Loader2, Printer, FileDown, FileText as FileTextIcon, Save, Edit2, Copy, X, Check } from 'lucide-react'
 import html2pdf from 'html2pdf.js'
 
-// CRITICAL FIX: Corrected CSS import path based on terminal feedback
-import '../src/styles/print.css'
+import '../src/styles/print.css' // Corrected path
 
 // ═══════════════════════════════════════════════════════════════
 // TYPE DEFINITIONS
@@ -23,7 +24,7 @@ interface Shot {
 
 interface NarrativeAnalysis {
   synopsis: string
-  centralConflict: string // string for simplified editing
+  centralConflict: string
   sceneTurn: string
   emotionalTone: string
   stakes: string
@@ -40,7 +41,7 @@ interface Scene {
   analysis: SceneAnalysis | null
   status: 'pending' | 'processing' | 'complete' | 'error'
   error: string | null
-  isEditing?: boolean // New state for local editing
+  isEditing?: boolean
 }
 
 interface AppState {
@@ -53,7 +54,6 @@ interface AppState {
 // UTILITY FUNCTIONS
 // ═══════════════════════════════════════════════════════════════
 
-// Simple toast replacement
 const showToast = (title: string, description?: string, variant?: 'default' | 'destructive') => {
   const message = description ? `${title}\n${description}` : title
   if (variant === 'destructive') {
@@ -67,7 +67,6 @@ const showToast = (title: string, description?: string, variant?: 'default' | 'd
   }
 }
 
-// Extract scenes from screenplay text (Placeholder for external parsing logic)
 function extractScenes(screenplayText: string): Scene[] {
     const sceneBlocks = screenplayText.split(/(?=(?:INT\.|EXT\.))/i)
     
@@ -86,7 +85,6 @@ function extractScenes(screenplayText: string): Scene[] {
     return scenes
 }
 
-// Convert file to base64 (Placeholder)
 async function fileToBase64(file: File): Promise<string> {
     return new Promise((resolve) => {
         const reader = new FileReader()
@@ -119,7 +117,6 @@ const loadState = (): AppState | undefined => {
             return undefined;
         }
         const state: AppState = JSON.parse(serializedState);
-        // Ensure complex objects like 'File' are handled (though we only save the name/type)
         if (state.scenes && !Array.isArray(state.scenes)) {
             state.scenes = Object.values(state.scenes);
         }
@@ -144,23 +141,19 @@ function Index() {
   const [visualStyle, setVisualStyle] = useState<string>('');
 
   // ---------------------------------------------------------------
-  // EFFECT: LOAD STATE ON MOUNT
+  // EFFECT: LOAD STATE ON MOUNT / SAVE STATE ON CHANGE
   // ---------------------------------------------------------------
   useEffect(() => {
     const persistedState = loadState();
     if (persistedState) {
         setFileInfo(persistedState.file);
-        setScenes(persistedState.scenes.map(s => ({ ...s, isEditing: false }))); // Reset editing state on load
+        setScenes(persistedState.scenes.map(s => ({ ...s, isEditing: false })));
         setVisualStyle(persistedState.visualStyle);
         showToast("Project Loaded", "Analysis results restored from your last session.");
     }
   }, []);
 
-  // ---------------------------------------------------------------
-  // EFFECT: SAVE STATE ON CHANGE
-  // ---------------------------------------------------------------
   useEffect(() => {
-    // Debounce state saving slightly to prevent excessive writes
     const handler = setTimeout(() => {
         if (scenes.length > 0 || fileInfo) {
             saveState({ file: fileInfo, scenes, visualStyle });
@@ -197,7 +190,7 @@ function Index() {
   }, [])
 
   // ---------------------------------------------------------------
-  // FILE UPLOAD HANDLER (Restored Real Logic)
+  // FILE UPLOAD HANDLER (FIXED: Accepts FDX and PDF for Backend Parsing)
   // ---------------------------------------------------------------
 
   const handleFileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -205,13 +198,10 @@ function Index() {
     if (!uploadedFile) return
 
     const extension = uploadedFile.name.split('.').pop()?.toLowerCase()
-
-    if (extension === 'pdf') {
-      showToast("PDF Format Not Supported", "Please export your screenplay as .txt or .fdx.", "destructive")
-      return
-    }
-    if (!['txt', 'fdx'].includes(extension || '')) {
-      showToast("Unsupported File Type", `${extension?.toUpperCase()} files are not supported.`, "destructive")
+    
+    // ALLOWED EXTENSIONS: txt, fdx, pdf
+    if (!['txt', 'fdx', 'pdf'].includes(extension || '')) {
+      showToast("Unsupported File Type", `${extension?.toUpperCase()} files are not supported. Please upload .txt, .fdx, or .pdf files.`, "destructive")
       return
     }
 
@@ -221,25 +211,31 @@ function Index() {
 
     try {
       let screenplayText = ''
+      
       if (extension === 'txt') {
         screenplayText = await uploadedFile.text()
-      } else if (extension === 'fdx') {
-        const base64Data = await fileToBase64(uploadedFile)
+      } else if (extension === 'fdx' || extension === 'pdf') {
+        // Use backend API for FDX and PDF parsing
+        console.log(`Sending ${extension} file to backend for parsing...`)
+        const base64Data = (await fileToBase64(uploadedFile)).split(',')[1] // Get raw base64 data
+        
         const response = await fetch('/api/parse-screenplay', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ fileData: base64Data, fileName: uploadedFile.name, fileType: extension })
         })
+        
         const result = await response.json()
         if (!response.ok || !result.screenplayText) {
-            throw new Error(result.error || result.message || `Failed to parse FDX file`)
+            throw new Error(result.error || result.message || `Failed to parse ${extension} file on server.`)
         }
         screenplayText = result.screenplayText
+        console.log(`Backend parsing successful. Extracted ${screenplayText.length} characters.`)
       }
 
       if (!screenplayText || screenplayText.length < 100) {
         showToast("Invalid File", "The file appears to be empty or too short.", "destructive")
-        setFileInfo(null); // Clear file info if parsing fails
+        setFileInfo(null);
         return
       }
 
@@ -247,7 +243,7 @@ function Index() {
       
       if (extractedScenes.length === 0) {
         showToast("No Scenes Found", "Could not find any scene headers (INT. or EXT.).", "destructive")
-        setFileInfo(null); // Clear file info if parsing fails
+        setFileInfo(null);
         return
       }
 
@@ -255,19 +251,19 @@ function Index() {
       setProgress(0)
       setCurrentScene(0)
 
-      showToast("File Loaded", `Found ${extractedScenes.length} scenes.`)
+      showToast("File Loaded", `Found ${extractedScenes.length} scenes from the ${extension.toUpperCase()} file.`)
 
     } catch (error) {
       console.error('File upload error:', error)
       showToast("Upload Failed", error instanceof Error ? error.message : "Failed to read file", "destructive")
-      setFileInfo(null); // Clear file info on error
+      setFileInfo(null);
     } finally {
       setIsParsing(false)
     }
   }, [showToast])
 
   // ---------------------------------------------------------------
-  // ANALYZE SCENE (Restored Real Logic)
+  // ANALYZE SCENE (Real API Logic)
   // ---------------------------------------------------------------
 
   const analyzeScene = useCallback(async (scene: Scene, totalScenes: number): Promise<SceneAnalysis> => {
@@ -354,8 +350,9 @@ function Index() {
   }, [scenes, analyzeScene, showToast])
 
   // ---------------------------------------------------------------
-  // FEATURE 3: COPY PROMPT HANDLER
+  // FEATURE 3 & 4: COPY PROMPT / EDIT SHOT LIST
   // ---------------------------------------------------------------
+  
   const handleCopyPrompt = useCallback(async (prompt: string) => {
     try {
         await navigator.clipboard.writeText(prompt);
@@ -366,11 +363,6 @@ function Index() {
     }
   }, [showToast]);
 
-  // ---------------------------------------------------------------
-  // FEATURE 2: EDIT SHOT LIST HANDLERS
-  // ---------------------------------------------------------------
-
-  // Toggles the editing state for a single scene
   const handleToggleEdit = useCallback((sceneNumber: number, shotIndex: number) => {
     setScenes(prevScenes => prevScenes.map(scene => {
         if (scene.number === sceneNumber && scene.analysis) {
@@ -390,7 +382,6 @@ function Index() {
     }));
   }, []);
 
-  // Updates local state as the user types
   const handleShotChange = useCallback((sceneNumber: number, shotIndex: number, field: keyof Shot, value: string) => {
     setScenes(prevScenes => prevScenes.map(scene => {
         if (scene.number === sceneNumber && scene.analysis) {
@@ -409,13 +400,11 @@ function Index() {
     }));
   }, []);
 
-  // Saves the edit and exits edit mode
   const handleSaveEdit = useCallback((sceneNumber: number, shotIndex: number) => {
     setScenes(prevScenes => prevScenes.map(scene => {
         if (scene.number === sceneNumber && scene.analysis) {
             const newShotList = scene.analysis.shotList.map((shot, index) => {
                 if (index === shotIndex) {
-                    // Remove the temporary isEditing flag before saving
                     const { isEditing, ...rest } = shot;
                     return { ...rest, isEditing: false }; 
                 }
@@ -460,7 +449,6 @@ function Index() {
 
     showToast("Generating PDF", "Please wait while your PDF is being created...")
 
-    // CRITICAL FIX: Use setTimeout to ensure the DOM is fully ready before capture
     setTimeout(() => {
         html2pdf().set(options).from(element).save()
             .then(() => showToast("PDF Exported", "Your analysis has been downloaded successfully"))
@@ -489,11 +477,13 @@ function Index() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-8">
       <div className="max-w-6xl mx-auto space-y-8">
         
-        {/* Header */}
+        {/* Header - MODIFIED TO INCLUDE LINK TO DASHBOARD */}
         <div className="text-center space-y-4">
-          <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            ShotLogic
-          </h1>
+          <Link to="/" className='inline-block'>
+            <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent hover:text-blue-500 transition-colors cursor-pointer">
+                ShotLogic
+            </h1>
+          </Link>
           <p className="text-xl text-slate-600">
             AI-Powered Screenplay Analysis for Production Planning
           </p>
@@ -506,13 +496,13 @@ function Index() {
             Upload Screenplay
           </h2>
           <p className="text-sm text-slate-600">
-            Upload a .txt or .fdx (Final Draft) screenplay file to analyze scene requirements
+            Upload a .txt, .fdx, or .pdf file to analyze scene requirements
           </p>
           
           <div className="flex items-center gap-4">
             <input
               type="file"
-              accept=".txt,.fdx"
+              accept=".txt,.fdx,.pdf"
               onChange={handleFileUpload}
               disabled={isProcessing || isParsing}
               className="flex-1 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
@@ -608,7 +598,7 @@ function Index() {
               <h2 className="text-2xl font-semibold">Analysis Results</h2>
               <div className="flex items-center gap-2">
                 
-                {/* NEW: Save Button */}
+                {/* Save Button */}
                 <button
                     onClick={handleManualSave}
                     className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-green-700 bg-white border border-green-300 rounded-md hover:bg-green-50 transition-colors"
@@ -680,7 +670,6 @@ function Index() {
                         <div className="border-t-2 border-slate-200 pt-4">
                           <h4 className="text-lg font-bold text-slate-900 mb-3">📖 Narrative Analysis</h4>
                           <div className="space-y-3 text-sm">
-                            {/* ... Narrative Analysis content is read-only ... */}
                             <div>
                               <span className="font-semibold text-slate-700">Synopsis:</span>
                               <p className="text-slate-600 mt-1">{scene.analysis.narrativeAnalysis.synopsis}</p>
