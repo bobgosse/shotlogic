@@ -1,12 +1,12 @@
 // api/projects/get-all.ts
 // PRODUCTION-READY: Fetches all saved projects
-// CRITICAL: Does NOT close MongoDB connection (connection is reused)
+// CRITICAL: Uses .js extension for ES Module compatibility in Vercel
 
 import { VercelRequest, VercelResponse } from '@vercel/node'
-import { getDb } from '../lib/mongodb' // NO .js extension in TypeScript
+import { getDb } from '../lib/mongodb.js' // CRITICAL: .js extension required for Node.js ES Modules
 import { ObjectId } from 'mongodb'
 
-const DEPLOY_TIMESTAMP = '2024-12-13T08:00:00Z_FINAL_FIX'
+const DEPLOY_TIMESTAMP = '2024-12-13T09:00:00Z_MODULE_FIX'
 
 export default async function handler(
   req: VercelRequest,
@@ -19,7 +19,8 @@ export default async function handler(
   console.log(`📅 Timestamp: ${new Date().toISOString()}`)
   console.log(`🏷️  Deploy: ${DEPLOY_TIMESTAMP}`)
   console.log(`📍 Method: ${req.method}`)
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'unknown'}`)
+  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'production'}`)
+  console.log(`🔧 Node Version: ${process.version}`)
 
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -44,6 +45,8 @@ export default async function handler(
 
   try {
     console.log(`🔌 [${invocationId}] Connecting to MongoDB...`)
+    console.log(`   Database: ShotLogicDB`)
+    console.log(`   Collection: projects`)
 
     // Get database connection with timeout
     const db = await Promise.race([
@@ -53,7 +56,7 @@ export default async function handler(
       )
     ])
 
-    console.log(`✅ [${invocationId}] Connected to database: ShotLogicDB`)
+    console.log(`✅ [${invocationId}] Successfully connected to database`)
     console.log(`📊 [${invocationId}] Accessing 'projects' collection...`)
 
     const collection = db.collection('projects')
@@ -61,15 +64,15 @@ export default async function handler(
     // Verify collection is accessible
     try {
       const count = await collection.estimatedDocumentCount()
-      console.log(`✅ [${invocationId}] Collection 'projects' verified (${count} documents)`)
+      console.log(`✅ [${invocationId}] Collection verified: ${count} document(s) total`)
     } catch (collError) {
       console.error(`❌ [${invocationId}] Collection access error:`, collError)
       throw new Error('Projects collection not accessible')
     }
 
-    console.log(`🔍 [${invocationId}] Fetching projects...`)
+    console.log(`🔍 [${invocationId}] Executing query...`)
 
-    // Fetch projects
+    // Fetch projects with proper error handling
     const projectList = await collection
       .find({})
       .project({ name: 1, updatedAt: 1 })
@@ -77,7 +80,7 @@ export default async function handler(
       .limit(100)
       .toArray()
 
-    console.log(`📦 [${invocationId}] Found ${projectList.length} projects`)
+    console.log(`📦 [${invocationId}] Query successful: ${projectList.length} project(s) found`)
 
     // Transform results
     const projects = projectList.map((project) => {
@@ -105,7 +108,7 @@ export default async function handler(
     })
 
     const totalDuration = Date.now() - startTime
-    console.log(`⏱️  [${invocationId}] Total: ${totalDuration}ms`)
+    console.log(`⏱️  [${invocationId}] Processing complete: ${totalDuration}ms`)
     console.log(`✅ [${invocationId}] SUCCESS`)
     console.log(`🔄 [${invocationId}] Connection kept alive for reuse`)
     console.log(`═══════════════════════════════════════════════════════\n`)
@@ -122,17 +125,18 @@ export default async function handler(
   } catch (error) {
     const totalDuration = Date.now() - startTime
     console.error(`\n💥 [${invocationId}] ═══════════════════════════════`)
-    console.error(`❌ ERROR after ${totalDuration}ms`)
-    console.error(`📛 Type: ${error instanceof Error ? error.constructor.name : 'Unknown'}`)
-    console.error(`📛 Message: ${error instanceof Error ? error.message : String(error)}`)
+    console.error(`❌ FATAL ERROR after ${totalDuration}ms`)
+    console.error(`📛 Error Type: ${error instanceof Error ? error.constructor.name : 'Unknown'}`)
+    console.error(`📛 Error Message: ${error instanceof Error ? error.message : String(error)}`)
 
-    if (error instanceof Error) {
-      console.error(`📛 Stack:`, error.stack)
+    if (error instanceof Error && error.stack) {
+      console.error(`📛 Stack Trace:`)
+      console.error(error.stack)
     }
 
     console.error(`═══════════════════════════════════════════════════════\n`)
 
-    // Determine error type
+    // Determine error type and appropriate response
     let statusCode = 500
     let errorMessage = 'Failed to fetch projects'
     let errorDetails = error instanceof Error ? error.message : 'Unknown error'
@@ -148,7 +152,11 @@ export default async function handler(
     } else if (errorDetails.includes('not accessible')) {
       statusCode = 500
       errorMessage = 'Collection not found'
-      errorDetails = 'The projects collection does not exist. Create it in MongoDB Atlas.'
+      errorDetails = 'The projects collection does not exist in ShotLogicDB. Create it in MongoDB Atlas.'
+    } else if (errorDetails.includes('ENOTFOUND') || errorDetails.includes('network')) {
+      statusCode = 503
+      errorMessage = 'Database unreachable'
+      errorDetails = 'Cannot reach MongoDB Atlas. Check network access settings and cluster status.'
     }
 
     return res.status(statusCode).json({
@@ -158,6 +166,5 @@ export default async function handler(
       processingTime: totalDuration
     })
   }
-  // CRITICAL: NO finally block to close connection
-  // Connection is reused across invocations for performance
+  // CRITICAL: NO finally block - connection must stay alive for reuse
 }
