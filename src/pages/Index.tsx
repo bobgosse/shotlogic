@@ -1,7 +1,7 @@
 // src/pages/Index.tsx - COMPLETE FINAL PRODUCTION FILE
-// Includes: Cloud Save Integration, Project Naming, Dashboard Link
+// Includes: Cloud Save/Load Integration, Project Naming, Dashboard Link
 import { useState, useCallback, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom' // <-- useLocation is NEW
 import { Upload, FileText, CheckCircle2, AlertCircle, Loader2, Printer, FileDown, FileText as FileTextIcon, Save, Edit2, Copy, X, Check } from 'lucide-react'
 import html2pdf from 'html2pdf.js'
 
@@ -20,6 +20,7 @@ interface Shot {
   rationale: string
   editorialIntent: string
   aiImagePrompt: string
+  // isEditing?: boolean // Keep this transient state out of the payload
 }
 
 interface NarrativeAnalysis {
@@ -44,12 +45,20 @@ interface Scene {
   isEditing?: boolean
 }
 
+// Interface for the data stored in MongoDB (the 'data' field)
+interface ProjectDataPayload {
+    file: { name: string, type: string } | null;
+    scenes: Scene[];
+    visualStyle: string;
+}
+
+// Interface for the state tracked locally
 interface AppState {
     file: { name: string, type: string } | null;
     scenes: Scene[];
     visualStyle: string;
-    projectId: string | null; // <-- NEW
-    projectName: string;      // <-- NEW
+    projectId: string | null;
+    projectName: string;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -63,7 +72,7 @@ const showToast = (title: string, description?: string, variant?: 'default' | 'd
     alert(`❌ ${message}`)
   } else {
     console.log(message)
-    if (title.includes('Exported') || title.includes('Saved')) {
+    if (title.includes('Exported') || title.includes('Saved') || title.includes('Loaded')) {
         alert(`✅ ${message}`)
     }
   }
@@ -97,7 +106,7 @@ async function fileToBase64(file: File): Promise<string> {
 
 
 // ═══════════════════════════════════════════════════════════════
-// LOCAL STORAGE MANAGEMENT (Still used for autosave/restore of current session)
+// LOCAL STORAGE MANAGEMENT (For Autosave/Restore of CURRENT session)
 // ═══════════════════════════════════════════════════════════════
 
 const STORAGE_KEY = 'shotLogicAppState';
@@ -122,7 +131,6 @@ const loadState = (): AppState | undefined => {
         if (state.scenes && !Array.isArray(state.scenes)) {
             state.scenes = Object.values(state.scenes);
         }
-        // Ensure new fields are present for compatibility
         state.projectId = state.projectId || null;
         state.projectName = state.projectName || 'Untitled Project';
 
@@ -138,6 +146,7 @@ const loadState = (): AppState | undefined => {
 // ═══════════════════════════════════════════════════════════════
 
 function Index() {
+  const location = useLocation(); // Hook to access URL parameters
   const [fileInfo, setFileInfo] = useState<{ name: string, type: string } | null>(null);
   const [scenes, setScenes] = useState<Scene[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -146,31 +155,77 @@ function Index() {
   const [currentScene, setCurrentScene] = useState(0);
   const [visualStyle, setVisualStyle] = useState<string>('');
   
-  // CLOUD SAVE STATE
-  const [projectId, setProjectId] = useState<string | null>(null); // MongoDB ID
+  // CLOUD SAVE/LOAD STATE
+  const [projectId, setProjectId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState<string>('Untitled Project');
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingProject, setIsLoadingProject] = useState(false); // NEW state for loading
 
 
   // ---------------------------------------------------------------
-  // EFFECT: LOAD STATE ON MOUNT / SAVE STATE ON CHANGE
+  // EFFECT 1: LOAD PROJECT FROM URL QUERY PARAMETER
   // ---------------------------------------------------------------
   useEffect(() => {
-    const persistedState = loadState();
-    if (persistedState) {
+    const queryParams = new URLSearchParams(location.search);
+    const idFromUrl = queryParams.get('projectId');
+
+    if (idFromUrl && idFromUrl !== projectId) {
+      const loadProject = async () => {
+        setIsLoadingProject(true);
+        try {
+          const response = await fetch(`/api/projects/get-one?projectId=${idFromUrl}`);
+          const result = await response.json();
+
+          if (!response.ok || !result.projectData) {
+            throw new Error(result.error || 'Failed to retrieve project data.');
+          }
+
+          const loadedData: ProjectDataPayload = result.projectData;
+          
+          // Apply loaded data to state
+          setProjectId(result.projectId);
+          setProjectName(result.projectName || 'Untitled Project');
+          setFileInfo(loadedData.file);
+          setVisualStyle(loadedData.visualStyle || '');
+          // Ensure scenes are mapped with transient UI state (isEditing)
+          setScenes(loadedData.scenes.map(s => ({ ...s, isEditing: false })));
+          
+          showToast("Project Loaded", `Successfully loaded project: ${result.projectName}`);
+
+        } catch (error) {
+          console.error('Load Project Error:', error);
+          showToast("Load Failed", error instanceof Error ? error.message : "An unknown error occurred while loading the project.", "destructive");
+        } finally {
+          setIsLoadingProject(false);
+        }
+      };
+      
+      loadProject();
+      
+    } else if (!idFromUrl) {
+      // If no ID in URL, load from LocalStorage for session continuity
+      const persistedState = loadState();
+      if (persistedState) {
         setFileInfo(persistedState.file);
         setScenes(persistedState.scenes.map(s => ({ ...s, isEditing: false })));
         setVisualStyle(persistedState.visualStyle);
-        // Load cloud save tracking info
         setProjectId(persistedState.projectId);
         setProjectName(persistedState.projectName);
-        
-        showToast("Project Loaded", "Analysis results restored from your last session.");
+        // Only show toast if scenes were actually loaded from local storage
+        if (persistedState.scenes.length > 0) {
+            showToast("Session Restored", "Analysis results restored from your last local session.");
+        }
+      }
     }
-  }, []);
+  }, [location.search]); // Depend on URL changes
 
-  // Autosave to LocalStorage
+  // ---------------------------------------------------------------
+  // EFFECT 2: AUTOSAVE TO LOCAL STORAGE
+  // ---------------------------------------------------------------
   useEffect(() => {
+    // Only autosave if we are not actively loading a new project from the cloud
+    if (isLoadingProject) return; 
+
     const handler = setTimeout(() => {
         if (scenes.length > 0 || fileInfo) {
             saveState({ file: fileInfo, scenes, visualStyle, projectId, projectName });
@@ -178,14 +233,14 @@ function Index() {
     }, 500);
 
     return () => clearTimeout(handler);
-  }, [scenes, fileInfo, visualStyle, projectId, projectName]);
+  }, [scenes, fileInfo, visualStyle, projectId, projectName, isLoadingProject]);
 
 
   // ═══════════════════════════════════════════════════════════════
   // HANDLERS
   // ═══════════════════════════════════════════════════════════════
 
-  // MODIFIED TO SAVE TO CLOUD API
+  // HANDLER: CLOUD SAVE
   const handleManualSave = useCallback(async () => {
     if (scenes.length === 0) {
         showToast("Cannot Save", "Upload and analyze a screenplay first.", "destructive");
@@ -200,9 +255,12 @@ function Index() {
     setIsSaving(true);
     
     // Construct the data payload to save to MongoDB
-    const projectDataPayload = { 
+    const projectDataPayload: ProjectDataPayload = { 
         file: fileInfo, 
-        scenes: scenes.map(s => ({ ...s, isEditing: undefined })), // Remove transient frontend state
+        scenes: scenes.map(s => {
+            const { isEditing, ...rest } = s; // Exclude transient state
+            return rest as Scene;
+        }), 
         visualStyle: visualStyle,
     };
 
@@ -241,6 +299,7 @@ function Index() {
     saveState({ file: fileInfo, scenes, visualStyle, projectId, projectName });
   }, [scenes, fileInfo, visualStyle, projectId, projectName]);
 
+  // HANDLER: RESET
   const handleReset = useCallback(() => {
     console.log('🔄 Resetting application state')
     setFileInfo(null)
@@ -255,10 +314,7 @@ function Index() {
     showToast("Project Cleared", "Local session data has been removed.");
   }, [])
 
-  // ---------------------------------------------------------------
-  // FILE UPLOAD HANDLER
-  // ---------------------------------------------------------------
-
+  // HANDLER: FILE UPLOAD
   const handleFileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const uploadedFile = event.target.files?.[0]
     if (!uploadedFile) return
@@ -273,9 +329,8 @@ function Index() {
     setIsParsing(true)
     setScenes([])
     setFileInfo({ name: uploadedFile.name, type: extension || 'txt' })
-    // Automatically set project name based on file name (without extension)
     setProjectName(uploadedFile.name.replace(/\.[^/.]+$/, ''));
-    setProjectId(null); // Clear any old project ID
+    setProjectId(null); 
 
     try {
       let screenplayText = ''
@@ -329,10 +384,7 @@ function Index() {
     }
   }, [showToast])
 
-  // ---------------------------------------------------------------
-  // ANALYZE SCENE
-  // ---------------------------------------------------------------
-
+  // HANDLER: ANALYZE SCENE (unchanged)
   const analyzeScene = useCallback(async (scene: Scene, totalScenes: number): Promise<SceneAnalysis> => {
     try {
       const response = await fetch('/api/analyze-scene', {
@@ -363,6 +415,7 @@ function Index() {
     }
   }, [visualStyle])
 
+  // HANDLER: PROCESS SCREENPLAY (unchanged)
   const handleProcessScreenplay = useCallback(async () => {
     if (scenes.length === 0) {
       showToast("No Screenplay Loaded", "Please upload a screenplay file first.", "destructive")
@@ -416,9 +469,7 @@ function Index() {
 
   }, [scenes, analyzeScene, showToast])
 
-  // ---------------------------------------------------------------
-  // EDIT/COPY HANDLERS
-  // ---------------------------------------------------------------
+  // HANDLER: EDIT/COPY (unchanged)
   
   const handleCopyPrompt = useCallback(async (prompt: string) => {
     try {
@@ -487,10 +538,7 @@ function Index() {
     }));
   }, [showToast]);
 
-  // ---------------------------------------------------------------
-  // EXPORT HANDLERS
-  // ---------------------------------------------------------------
-
+  // HANDLER: EXPORT (unchanged)
   const handleExportPDF = useCallback(() => {
     const element = document.getElementById('analysis-content')
     if (!element) {
@@ -539,6 +587,17 @@ function Index() {
   // ═══════════════════════════════════════════════════════════════
   // RENDER
   // ═══════════════════════════════════════════════════════════════
+  
+  // Display a loading screen while fetching project data from the URL
+  if (isLoadingProject) {
+    return (
+        <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-8">
+            <Loader2 className="w-12 h-12 animate-spin text-blue-600 mb-4" />
+            <h1 className="text-3xl font-bold text-gray-800">Loading Project from Cloud...</h1>
+            <p className="text-gray-600 mt-2">Please wait while your analysis is retrieved.</p>
+        </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-8">
@@ -556,7 +615,7 @@ function Index() {
           </p>
         </div>
 
-        {/* Project Name Input (NEW) */}
+        {/* Project Name Input */}
         <div className="bg-white rounded-lg border shadow-lg p-4">
             <label className="block text-sm font-medium text-slate-700 mb-1">
                 Project Name:
@@ -571,7 +630,7 @@ function Index() {
             />
             {projectId && (
                 <p className="text-xs text-green-600 mt-1">
-                    * Saved in Cloud (ID: {projectId})
+                    * Saved in Cloud (ID: {projectId}). Click Save to update.
                 </p>
             )}
         </div>
@@ -581,7 +640,7 @@ function Index() {
         <div className="bg-white rounded-lg border shadow-xl p-6 space-y-4">
           <h2 className="text-2xl font-semibold flex items-center gap-2">
             <Upload className="w-6 h-6" />
-            Upload Screenplay
+            {scenes.length > 0 ? 'Project File Details' : 'Upload Screenplay'}
           </h2>
           <p className="text-sm text-slate-600">
             Upload a .txt, .fdx, or .pdf file to analyze scene requirements
