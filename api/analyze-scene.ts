@@ -79,7 +79,7 @@ interface SceneAnalysis {
 }
 
 export const config = {
-  maxDuration: 30,
+  maxDuration: 60, // Maximum allowed timeout for most Vercel plans
 }
 
 // ═══════════════════════════════════════════════════════════════
