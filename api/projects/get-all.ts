@@ -1,12 +1,12 @@
 // api/projects/get-all.ts
 // PRODUCTION-READY: Fetches all saved projects
-// CRITICAL: Uses .js extension for ES Module compatibility in Vercel
+// CRITICAL FIX: Returns _id (not id) to match frontend expectations
 
 import { VercelRequest, VercelResponse } from '@vercel/node'
-import { getDb } from '../lib/mongodb.js' // CRITICAL: .js extension required for Node.js ES Modules
+import { getDb } from '../lib/mongodb.js'
 import { ObjectId } from 'mongodb'
 
-const DEPLOY_TIMESTAMP = '2024-12-13T09:00:00Z_MODULE_FIX'
+const DEPLOY_TIMESTAMP = '2024-12-13T12:00:00Z_ID_FIELD_FIX'
 
 export default async function handler(
   req: VercelRequest,
@@ -82,14 +82,22 @@ export default async function handler(
 
     console.log(`📦 [${invocationId}] Query successful: ${projectList.length} project(s) found`)
 
-    // Transform results
-    const projects = projectList.map((project) => {
+    // CRITICAL FIX: Transform results with _id (not id)
+    const projects = projectList.map((project, index) => {
       try {
+        // Extract and convert _id to string
+        const idString = project._id instanceof ObjectId
+          ? project._id.toHexString()
+          : String(project._id)
+        
+        // Log each project for debugging
+        console.log(`   [${index}] Name: "${project.name || 'Untitled'}"`)
+        console.log(`        Raw _id: ${project._id}`)
+        console.log(`        Converted: ${idString}`)
+        console.log(`        Length: ${idString.length}`)
+        
         return {
-          id:
-            project._id instanceof ObjectId
-              ? project._id.toHexString()
-              : String(project._id),
+          _id: idString, // ✅ FIXED: Changed from 'id' to '_id'
           name: project.name || 'Untitled Project',
           updatedAt: project.updatedAt
             ? project.updatedAt instanceof Date
@@ -98,9 +106,12 @@ export default async function handler(
             : new Date().toISOString()
         }
       } catch (transformError) {
-        console.error(`⚠️  [${invocationId}] Error transforming project:`, transformError)
+        console.error(`⚠️  [${invocationId}] Error transforming project at index ${index}:`, transformError)
+        console.error(`    Raw project:`, project)
+        
+        // Fallback with safe defaults
         return {
-          id: String(project._id),
+          _id: project._id ? String(project._id) : `error-${index}`, // ✅ FIXED: _id not id
           name: project.name || 'Untitled Project',
           updatedAt: new Date().toISOString()
         }
@@ -110,6 +121,7 @@ export default async function handler(
     const totalDuration = Date.now() - startTime
     console.log(`⏱️  [${invocationId}] Processing complete: ${totalDuration}ms`)
     console.log(`✅ [${invocationId}] SUCCESS`)
+    console.log(`📤 [${invocationId}] Returning ${projects.length} projects`)
     console.log(`🔄 [${invocationId}] Connection kept alive for reuse`)
     console.log(`═══════════════════════════════════════════════════════\n`)
 
