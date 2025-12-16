@@ -1,11 +1,8 @@
-// src/pages/Index.tsx - COMPLETE FINAL PRODUCTION FILE with Cinematic Red/Deep Black UI
-// Includes: Cloud Save/Load Integration, Project Naming, Dashboard Link, and the critical text visibility fix.
+// src/pages/Index.tsx - COMPLETE FINAL PRODUCTION FILE with Cloud Save Fix
 import { useState, useCallback, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom' 
 import { Upload, FileText, CheckCircle2, AlertCircle, Loader2, Printer, FileDown, FileText as FileTextIcon, Save, Edit2, Copy, X, Check } from 'lucide-react'
 import html2pdf from 'html2pdf.js'
-
-import '../src/styles/print.css' 
 
 // ═══════════════════════════════════════════════════════════════
 // TYPE DEFINITIONS
@@ -20,6 +17,7 @@ interface Shot {
   rationale: string
   editorialIntent: string
   aiImagePrompt: string
+  isEditing?: boolean // Fixed: Made optional for type compatibility
 }
 
 interface NarrativeAnalysis {
@@ -44,14 +42,12 @@ interface Scene {
   isEditing?: boolean
 }
 
-// Interface for the data stored in MongoDB (the 'data' field)
 interface ProjectDataPayload {
     file: { name: string, type: string } | null;
     scenes: Scene[];
     visualStyle: string;
 }
 
-// Interface for the state tracked locally
 interface AppState {
     file: { name: string, type: string } | null;
     scenes: Scene[];
@@ -103,9 +99,8 @@ async function fileToBase64(file: File): Promise<string> {
     })
 }
 
-
 // ═══════════════════════════════════════════════════════════════
-// LOCAL STORAGE MANAGEMENT (For Autosave/Restore of CURRENT session)
+// LOCAL STORAGE MANAGEMENT
 // ═══════════════════════════════════════════════════════════════
 
 const STORAGE_KEY = 'shotLogicAppState';
@@ -145,7 +140,7 @@ const loadState = (): AppState | undefined => {
 // ═══════════════════════════════════════════════════════════════
 
 function Index() {
-  const location = useLocation(); // Hook to access URL parameters
+  const location = useLocation();
   const [fileInfo, setFileInfo] = useState<{ name: string, type: string } | null>(null);
   const [scenes, setScenes] = useState<Scene[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -154,15 +149,13 @@ function Index() {
   const [currentScene, setCurrentScene] = useState(0);
   const [visualStyle, setVisualStyle] = useState<string>('');
   
-  // CLOUD SAVE/LOAD STATE
   const [projectId, setProjectId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState<string>('Untitled Project');
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingProject, setIsLoadingProject] = useState(false); 
 
-
   // ---------------------------------------------------------------
-  // EFFECT 1: LOAD PROJECT FROM URL QUERY PARAMETER
+  // EFFECT 1: LOAD PROJECT FROM URL
   // ---------------------------------------------------------------
   useEffect(() => {
     const queryParams = new URLSearchParams(location.search);
@@ -181,19 +174,17 @@ function Index() {
 
           const loadedData: ProjectDataPayload = result.projectData;
           
-          // Apply loaded data to state
           setProjectId(result.projectId);
           setProjectName(result.projectName || 'Untitled Project');
           setFileInfo(loadedData.file);
           setVisualStyle(loadedData.visualStyle || '');
-          // Ensure scenes are mapped with transient UI state (isEditing)
           setScenes(loadedData.scenes.map(s => ({ ...s, isEditing: false })));
           
           showToast("Project Loaded", `Successfully loaded project: ${result.projectName}`);
 
         } catch (error) {
           console.error('Load Project Error:', error);
-          showToast("Load Failed", error instanceof Error ? error.message : "An unknown error occurred while loading the project.", "destructive");
+          showToast("Load Failed", error instanceof Error ? error.message : "An unknown error occurred.", "destructive");
         } finally {
           setIsLoadingProject(false);
         }
@@ -202,7 +193,6 @@ function Index() {
       loadProject();
       
     } else if (!idFromUrl) {
-      // If no ID in URL, load from LocalStorage for session continuity
       const persistedState = loadState();
       if (persistedState) {
         setFileInfo(persistedState.file);
@@ -210,7 +200,6 @@ function Index() {
         setVisualStyle(persistedState.visualStyle);
         setProjectId(persistedState.projectId);
         setProjectName(persistedState.projectName);
-        // Only show toast if scenes were actually loaded from local storage
         if (persistedState.scenes.length > 0) {
             showToast("Session Restored", "Analysis results restored from your last local session.");
         }
@@ -222,7 +211,6 @@ function Index() {
   // EFFECT 2: AUTOSAVE TO LOCAL STORAGE
   // ---------------------------------------------------------------
   useEffect(() => {
-    // Only autosave if we are not actively loading a new project from the cloud
     if (isLoadingProject) return; 
 
     const handler = setTimeout(() => {
@@ -234,12 +222,11 @@ function Index() {
     return () => clearTimeout(handler);
   }, [scenes, fileInfo, visualStyle, projectId, projectName, isLoadingProject]);
 
-
   // ═══════════════════════════════════════════════════════════════
   // HANDLERS
   // ═══════════════════════════════════════════════════════════════
 
-  // HANDLER: CLOUD SAVE
+  // HANDLER: CLOUD SAVE - FIXED
   const handleManualSave = useCallback(async () => {
     if (scenes.length === 0) {
         showToast("Cannot Save", "Upload and analyze a screenplay first.", "destructive");
@@ -251,50 +238,69 @@ function Index() {
         return;
     }
 
+    console.log(`💾 Initiating cloud save for project: ${projectName}`)
+    console.log(`   Project ID: ${projectId || 'NEW'}`)
+    console.log(`   Scenes: ${scenes.length}`)
+    
     setIsSaving(true);
     
-    // Construct the data payload to save to MongoDB
+    // Construct the data payload
     const projectDataPayload: ProjectDataPayload = { 
         file: fileInfo, 
         scenes: scenes.map(s => {
-            const { isEditing, ...rest } = s; // Exclude transient state
+            const { isEditing, ...rest } = s;
             return rest as Scene;
         }), 
         visualStyle: visualStyle,
     };
 
     try {
+        // CRITICAL FIX: Backend expects 'name' not 'projectName'
+        const requestBody = {
+            projectId: projectId || undefined, // Send as undefined if null for new projects
+            name: projectName, // FIXED: Changed from 'projectName' to 'name'
+            projectData: projectDataPayload
+        };
+
+        console.log(`📤 Sending save request:`, {
+            hasProjectId: !!requestBody.projectId,
+            name: requestBody.name,
+            dataSize: JSON.stringify(requestBody.projectData).length
+        });
+
         const response = await fetch('/api/projects/save', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                projectId: projectId, 
-                projectName: projectName,
-                projectData: projectDataPayload
-            })
+            body: JSON.stringify(requestBody)
         });
 
-        const result = await response.json();
+        console.log(`📥 Save response status: ${response.status}`);
 
         if (!response.ok) {
-            throw new Error(result.error || result.message || 'Failed to save project to the cloud.');
+            const errorData = await response.json().catch(() => ({}));
+            console.error(`❌ Save failed:`, errorData);
+            throw new Error(errorData.error || errorData.message || 'Failed to save project to the cloud.');
         }
+
+        const result = await response.json();
+        console.log(`✅ Save successful:`, result);
 
         // Update the projectId if this was a new save
         if (!projectId && result.projectId) {
             setProjectId(result.projectId);
+            console.log(`   New project ID assigned: ${result.projectId}`);
         }
 
-        showToast("Cloud Project Saved", `Project '${projectName}' updated successfully in the cloud!`);
+        showToast("Cloud Project Saved", `Project '${projectName}' saved successfully!`);
 
     } catch (error) {
-        console.error('Cloud Save Error:', error);
+        console.error('❌ Cloud Save Error:', error);
         showToast("Cloud Save Failed", error instanceof Error ? error.message : "An unknown error occurred during cloud save.", "destructive");
     } finally {
         setIsSaving(false);
     }
     
-    // Always call local save as well for immediate session restoration
+    // Always save locally as well
     saveState({ file: fileInfo, scenes, visualStyle, projectId, projectName });
   }, [scenes, fileInfo, visualStyle, projectId, projectName]);
 
@@ -307,8 +313,8 @@ function Index() {
     setCurrentScene(0)
     setIsProcessing(false)
     setVisualStyle('')
-    setProjectId(null); // Clear cloud ID
-    setProjectName('Untitled Project'); // Reset name
+    setProjectId(null);
+    setProjectName('Untitled Project');
     localStorage.removeItem(STORAGE_KEY);
     showToast("Project Cleared", "Local session data has been removed.");
   }, [])
@@ -372,7 +378,7 @@ function Index() {
       setProgress(0)
       setCurrentScene(0)
 
-      showToast("File Loaded", `Found ${extractedScenes.length} scenes from the ${extension.toUpperCase()} file.`)
+      showToast("File Loaded", `Found ${extractedScenes.length} scenes from the ${extension?.toUpperCase()} file.`)
 
     } catch (error) {
       console.error('File upload error:', error)
@@ -381,10 +387,12 @@ function Index() {
     } finally {
       setIsParsing(false)
     }
-  }, [showToast])
+  }, [])
 
   // HANDLER: ANALYZE SCENE 
   const analyzeScene = useCallback(async (scene: Scene, totalScenes: number): Promise<SceneAnalysis> => {
+    console.log(`🎬 Analyzing scene ${scene.number}/${totalScenes}`)
+    
     try {
       const response = await fetch('/api/analyze-scene', {
         method: 'POST',
@@ -406,6 +414,8 @@ function Index() {
       if (!result.data || !result.data.narrativeAnalysis || !result.data.shotList) {
         throw new Error('Invalid analysis structure received from API')
       }
+      
+      console.log(`✅ Scene ${scene.number} analyzed successfully`)
       return result.data as SceneAnalysis
 
     } catch (error) {
@@ -421,6 +431,8 @@ function Index() {
       return
     }
 
+    console.log(`\n🎬 Starting screenplay analysis (${scenes.length} scenes)`)
+    
     setIsProcessing(true)
     setProgress(0)
     setCurrentScene(0)
@@ -460,16 +472,17 @@ function Index() {
     const completedScenes = updatedScenes.filter(s => s.status === 'complete').length
     const errorScenes = updatedScenes.filter(s => s.status === 'error').length
 
+    console.log(`✅ Analysis complete: ${completedScenes}/${totalScenes} successful`)
+
     if (completedScenes === totalScenes) {
       showToast("Analysis Complete!", `Successfully analyzed all ${totalScenes} scenes.`)
     } else {
       showToast("Analysis Finished with Errors", `Completed: ${completedScenes}/${totalScenes} scenes. ${errorScenes} scenes failed.`, "destructive")
     }
 
-  }, [scenes, analyzeScene, showToast])
+  }, [scenes, analyzeScene])
 
   // HANDLER: EDIT/COPY 
-  
   const handleCopyPrompt = useCallback(async (prompt: string) => {
     try {
         await navigator.clipboard.writeText(prompt);
@@ -478,7 +491,7 @@ function Index() {
         console.error('Failed to copy text: ', err);
         showToast("Copy Failed", "Your browser may be blocking clipboard access.", "destructive");
     }
-  }, [showToast]);
+  }, []);
 
   const handleToggleEdit = useCallback((sceneNumber: number, shotIndex: number) => {
     setScenes(prevScenes => prevScenes.map(scene => {
@@ -535,7 +548,7 @@ function Index() {
         }
         return scene;
     }));
-  }, [showToast]);
+  }, []);
 
   // HANDLER: EXPORT 
   const handleExportPDF = useCallback(() => {
@@ -561,8 +574,6 @@ function Index() {
       pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
     }
 
-    showToast("Generating PDF", "Please wait while your PDF is being created...")
-
     setTimeout(() => {
         html2pdf().set(options).from(element).save()
             .then(() => showToast("PDF Exported", "Your analysis has been downloaded successfully"))
@@ -572,7 +583,7 @@ function Index() {
             })
     }, 100); 
 
-  }, [projectName, showToast]);
+  }, [projectName]);
 
   const handlePrint = useCallback(() => {
     window.print()
@@ -580,14 +591,12 @@ function Index() {
 
   const handleExportDOCX = useCallback(() => {
     showToast("Coming Soon", "DOCX export functionality will be available in the next update!")
-  }, [showToast])
-
+  }, [])
 
   // ═══════════════════════════════════════════════════════════════
   // RENDER
   // ═══════════════════════════════════════════════════════════════
   
-  // Display a loading screen while fetching project data from the URL
   if (isLoadingProject) {
     return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-[#141414] p-8">
@@ -599,19 +608,16 @@ function Index() {
   }
 
   return (
-    // UPDATED: Deep Black background and White text
     <div className="min-h-screen bg-[#141414] text-white p-8">
       <div className="max-w-6xl mx-auto space-y-8">
         
         {/* Header */}
         <div className="text-center space-y-4">
           <Link to="/" className='inline-block'>
-            {/* UPDATED: Cinematic Red title */}
             <h1 className="text-5xl font-bold text-[#E50914] hover:text-red-700 transition-colors cursor-pointer">
                 ShotLogic
             </h1>
           </Link>
-          {/* UPDATED: Gray text */}
           <p className="text-xl text-gray-400">
             AI-Powered Screenplay Analysis for Production Planning
           </p>
@@ -632,11 +638,10 @@ function Index() {
             />
             {projectId && (
                 <p className="text-xs text-green-500 mt-1">
-                    * Saved in Cloud (ID: {projectId}). Click Save to update.
+                    ✓ Saved in Cloud (ID: {projectId.substring(0, 8)}...). Click Save to update.
                 </p>
             )}
         </div>
-
 
         {/* Upload Card */}
         <div className="bg-gray-900 rounded-lg border border-gray-700 shadow-xl p-6 space-y-4">
@@ -654,7 +659,6 @@ function Index() {
               accept=".txt,.fdx,.pdf"
               onChange={handleFileUpload}
               disabled={isProcessing || isParsing}
-              // Dark mode file input styling
               className="flex-1 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-[#E50914] file:text-white hover:file:bg-red-700 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             />
             <button
@@ -695,7 +699,6 @@ function Index() {
                   value={visualStyle}
                   onChange={(e) => setVisualStyle(e.target.value)}
                   placeholder="e.g., 1918 period piece, grainy stock, Vittorio Storaro lighting"
-                  // FIX: Added text-black here to fix invisibility issue, but set input background/text for dark mode
                   className="w-full px-4 py-2 border border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-[#E50914] bg-gray-800 text-white"
                   disabled={isProcessing}
                 />
@@ -746,7 +749,6 @@ function Index() {
               <h2 className="text-2xl font-semibold text-white">Analysis Results</h2>
               <div className="flex items-center gap-2">
                 
-                {/* Save Button - Cinematic Red Style */}
                 <button
                     onClick={handleManualSave}
                     disabled={isSaving}
@@ -791,7 +793,7 @@ function Index() {
               </div>
             </div>
 
-            {/* Analysis Content - Wrapped for PDF Export */}
+            {/* Analysis Content */}
             <div id="analysis-content" className="p-6">
               <p className="text-sm text-gray-400 mb-4">
                 {scenes.filter(s => s.status === 'complete').length} of {scenes.length} scenes analyzed
@@ -848,7 +850,7 @@ function Index() {
                           </div>
                         </div>
 
-                        {/* Shot List with Edit/Copy Features */}
+                        {/* Shot List */}
                         <div className="border-t border-gray-700 pt-4">
                           <h4 className="text-lg font-bold text-white mb-4">
                             🎥 Shot List ({scene.analysis.shotList.length} shots)
@@ -857,13 +859,11 @@ function Index() {
                             {scene.analysis.shotList.map((shot, idx) => (
                               <div key={idx} className="bg-gray-800 border-2 border-gray-700 rounded-lg p-4">
                                 
-                                {/* Shot Header with Edit Button */}
                                 <div className="flex items-center justify-between mb-3">
                                     <span className="px-3 py-1 bg-[#E50914] text-white text-sm font-bold rounded">
                                         Shot {idx + 1}: {shot.shotType}
                                     </span>
                                     
-                                    {/* Toggle Edit Button */}
                                     {shot.isEditing ? (
                                         <div className='flex gap-2'>
                                             <button
@@ -892,10 +892,8 @@ function Index() {
                                     )}
                                 </div>
                                 
-                                {/* Shot Content - Conditional Rendering */}
                                 <div className="space-y-2 text-sm">
                                   
-                                    {/* Shot Type (Dropdown in Edit Mode) */}
                                     <div>
                                         <span className="font-semibold text-gray-400">Shot Type:</span>
                                         {shot.isEditing ? (
@@ -913,14 +911,12 @@ function Index() {
                                         )}
                                     </div>
                                     
-                                    {/* Visual Description */}
                                     <div>
                                         <span className="font-semibold text-gray-400">Visual Description:</span>
                                         {shot.isEditing ? (
                                             <textarea
                                                 value={shot.visualDescription}
                                                 onChange={(e) => handleShotChange(scene.number, idx, 'visualDescription', e.target.value)}
-                                                // FIX: Added text-white and bg-gray-900 for visibility
                                                 className="w-full mt-1 p-2 border border-gray-700 rounded-md text-sm resize-y bg-gray-900 text-white" 
                                                 rows={2}
                                             />
@@ -929,14 +925,12 @@ function Index() {
                                         )}
                                     </div>
 
-                                    {/* Rationale */}
                                     <div>
                                         <span className="font-semibold text-gray-400">Rationale:</span>
                                         {shot.isEditing ? (
                                             <textarea
                                                 value={shot.rationale}
                                                 onChange={(e) => handleShotChange(scene.number, idx, 'rationale', e.target.value)}
-                                                // FIX: Added text-white and bg-gray-900 for visibility
                                                 className="w-full mt-1 p-2 border border-gray-700 rounded-md text-sm resize-y bg-gray-900 text-white" 
                                                 rows={2}
                                             />
@@ -945,14 +939,12 @@ function Index() {
                                         )}
                                     </div>
 
-                                    {/* Editorial Intent */}
                                     <div>
                                         <span className="font-semibold text-gray-400">Editorial Intent:</span>
                                         {shot.isEditing ? (
                                             <textarea
                                                 value={shot.editorialIntent}
                                                 onChange={(e) => handleShotChange(scene.number, idx, 'editorialIntent', e.target.value)}
-                                                // FIX: Added text-white and bg-gray-900 for visibility
                                                 className="w-full mt-1 p-2 border border-gray-700 rounded-md text-sm resize-y bg-gray-900 text-white" 
                                                 rows={2}
                                             />
@@ -961,7 +953,6 @@ function Index() {
                                         )}
                                     </div>
                                     
-                                    {/* AI Image Prompt with Copy Button */}
                                     <div className="pt-2 border-t border-gray-700">
                                         <div className='flex justify-between items-center'>
                                             <span className="font-semibold text-gray-400">AI Image Prompt:</span>
