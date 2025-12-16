@@ -2,6 +2,7 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { getDb } from '../lib/mongodb.js'; // CRITICAL: Must use .js extension
 import { ObjectId } from 'mongodb';
+import { MongoClient } from 'mongodb'; // CRITICAL: Ensure MongoDB driver dependency is resolved
 
 const DEPLOY_TIMESTAMP = '2024-12-16T12:58:00Z_SAVE_INIT';
 
