@@ -1,11 +1,11 @@
 // src/pages/Index.tsx - COMPLETE FINAL PRODUCTION FILE
-// Includes: Save/Load, Edit/Copy, Real Analysis Call, FDX/PDF Enablement, and DASHBOARD LINK
+// Includes: Cloud Save Integration, Project Naming, Dashboard Link
 import { useState, useCallback, useEffect } from 'react'
-import { Link } from 'react-router-dom' // <-- NEW IMPORT
+import { Link } from 'react-router-dom'
 import { Upload, FileText, CheckCircle2, AlertCircle, Loader2, Printer, FileDown, FileText as FileTextIcon, Save, Edit2, Copy, X, Check } from 'lucide-react'
 import html2pdf from 'html2pdf.js'
 
-import '../src/styles/print.css' // Corrected path
+import '../src/styles/print.css' 
 
 // ═══════════════════════════════════════════════════════════════
 // TYPE DEFINITIONS
@@ -48,6 +48,8 @@ interface AppState {
     file: { name: string, type: string } | null;
     scenes: Scene[];
     visualStyle: string;
+    projectId: string | null; // <-- NEW
+    projectName: string;      // <-- NEW
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -95,7 +97,7 @@ async function fileToBase64(file: File): Promise<string> {
 
 
 // ═══════════════════════════════════════════════════════════════
-// LOCAL STORAGE MANAGEMENT
+// LOCAL STORAGE MANAGEMENT (Still used for autosave/restore of current session)
 // ═══════════════════════════════════════════════════════════════
 
 const STORAGE_KEY = 'shotLogicAppState';
@@ -120,6 +122,10 @@ const loadState = (): AppState | undefined => {
         if (state.scenes && !Array.isArray(state.scenes)) {
             state.scenes = Object.values(state.scenes);
         }
+        // Ensure new fields are present for compatibility
+        state.projectId = state.projectId || null;
+        state.projectName = state.projectName || 'Untitled Project';
+
         return state;
     } catch (e) {
         console.error("Could not load state:", e);
@@ -139,6 +145,12 @@ function Index() {
   const [progress, setProgress] = useState(0);
   const [currentScene, setCurrentScene] = useState(0);
   const [visualStyle, setVisualStyle] = useState<string>('');
+  
+  // CLOUD SAVE STATE
+  const [projectId, setProjectId] = useState<string | null>(null); // MongoDB ID
+  const [projectName, setProjectName] = useState<string>('Untitled Project');
+  const [isSaving, setIsSaving] = useState(false);
+
 
   // ---------------------------------------------------------------
   // EFFECT: LOAD STATE ON MOUNT / SAVE STATE ON CHANGE
@@ -149,33 +161,85 @@ function Index() {
         setFileInfo(persistedState.file);
         setScenes(persistedState.scenes.map(s => ({ ...s, isEditing: false })));
         setVisualStyle(persistedState.visualStyle);
+        // Load cloud save tracking info
+        setProjectId(persistedState.projectId);
+        setProjectName(persistedState.projectName);
+        
         showToast("Project Loaded", "Analysis results restored from your last session.");
     }
   }, []);
 
+  // Autosave to LocalStorage
   useEffect(() => {
     const handler = setTimeout(() => {
         if (scenes.length > 0 || fileInfo) {
-            saveState({ file: fileInfo, scenes, visualStyle });
+            saveState({ file: fileInfo, scenes, visualStyle, projectId, projectName });
         }
     }, 500);
 
     return () => clearTimeout(handler);
-  }, [scenes, fileInfo, visualStyle]);
+  }, [scenes, fileInfo, visualStyle, projectId, projectName]);
 
 
   // ═══════════════════════════════════════════════════════════════
   // HANDLERS
   // ═══════════════════════════════════════════════════════════════
 
-  const handleManualSave = useCallback(() => {
+  // MODIFIED TO SAVE TO CLOUD API
+  const handleManualSave = useCallback(async () => {
     if (scenes.length === 0) {
         showToast("Cannot Save", "Upload and analyze a screenplay first.", "destructive");
         return;
     }
-    saveState({ file: fileInfo, scenes, visualStyle });
-    showToast("Project Saved", `Successfully saved ${scenes.length} scenes to your browser.`);
-  }, [scenes, fileInfo, visualStyle]);
+
+    if (!projectName || projectName === 'Untitled Project') {
+        showToast("Naming Required", "Please enter a descriptive name for your project before saving to the cloud.", "destructive");
+        return;
+    }
+
+    setIsSaving(true);
+    
+    // Construct the data payload to save to MongoDB
+    const projectDataPayload = { 
+        file: fileInfo, 
+        scenes: scenes.map(s => ({ ...s, isEditing: undefined })), // Remove transient frontend state
+        visualStyle: visualStyle,
+    };
+
+    try {
+        const response = await fetch('/api/projects/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                projectId: projectId, 
+                projectName: projectName,
+                projectData: projectDataPayload
+            })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.error || result.message || 'Failed to save project to the cloud.');
+        }
+
+        // Update the projectId if this was a new save
+        if (!projectId && result.projectId) {
+            setProjectId(result.projectId);
+        }
+
+        showToast("Cloud Project Saved", `Project '${projectName}' updated successfully in the cloud!`);
+
+    } catch (error) {
+        console.error('Cloud Save Error:', error);
+        showToast("Cloud Save Failed", error instanceof Error ? error.message : "An unknown error occurred during cloud save.", "destructive");
+    } finally {
+        setIsSaving(false);
+    }
+    
+    // Always call local save as well for immediate session restoration
+    saveState({ file: fileInfo, scenes, visualStyle, projectId, projectName });
+  }, [scenes, fileInfo, visualStyle, projectId, projectName]);
 
   const handleReset = useCallback(() => {
     console.log('🔄 Resetting application state')
@@ -185,12 +249,14 @@ function Index() {
     setCurrentScene(0)
     setIsProcessing(false)
     setVisualStyle('')
+    setProjectId(null); // Clear cloud ID
+    setProjectName('Untitled Project'); // Reset name
     localStorage.removeItem(STORAGE_KEY);
-    showToast("Project Cleared", "Local storage data has been removed.");
+    showToast("Project Cleared", "Local session data has been removed.");
   }, [])
 
   // ---------------------------------------------------------------
-  // FILE UPLOAD HANDLER (FIXED: Accepts FDX and PDF for Backend Parsing)
+  // FILE UPLOAD HANDLER
   // ---------------------------------------------------------------
 
   const handleFileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -199,7 +265,6 @@ function Index() {
 
     const extension = uploadedFile.name.split('.').pop()?.toLowerCase()
     
-    // ALLOWED EXTENSIONS: txt, fdx, pdf
     if (!['txt', 'fdx', 'pdf'].includes(extension || '')) {
       showToast("Unsupported File Type", `${extension?.toUpperCase()} files are not supported. Please upload .txt, .fdx, or .pdf files.`, "destructive")
       return
@@ -208,6 +273,9 @@ function Index() {
     setIsParsing(true)
     setScenes([])
     setFileInfo({ name: uploadedFile.name, type: extension || 'txt' })
+    // Automatically set project name based on file name (without extension)
+    setProjectName(uploadedFile.name.replace(/\.[^/.]+$/, ''));
+    setProjectId(null); // Clear any old project ID
 
     try {
       let screenplayText = ''
@@ -215,9 +283,8 @@ function Index() {
       if (extension === 'txt') {
         screenplayText = await uploadedFile.text()
       } else if (extension === 'fdx' || extension === 'pdf') {
-        // Use backend API for FDX and PDF parsing
         console.log(`Sending ${extension} file to backend for parsing...`)
-        const base64Data = (await fileToBase64(uploadedFile)).split(',')[1] // Get raw base64 data
+        const base64Data = (await fileToBase64(uploadedFile)).split(',')[1] 
         
         const response = await fetch('/api/parse-screenplay', {
           method: 'POST',
@@ -263,7 +330,7 @@ function Index() {
   }, [showToast])
 
   // ---------------------------------------------------------------
-  // ANALYZE SCENE (Real API Logic)
+  // ANALYZE SCENE
   // ---------------------------------------------------------------
 
   const analyzeScene = useCallback(async (scene: Scene, totalScenes: number): Promise<SceneAnalysis> => {
@@ -350,7 +417,7 @@ function Index() {
   }, [scenes, analyzeScene, showToast])
 
   // ---------------------------------------------------------------
-  // FEATURE 3 & 4: COPY PROMPT / EDIT SHOT LIST
+  // EDIT/COPY HANDLERS
   // ---------------------------------------------------------------
   
   const handleCopyPrompt = useCallback(async (prompt: string) => {
@@ -421,7 +488,7 @@ function Index() {
   }, [showToast]);
 
   // ---------------------------------------------------------------
-  // EXPORT HANDLERS (Stabilized)
+  // EXPORT HANDLERS
   // ---------------------------------------------------------------
 
   const handleExportPDF = useCallback(() => {
@@ -431,7 +498,7 @@ function Index() {
       return
     }
 
-    const filename = fileInfo ? `${fileInfo.name.replace(/\.[^/.]+$/, '')}_analysis.pdf` : 'screenplay_analysis.pdf'
+    const filename = projectName ? `${projectName.replace(/[^a-z0-9]/gi, '_')}_analysis.pdf` : 'screenplay_analysis.pdf'
 
     const options = {
       margin: [10, 10, 10, 10],
@@ -458,7 +525,7 @@ function Index() {
             })
     }, 100); 
 
-  }, [fileInfo, showToast]);
+  }, [projectName, showToast]);
 
   const handlePrint = useCallback(() => {
     window.print()
@@ -477,7 +544,7 @@ function Index() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-8">
       <div className="max-w-6xl mx-auto space-y-8">
         
-        {/* Header - MODIFIED TO INCLUDE LINK TO DASHBOARD */}
+        {/* Header */}
         <div className="text-center space-y-4">
           <Link to="/" className='inline-block'>
             <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent hover:text-blue-500 transition-colors cursor-pointer">
@@ -488,6 +555,27 @@ function Index() {
             AI-Powered Screenplay Analysis for Production Planning
           </p>
         </div>
+
+        {/* Project Name Input (NEW) */}
+        <div className="bg-white rounded-lg border shadow-lg p-4">
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+                Project Name:
+            </label>
+            <input
+                type="text"
+                value={projectName}
+                onChange={(e) => setProjectName(e.target.value)}
+                placeholder="e.g., The Last Gambit Feature Film"
+                className="w-full px-4 py-2 text-xl font-bold border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={isProcessing || isParsing}
+            />
+            {projectId && (
+                <p className="text-xs text-green-600 mt-1">
+                    * Saved in Cloud (ID: {projectId})
+                </p>
+            )}
+        </div>
+
 
         {/* Upload Card */}
         <div className="bg-white rounded-lg border shadow-xl p-6 space-y-4">
@@ -513,7 +601,7 @@ function Index() {
                 disabled={isProcessing || isParsing}
                 className="px-4 py-2 rounded-md border border-slate-300 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                Clear
+                Clear Project
               </button>
             )}
           </div>
@@ -537,7 +625,7 @@ function Index() {
                 </div>
               </div>
               
-              {/* Visual Style Input - FIXED: Force black text color */}
+              {/* Visual Style Input */}
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-slate-700">
                   Visual Style (Optional)
@@ -598,14 +686,19 @@ function Index() {
               <h2 className="text-2xl font-semibold">Analysis Results</h2>
               <div className="flex items-center gap-2">
                 
-                {/* Save Button */}
+                {/* Save Button - Now calls Cloud API */}
                 <button
                     onClick={handleManualSave}
-                    className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-green-700 bg-white border border-green-300 rounded-md hover:bg-green-50 transition-colors"
-                    title="Save Project Locally"
+                    disabled={isSaving}
+                    className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-green-700 bg-white border border-green-300 rounded-md hover:bg-green-50 transition-colors disabled:opacity-50"
+                    title="Save Project to Cloud Database"
                 >
-                    <Save className="w-4 h-4" />
-                    Save
+                    {isSaving ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                        <Save className="w-4 h-4" />
+                    )}
+                    {projectId ? 'Update Cloud Save' : 'Save New Project'}
                 </button>
 
                 <button
