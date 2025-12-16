@@ -1,14 +1,17 @@
 // api/projects/get-all.ts
-// PRODUCTION-READY: Fetches all saved projects with enhanced error handling
+// PRODUCTION-READY: Fetches all saved projects
+// CRITICAL: Does NOT close MongoDB connection (connection is reused)
 
 import { VercelRequest, VercelResponse } from '@vercel/node'
-// api/projects/get-all.ts (The only change is adding .js to the import path)
-import { getDb } from '../lib/mongodb.js';
+import { getDb } from '../lib/mongodb' // NO .js extension in TypeScript
 import { ObjectId } from 'mongodb'
 
-const DEPLOY_TIMESTAMP = '2024-12-13T07:00:00Z_MONGODB_FIX'
+const DEPLOY_TIMESTAMP = '2024-12-13T08:00:00Z_FINAL_FIX'
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(
+  req: VercelRequest,
+  res: VercelResponse
+) {
   const invocationId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
   const startTime = Date.now()
 
@@ -16,6 +19,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   console.log(`📅 Timestamp: ${new Date().toISOString()}`)
   console.log(`🏷️  Deploy: ${DEPLOY_TIMESTAMP}`)
   console.log(`📍 Method: ${req.method}`)
+  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'unknown'}`)
 
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -40,24 +44,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     console.log(`🔌 [${invocationId}] Connecting to MongoDB...`)
-    
+
     // Get database connection with timeout
     const db = await Promise.race([
       getDb(),
-      new Promise((_, reject) => 
+      new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('Database connection timeout')), 15000)
       )
-    ]) as any
+    ])
 
-    console.log(`✅ [${invocationId}] Connected to database`)
+    console.log(`✅ [${invocationId}] Connected to database: ShotLogicDB`)
     console.log(`📊 [${invocationId}] Accessing 'projects' collection...`)
 
     const collection = db.collection('projects')
 
-    // Verify collection exists by attempting to get stats
+    // Verify collection is accessible
     try {
-      await collection.estimatedDocumentCount()
-      console.log(`✅ [${invocationId}] Collection 'projects' verified`)
+      const count = await collection.estimatedDocumentCount()
+      console.log(`✅ [${invocationId}] Collection 'projects' verified (${count} documents)`)
     } catch (collError) {
       console.error(`❌ [${invocationId}] Collection access error:`, collError)
       throw new Error('Projects collection not accessible')
@@ -65,28 +69,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log(`🔍 [${invocationId}] Fetching projects...`)
 
-    // Fetch projects with proper error handling
+    // Fetch projects
     const projectList = await collection
       .find({})
       .project({ name: 1, updatedAt: 1 })
       .sort({ updatedAt: -1 })
-      .limit(100) // Safety limit
+      .limit(100)
       .toArray()
 
     console.log(`📦 [${invocationId}] Found ${projectList.length} projects`)
 
-    // Transform the results
-    const projects = projectList.map(project => {
+    // Transform results
+    const projects = projectList.map((project) => {
       try {
         return {
-          id: project._id instanceof ObjectId 
-            ? project._id.toHexString() 
-            : String(project._id),
+          id:
+            project._id instanceof ObjectId
+              ? project._id.toHexString()
+              : String(project._id),
           name: project.name || 'Untitled Project',
-          updatedAt: project.updatedAt 
-            ? (project.updatedAt instanceof Date 
-              ? project.updatedAt.toISOString() 
-              : new Date(project.updatedAt).toISOString())
+          updatedAt: project.updatedAt
+            ? project.updatedAt instanceof Date
+              ? project.updatedAt.toISOString()
+              : new Date(project.updatedAt).toISOString()
             : new Date().toISOString()
         }
       } catch (transformError) {
@@ -102,6 +107,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const totalDuration = Date.now() - startTime
     console.log(`⏱️  [${invocationId}] Total: ${totalDuration}ms`)
     console.log(`✅ [${invocationId}] SUCCESS`)
+    console.log(`🔄 [${invocationId}] Connection kept alive for reuse`)
     console.log(`═══════════════════════════════════════════════════════\n`)
 
     return res.status(200).json({
@@ -113,21 +119,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         deployMarker: DEPLOY_TIMESTAMP
       }
     })
-
   } catch (error) {
     const totalDuration = Date.now() - startTime
     console.error(`\n💥 [${invocationId}] ═══════════════════════════════`)
     console.error(`❌ ERROR after ${totalDuration}ms`)
     console.error(`📛 Type: ${error instanceof Error ? error.constructor.name : 'Unknown'}`)
     console.error(`📛 Message: ${error instanceof Error ? error.message : String(error)}`)
-    
+
     if (error instanceof Error) {
       console.error(`📛 Stack:`, error.stack)
     }
-    
+
     console.error(`═══════════════════════════════════════════════════════\n`)
 
-    // Determine error type and return appropriate response
+    // Determine error type
     let statusCode = 500
     let errorMessage = 'Failed to fetch projects'
     let errorDetails = error instanceof Error ? error.message : 'Unknown error'
@@ -136,14 +141,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       statusCode = 504
       errorMessage = 'Database connection timeout'
       errorDetails = 'The database took too long to respond. Please try again.'
-    } else if (errorDetails.includes('authentication')) {
+    } else if (errorDetails.includes('authentication') || errorDetails.includes('auth')) {
       statusCode = 500
       errorMessage = 'Database authentication failed'
-      errorDetails = 'Unable to authenticate with the database. Check MONGODB_URI.'
+      errorDetails = 'Check your MongoDB URI and credentials in Vercel environment variables.'
     } else if (errorDetails.includes('not accessible')) {
       statusCode = 500
       errorMessage = 'Collection not found'
-      errorDetails = 'The projects collection does not exist in the database.'
+      errorDetails = 'The projects collection does not exist. Create it in MongoDB Atlas.'
     }
 
     return res.status(statusCode).json({
@@ -153,4 +158,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       processingTime: totalDuration
     })
   }
+  // CRITICAL: NO finally block to close connection
+  // Connection is reused across invocations for performance
 }
