@@ -2,7 +2,8 @@
 // PRODUCTION-READY: Fetches all saved projects with enhanced error handling
 
 import { VercelRequest, VercelResponse } from '@vercel/node'
-import { getDb } from '../lib/mongodb'
+// api/projects/get-all.ts (The only change is adding .js to the import path)
+import { getDb } from '../lib/mongodb.js';
 import { ObjectId } from 'mongodb'
 
 const DEPLOY_TIMESTAMP = '2024-12-13T07:00:00Z_MONGODB_FIX'
