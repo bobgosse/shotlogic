@@ -1,20 +1,25 @@
 // src/pages/Dashboard.tsx
-// Complete dashboard for viewing and managing saved projects, integrated with ProjectList
+// Complete dashboard for viewing and managing saved projects - FIXED NAVIGATION LINKS
 
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { Loader2, Plus, Home } from 'lucide-react'
-// CRITICAL FIX: Import the new ProjectList component
-import ProjectList from '../components/ProjectList' 
+import ProjectList from '../components/ProjectList'
 
 // ═══════════════════════════════════════════════════════════════
-// TYPE DEFINITIONS (Ensure these match your actual types)
+// TYPE DEFINITIONS
 // ═══════════════════════════════════════════════════════════════
 
 interface ProjectItem {
   _id: string
   name: string
   updatedAt: string
+}
+
+interface ProjectListProps {
+    projects: ProjectItem[]
+    setProjects: React.Dispatch<React.SetStateAction<ProjectItem[]>>
+    showToast: (title: string, description?: string, variant?: 'default' | 'destructive') => void
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -27,14 +32,13 @@ function Dashboard() {
   const [error, setError] = useState<string | null>(null)
 
   // ---------------------------------------------------------------
-  // TOAST UTILITY (Defined locally for completeness, adjust as needed)
+  // TOAST UTILITY
   // ---------------------------------------------------------------
   const showToast = useCallback((
     title: string, 
     description?: string, 
     variant?: 'default' | 'destructive'
   ) => {
-    // This is a simple alert implementation. Replace with your actual toast logic.
     const message = description ? `${title}\n${description}` : title
     if (variant === 'destructive') {
       console.error(message)
@@ -55,7 +59,6 @@ function Dashboard() {
       setError(null)
 
       try {
-        // Assume /api/projects/get-all is your endpoint to fetch all projects
         const response = await fetch('/api/projects/get-all', {
           method: 'GET',
           headers: {
@@ -121,18 +124,18 @@ function Dashboard() {
             </p>
           </div>
 
-          {/* Action Buttons */}
+          {/* Action Buttons - FIXED LINKS */}
           <div className="flex items-center gap-3">
             <Link 
-              to="/"
+              to="/analyze" // <-- FIXED: Go to Analysis/Home page
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gray-800 border border-gray-700 rounded-md hover:bg-gray-700 transition-colors"
             >
               <Home className="w-4 h-4" />
-              Back to Home
+              Analyze Screenplay
             </Link>
             
             <Link
-              to="/"
+              to="/analyze" // <-- FIXED: Go to Analysis/Upload page
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[#E50914] rounded-md hover:bg-red-700 transition-colors"
             >
               <Plus className="w-4 h-4" />
@@ -180,7 +183,7 @@ function Dashboard() {
             </div>
           )}
 
-          {/* CRITICAL: ProjectList Component is rendered here, replacing old list rendering */}
+          {/* ProjectList Component */}
           {!isLoading && !error && (
             <ProjectList 
               projects={projects}

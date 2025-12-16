@@ -1,4 +1,4 @@
-// src/pages/Index.tsx - COMPLETE FINAL PRODUCTION FILE
+// src/pages/Index.tsx - COMPLETE FINAL PRODUCTION FILE - FIXED NAVIGATION
 import { useState, useCallback, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Upload, FileText, CheckCircle2, AlertCircle, Loader2, Printer, FileDown, FileText as FileTextIcon, Save, Edit2, Copy, X, Check, FolderOpen } from 'lucide-react'
@@ -618,7 +618,7 @@ function Index() {
         {/* Header with Dashboard Link */}
         <div className="flex items-center justify-between">
           <div className="flex-1 text-center">
-            <Link to="/" className='inline-block'>
+            <Link to="/analyze" className='inline-block'> {/* Logo/Title Link - Should link to its own page /analyze */}
               <h1 className="text-5xl font-bold text-[#E50914] hover:text-red-700 transition-colors cursor-pointer">
                   ShotLogic
               </h1>
@@ -628,9 +628,9 @@ function Index() {
             </p>
           </div>
           
-          {/* ✅ CRITICAL: Dashboard Link Button */}
+          {/* CRITICAL: Dashboard Link Button - FIXED LINK */}
           <Link
-            to="/dashboard"
+            to="/" // <-- FIXED: Go to Dashboard root
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gray-800 border border-gray-700 rounded-md hover:bg-gray-700 transition-colors absolute top-8 right-8"
           >
             <FolderOpen className="w-4 h-4" />

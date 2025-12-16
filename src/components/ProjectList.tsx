@@ -1,8 +1,8 @@
 // src/components/ProjectList.tsx
-// CRITICAL FIX: Added proper Link import and navigation
+// Project List component - FIXED NAVIGATION
 
 import { useCallback, useState } from 'react'
-import { Link } from 'react-router-dom' // ✅ CRITICAL: Must import Link
+import { Link } from 'react-router-dom'
 import { Trash2, Loader2, Calendar, AlertCircle } from 'lucide-react'
 
 // ═══════════════════════════════════════════════════════════════
@@ -248,9 +248,9 @@ function ProjectList({ projects, setProjects, showToast }: ProjectListProps) {
               {/* Project Info */}
               <div className="flex-1 min-w-0">
                 {hasValidId ? (
-                  // ✅ CRITICAL: Valid project with Link navigation
+                  // Valid project - clickable link - FIXED LINK
                   <Link 
-                    to={`/?projectId=${projectId}`}
+                    to={`/analyze?projectId=${projectId}`} // <-- FIXED: Go to /analyze with query param
                     className="block hover:text-[#E50914] transition-colors"
                   >
                     <h3 className="text-lg font-semibold text-white truncate">
