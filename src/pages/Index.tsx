@@ -1,7 +1,7 @@
-// src/pages/Index.tsx - COMPLETE FINAL PRODUCTION FILE with Cloud Save Fix
+// src/pages/Index.tsx - COMPLETE FINAL PRODUCTION FILE
 import { useState, useCallback, useEffect } from 'react'
-import { Link, useLocation } from 'react-router-dom' 
-import { Upload, FileText, CheckCircle2, AlertCircle, Loader2, Printer, FileDown, FileText as FileTextIcon, Save, Edit2, Copy, X, Check } from 'lucide-react'
+import { Link, useLocation } from 'react-router-dom'
+import { Upload, FileText, CheckCircle2, AlertCircle, Loader2, Printer, FileDown, FileText as FileTextIcon, Save, Edit2, Copy, X, Check, FolderOpen } from 'lucide-react'
 import html2pdf from 'html2pdf.js'
 
 // ═══════════════════════════════════════════════════════════════
@@ -17,7 +17,7 @@ interface Shot {
   rationale: string
   editorialIntent: string
   aiImagePrompt: string
-  isEditing?: boolean // Fixed: Made optional for type compatibility
+  isEditing?: boolean
 }
 
 interface NarrativeAnalysis {
@@ -152,21 +152,33 @@ function Index() {
   const [projectId, setProjectId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState<string>('Untitled Project');
   const [isSaving, setIsSaving] = useState(false);
-  const [isLoadingProject, setIsLoadingProject] = useState(false); 
+  const [isLoadingProject, setIsLoadingProject] = useState(false);
+  const [hasLoadedFromUrl, setHasLoadedFromUrl] = useState(false); // Track if we've loaded from URL
 
   // ---------------------------------------------------------------
-  // EFFECT 1: LOAD PROJECT FROM URL
+  // EFFECT 1: LOAD PROJECT FROM URL (FIXED DEPENDENCIES)
   // ---------------------------------------------------------------
   useEffect(() => {
     const queryParams = new URLSearchParams(location.search);
     const idFromUrl = queryParams.get('projectId');
 
-    if (idFromUrl && idFromUrl !== projectId) {
+    console.log('📍 URL Check:', { idFromUrl, currentProjectId: projectId, hasLoadedFromUrl });
+
+    // Only load if:
+    // 1. There's an ID in the URL
+    // 2. It's different from current projectId
+    // 3. We haven't already loaded this URL
+    if (idFromUrl && idFromUrl !== projectId && !hasLoadedFromUrl) {
       const loadProject = async () => {
+        console.log(`🔄 Loading project from URL: ${idFromUrl}`)
         setIsLoadingProject(true);
+        setHasLoadedFromUrl(true); // Prevent re-loading
+
         try {
           const response = await fetch(`/api/projects/get-one?projectId=${idFromUrl}`);
           const result = await response.json();
+
+          console.log('📥 Load response:', result);
 
           if (!response.ok || !result.projectData) {
             throw new Error(result.error || 'Failed to retrieve project data.');
@@ -183,8 +195,9 @@ function Index() {
           showToast("Project Loaded", `Successfully loaded project: ${result.projectName}`);
 
         } catch (error) {
-          console.error('Load Project Error:', error);
+          console.error('❌ Load Project Error:', error);
           showToast("Load Failed", error instanceof Error ? error.message : "An unknown error occurred.", "destructive");
+          setHasLoadedFromUrl(false); // Allow retry on error
         } finally {
           setIsLoadingProject(false);
         }
@@ -192,7 +205,9 @@ function Index() {
       
       loadProject();
       
-    } else if (!idFromUrl) {
+    } else if (!idFromUrl && !hasLoadedFromUrl) {
+      // No URL parameter - load from localStorage
+      console.log('💾 Loading from localStorage...');
       const persistedState = loadState();
       if (persistedState) {
         setFileInfo(persistedState.file);
@@ -204,8 +219,14 @@ function Index() {
             showToast("Session Restored", "Analysis results restored from your last local session.");
         }
       }
+      setHasLoadedFromUrl(true); // Mark as loaded to prevent re-loading
     }
-  }, [location.search]); 
+  }, [location.search]); // Only depend on location.search
+
+  // Reset hasLoadedFromUrl when search params change
+  useEffect(() => {
+    setHasLoadedFromUrl(false);
+  }, [location.search]);
 
   // ---------------------------------------------------------------
   // EFFECT 2: AUTOSAVE TO LOCAL STORAGE
@@ -226,7 +247,7 @@ function Index() {
   // HANDLERS
   // ═══════════════════════════════════════════════════════════════
 
-  // HANDLER: CLOUD SAVE - FIXED
+  // HANDLER: CLOUD SAVE
   const handleManualSave = useCallback(async () => {
     if (scenes.length === 0) {
         showToast("Cannot Save", "Upload and analyze a screenplay first.", "destructive");
@@ -239,12 +260,9 @@ function Index() {
     }
 
     console.log(`💾 Initiating cloud save for project: ${projectName}`)
-    console.log(`   Project ID: ${projectId || 'NEW'}`)
-    console.log(`   Scenes: ${scenes.length}`)
     
     setIsSaving(true);
     
-    // Construct the data payload
     const projectDataPayload: ProjectDataPayload = { 
         file: fileInfo, 
         scenes: scenes.map(s => {
@@ -255,18 +273,11 @@ function Index() {
     };
 
     try {
-        // CRITICAL FIX: Backend expects 'name' not 'projectName'
         const requestBody = {
-            projectId: projectId || undefined, // Send as undefined if null for new projects
-            name: projectName, // FIXED: Changed from 'projectName' to 'name'
+            projectId: projectId || undefined,
+            name: projectName,
             projectData: projectDataPayload
         };
-
-        console.log(`📤 Sending save request:`, {
-            hasProjectId: !!requestBody.projectId,
-            name: requestBody.name,
-            dataSize: JSON.stringify(requestBody.projectData).length
-        });
 
         const response = await fetch('/api/projects/save', {
             method: 'POST',
@@ -274,21 +285,15 @@ function Index() {
             body: JSON.stringify(requestBody)
         });
 
-        console.log(`📥 Save response status: ${response.status}`);
-
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
-            console.error(`❌ Save failed:`, errorData);
             throw new Error(errorData.error || errorData.message || 'Failed to save project to the cloud.');
         }
 
         const result = await response.json();
-        console.log(`✅ Save successful:`, result);
 
-        // Update the projectId if this was a new save
         if (!projectId && result.projectId) {
             setProjectId(result.projectId);
-            console.log(`   New project ID assigned: ${result.projectId}`);
         }
 
         showToast("Cloud Project Saved", `Project '${projectName}' saved successfully!`);
@@ -300,7 +305,6 @@ function Index() {
         setIsSaving(false);
     }
     
-    // Always save locally as well
     saveState({ file: fileInfo, scenes, visualStyle, projectId, projectName });
   }, [scenes, fileInfo, visualStyle, projectId, projectName]);
 
@@ -318,42 +322,6 @@ function Index() {
     localStorage.removeItem(STORAGE_KEY);
     showToast("Project Cleared", "Local session data has been removed.");
   }, [])
-
-  // HANDLER: DELETE PROJECT
-const handleDeleteProject = useCallback(async (idToDelete: string, nameToDelete: string) => {
-    if (!window.confirm(`Are you sure you want to permanently delete the project: "${nameToDelete}"? This cannot be undone.`)) {
-        return;
-    }
-
-    try {
-        const response = await fetch(`/api/projects/delete?projectId=${idToDelete}`, {
-            method: 'DELETE',
-            // Note: DELETE requests often don't require a body, we pass the ID in the query params.
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.error || errorData.message || 'Failed to delete project from the cloud.');
-        }
-
-        // --- SUCCESS ---
-        showToast("Project Deleted", `Project '${nameToDelete}' was successfully deleted.`);
-        
-        // 1. Clear the local state if the deleted project was the currently loaded one
-        if (projectId === idToDelete) {
-            handleReset(); // Reset to clear the screen and local storage
-        } 
-        // 2. Refresh the list of projects (Requires fetching the list again, which we will simulate)
-        // Since we don't have a dedicated project list component, we assume you can refresh the page to see the new state.
-        
-        // For now, let's reset to the home view:
-        window.location.href = '/'; 
-
-    } catch (error) {
-        console.error('❌ Delete Project Error:', error);
-        showToast("Deletion Failed", error instanceof Error ? error.message : "An unknown error occurred during deletion.", "destructive");
-    }
-}, [projectId, handleReset]);
 
   // HANDLER: FILE UPLOAD
   const handleFileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -647,16 +615,27 @@ const handleDeleteProject = useCallback(async (idToDelete: string, nameToDelete:
     <div className="min-h-screen bg-[#141414] text-white p-8">
       <div className="max-w-6xl mx-auto space-y-8">
         
-        {/* Header */}
-        <div className="text-center space-y-4">
-          <Link to="/" className='inline-block'>
-            <h1 className="text-5xl font-bold text-[#E50914] hover:text-red-700 transition-colors cursor-pointer">
-                ShotLogic
-            </h1>
+        {/* Header with Dashboard Link */}
+        <div className="flex items-center justify-between">
+          <div className="flex-1 text-center">
+            <Link to="/" className='inline-block'>
+              <h1 className="text-5xl font-bold text-[#E50914] hover:text-red-700 transition-colors cursor-pointer">
+                  ShotLogic
+              </h1>
+            </Link>
+            <p className="text-xl text-gray-400 mt-2">
+              AI-Powered Screenplay Analysis for Production Planning
+            </p>
+          </div>
+          
+          {/* ✅ CRITICAL: Dashboard Link Button */}
+          <Link
+            to="/dashboard"
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gray-800 border border-gray-700 rounded-md hover:bg-gray-700 transition-colors absolute top-8 right-8"
+          >
+            <FolderOpen className="w-4 h-4" />
+            My Projects
           </Link>
-          <p className="text-xl text-gray-400">
-            AI-Powered Screenplay Analysis for Production Planning
-          </p>
         </div>
 
         {/* Project Name Input */}
@@ -725,7 +704,6 @@ const handleDeleteProject = useCallback(async (idToDelete: string, nameToDelete:
                 </div>
               </div>
               
-              {/* Visual Style Input */}
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-400">
                   Visual Style (Optional)
@@ -780,7 +758,6 @@ const handleDeleteProject = useCallback(async (idToDelete: string, nameToDelete:
         {/* Results with Export Toolbar */}
         {scenes.length > 0 && scenes.some(s => s.status === 'complete' || s.status === 'error') && (
           <div className="bg-gray-900 rounded-lg border border-gray-700 shadow-xl">
-            {/* Export Toolbar */}
             <div className="p-4 border-b border-gray-700 bg-gray-800 flex items-center justify-between no-print">
               <h2 className="text-2xl font-semibold text-white">Analysis Results</h2>
               <div className="flex items-center gap-2">
@@ -829,7 +806,6 @@ const handleDeleteProject = useCallback(async (idToDelete: string, nameToDelete:
               </div>
             </div>
 
-            {/* Analysis Content */}
             <div id="analysis-content" className="p-6">
               <p className="text-sm text-gray-400 mb-4">
                 {scenes.filter(s => s.status === 'complete').length} of {scenes.length} scenes analyzed
@@ -857,7 +833,6 @@ const handleDeleteProject = useCallback(async (idToDelete: string, nameToDelete:
 
                     {scene.analysis && (
                       <div className="space-y-6">
-                        {/* Narrative Analysis */}
                         <div className="border-t border-gray-700 pt-4">
                           <h4 className="text-lg font-bold text-white mb-3">📖 Narrative Analysis</h4>
                           <div className="space-y-3 text-sm">
@@ -886,7 +861,6 @@ const handleDeleteProject = useCallback(async (idToDelete: string, nameToDelete:
                           </div>
                         </div>
 
-                        {/* Shot List */}
                         <div className="border-t border-gray-700 pt-4">
                           <h4 className="text-lg font-bold text-white mb-4">
                             🎥 Shot List ({scene.analysis.shotList.length} shots)
@@ -905,14 +879,12 @@ const handleDeleteProject = useCallback(async (idToDelete: string, nameToDelete:
                                             <button
                                                 onClick={() => handleSaveEdit(scene.number, idx)}
                                                 className="flex items-center gap-1 px-3 py-1 text-xs font-medium text-white bg-green-500 rounded-md hover:bg-green-600 transition-colors"
-                                                title="Save Edits"
                                             >
                                                 <Check className="w-4 h-4" /> Save
                                             </button>
                                             <button
                                                 onClick={() => handleToggleEdit(scene.number, idx)}
                                                 className="flex items-center gap-1 px-3 py-1 text-xs font-medium text-white bg-gray-700 rounded-md hover:bg-gray-600 transition-colors"
-                                                title="Cancel Editing"
                                             >
                                                 <X className="w-4 h-4" /> Cancel
                                             </button>
@@ -921,7 +893,6 @@ const handleDeleteProject = useCallback(async (idToDelete: string, nameToDelete:
                                         <button
                                             onClick={() => handleToggleEdit(scene.number, idx)}
                                             className="flex items-center gap-1 px-3 py-1 text-xs font-medium text-white bg-gray-700 rounded-md hover:bg-gray-600 transition-colors"
-                                            title="Edit Shot Details"
                                         >
                                             <Edit2 className="w-4 h-4" /> Edit
                                         </button>
@@ -995,7 +966,6 @@ const handleDeleteProject = useCallback(async (idToDelete: string, nameToDelete:
                                             <button
                                                 onClick={() => handleCopyPrompt(shot.aiImagePrompt)}
                                                 className="flex items-center gap-1 px-3 py-1 text-xs font-medium text-white bg-gray-700 rounded-md hover:bg-gray-600 transition-colors"
-                                                title="Copy Prompt to Clipboard"
                                             >
                                                 <Copy className="w-3 h-3" /> Copy
                                             </button>
