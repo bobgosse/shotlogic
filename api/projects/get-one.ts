@@ -1,57 +1,77 @@
 // api/projects/get-one.ts
-
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { getDb } from '../../lib/mongodb.js'; // Adjust path if needed
 import { ObjectId } from 'mongodb';
 
-// CRITICAL FIX LINE
+// CRITICAL FIX: Ensure MongoDB driver dependency is resolved
 import { MongoClient } from 'mongodb'; 
-// -----------------
 
 const DEPLOY_TIMESTAMP = '2024-12-16T12:58:00Z_GET_INIT'; 
 
-// ... rest of the file
-export default async function (req: VercelRequest, res: VercelResponse) {
-    if (req.method !== 'GET') {
-        return res.status(405).json({ error: 'Method Not Allowed' });
+export default async function handler(
+  req: VercelRequest,
+  res: VercelResponse
+) {
+  const startTime = Date.now();
+  
+  // Only allow GET requests for retrieving data
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method Not Allowed' });
+  }
+
+  try {
+    const { projectId: idString } = req.query;
+    
+    // Basic validation
+    if (!idString || Array.isArray(idString) || !ObjectId.isValid(idString)) {
+      return res.status(400).json({ 
+        error: 'Invalid project ID provided',
+        message: 'A valid ObjectId string is required.' 
+      });
     }
 
-    // Expecting the project ID to be passed as a query parameter: /api/projects/get-one?projectId=...
-    const { projectId } = req.query;
+    const id = new ObjectId(idString as string);
 
-    if (!projectId || Array.isArray(projectId)) {
-        return res.status(400).json({ error: 'Missing or invalid projectId parameter.' });
-    }
+    // 1. Establish database connection
+    const db = await getDb();
+    const collection = db.collection('projects');
+    
+    // 2. Find the project by ID
+    // We fetch the entire document, which contains { name, projectData, createdAt, updatedAt }
+    const project = await collection.findOne({ _id: id });
 
-    try {
-        const db = await getDb();
-        const collection = db.collection('projects');
-        
-        let objectId;
-        try {
-            // Convert the string ID back into a MongoDB ObjectId for the lookup
-            objectId = new ObjectId(projectId);
-        } catch (e) {
-            return res.status(400).json({ error: 'Invalid MongoDB project ID format.' });
-        }
-
-        // Find the project document
-        const project = await collection.findOne({ _id: objectId });
-
-        if (!project) {
-            return res.status(404).json({ error: `Project with ID ${projectId} not found.` });
-        }
-
-        // Return the core project data payload
-        return res.status(200).json({ 
-            success: true, 
-            projectId: project._id.toHexString(),
-            projectName: project.name,
-            projectData: project.data // This contains the scenes, visualStyle, etc.
+    if (!project) {
+        return res.status(404).json({
+            error: 'Project not found',
+            message: `No project found with ID: ${idString}`,
+            deployMarker: DEPLOY_TIMESTAMP
         });
-
-    } catch (error) {
-        console.error('Fetch One Project Error:', error);
-        return res.status(500).json({ error: 'Failed to fetch project details from the database.' });
     }
+    
+    const duration = Date.now() - startTime;
+    console.log(`✅ Project loaded in ${duration}ms. ID: ${idString}`);
+
+    // CRITICAL FRONTEND FIX: The frontend (Index.tsx) expects 'projectName' 
+    // and 'projectId' at the top level of the response, not nested inside 'projectData'.
+    return res.status(200).json({
+      success: true,
+      projectId: project._id.toHexString(), // Return the ID explicitly
+      projectName: project.name,   // CRITICAL: Return the project name separately
+      projectData: project.projectData, // Return the main data object
+      deployMarker: DEPLOY_TIMESTAMP,
+      processingTime: duration
+    });
+
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`❌ FATAL ERROR in get-one.ts after ${duration}ms:`, error);
+    
+    // Ensure we return JSON on error.
+    return res.status(500).json({
+      error: 'Failed to retrieve project from cloud database',
+      details: error instanceof Error ? error.message : 'Unknown server error',
+      deployMarker: DEPLOY_TIMESTAMP,
+      processingTime: duration
+    });
+  }
 }
