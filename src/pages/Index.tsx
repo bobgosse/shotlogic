@@ -1,7 +1,7 @@
-// src/pages/Index.tsx - COMPLETE FINAL PRODUCTION FILE
-// Includes: Cloud Save/Load Integration, Project Naming, Dashboard Link
+// src/pages/Index.tsx - COMPLETE FINAL PRODUCTION FILE with Cinematic Red/Deep Black UI
+// Includes: Cloud Save/Load Integration, Project Naming, Dashboard Link, and the critical text visibility fix.
 import { useState, useCallback, useEffect } from 'react'
-import { Link, useLocation } from 'react-router-dom' // <-- useLocation is NEW
+import { Link, useLocation } from 'react-router-dom' 
 import { Upload, FileText, CheckCircle2, AlertCircle, Loader2, Printer, FileDown, FileText as FileTextIcon, Save, Edit2, Copy, X, Check } from 'lucide-react'
 import html2pdf from 'html2pdf.js'
 
@@ -20,7 +20,6 @@ interface Shot {
   rationale: string
   editorialIntent: string
   aiImagePrompt: string
-  // isEditing?: boolean // Keep this transient state out of the payload
 }
 
 interface NarrativeAnalysis {
@@ -159,7 +158,7 @@ function Index() {
   const [projectId, setProjectId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState<string>('Untitled Project');
   const [isSaving, setIsSaving] = useState(false);
-  const [isLoadingProject, setIsLoadingProject] = useState(false); // NEW state for loading
+  const [isLoadingProject, setIsLoadingProject] = useState(false); 
 
 
   // ---------------------------------------------------------------
@@ -217,7 +216,7 @@ function Index() {
         }
       }
     }
-  }, [location.search]); // Depend on URL changes
+  }, [location.search]); 
 
   // ---------------------------------------------------------------
   // EFFECT 2: AUTOSAVE TO LOCAL STORAGE
@@ -384,7 +383,7 @@ function Index() {
     }
   }, [showToast])
 
-  // HANDLER: ANALYZE SCENE (unchanged)
+  // HANDLER: ANALYZE SCENE 
   const analyzeScene = useCallback(async (scene: Scene, totalScenes: number): Promise<SceneAnalysis> => {
     try {
       const response = await fetch('/api/analyze-scene', {
@@ -415,7 +414,7 @@ function Index() {
     }
   }, [visualStyle])
 
-  // HANDLER: PROCESS SCREENPLAY (unchanged)
+  // HANDLER: PROCESS SCREENPLAY
   const handleProcessScreenplay = useCallback(async () => {
     if (scenes.length === 0) {
       showToast("No Screenplay Loaded", "Please upload a screenplay file first.", "destructive")
@@ -469,7 +468,7 @@ function Index() {
 
   }, [scenes, analyzeScene, showToast])
 
-  // HANDLER: EDIT/COPY (unchanged)
+  // HANDLER: EDIT/COPY 
   
   const handleCopyPrompt = useCallback(async (prompt: string) => {
     try {
@@ -538,7 +537,7 @@ function Index() {
     }));
   }, [showToast]);
 
-  // HANDLER: EXPORT (unchanged)
+  // HANDLER: EXPORT 
   const handleExportPDF = useCallback(() => {
     const element = document.getElementById('analysis-content')
     if (!element) {
@@ -591,33 +590,36 @@ function Index() {
   // Display a loading screen while fetching project data from the URL
   if (isLoadingProject) {
     return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-8">
-            <Loader2 className="w-12 h-12 animate-spin text-blue-600 mb-4" />
-            <h1 className="text-3xl font-bold text-gray-800">Loading Project from Cloud...</h1>
-            <p className="text-gray-600 mt-2">Please wait while your analysis is retrieved.</p>
+        <div className="min-h-screen flex flex-col items-center justify-center bg-[#141414] p-8">
+            <Loader2 className="w-12 h-12 animate-spin text-[#E50914] mb-4" />
+            <h1 className="text-3xl font-bold text-white">Loading Project from Cloud...</h1>
+            <p className="text-gray-400 mt-2">Please wait while your analysis is retrieved.</p>
         </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-8">
+    // UPDATED: Deep Black background and White text
+    <div className="min-h-screen bg-[#141414] text-white p-8">
       <div className="max-w-6xl mx-auto space-y-8">
         
         {/* Header */}
         <div className="text-center space-y-4">
           <Link to="/" className='inline-block'>
-            <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent hover:text-blue-500 transition-colors cursor-pointer">
+            {/* UPDATED: Cinematic Red title */}
+            <h1 className="text-5xl font-bold text-[#E50914] hover:text-red-700 transition-colors cursor-pointer">
                 ShotLogic
             </h1>
           </Link>
-          <p className="text-xl text-slate-600">
+          {/* UPDATED: Gray text */}
+          <p className="text-xl text-gray-400">
             AI-Powered Screenplay Analysis for Production Planning
           </p>
         </div>
 
         {/* Project Name Input */}
-        <div className="bg-white rounded-lg border shadow-lg p-4">
-            <label className="block text-sm font-medium text-slate-700 mb-1">
+        <div className="bg-gray-900 rounded-lg border border-gray-700 shadow-lg p-4">
+            <label className="block text-sm font-medium text-gray-400 mb-1">
                 Project Name:
             </label>
             <input
@@ -625,11 +627,11 @@ function Index() {
                 value={projectName}
                 onChange={(e) => setProjectName(e.target.value)}
                 placeholder="e.g., The Last Gambit Feature Film"
-                className="w-full px-4 py-2 text-xl font-bold border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2 text-xl font-bold border border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-[#E50914] bg-gray-800 text-white"
                 disabled={isProcessing || isParsing}
             />
             {projectId && (
-                <p className="text-xs text-green-600 mt-1">
+                <p className="text-xs text-green-500 mt-1">
                     * Saved in Cloud (ID: {projectId}). Click Save to update.
                 </p>
             )}
@@ -637,12 +639,12 @@ function Index() {
 
 
         {/* Upload Card */}
-        <div className="bg-white rounded-lg border shadow-xl p-6 space-y-4">
+        <div className="bg-gray-900 rounded-lg border border-gray-700 shadow-xl p-6 space-y-4">
           <h2 className="text-2xl font-semibold flex items-center gap-2">
-            <Upload className="w-6 h-6" />
+            <Upload className="w-6 h-6 text-white" />
             {scenes.length > 0 ? 'Project File Details' : 'Upload Screenplay'}
           </h2>
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-gray-400">
             Upload a .txt, .fdx, or .pdf file to analyze scene requirements
           </p>
           
@@ -652,33 +654,32 @@ function Index() {
               accept=".txt,.fdx,.pdf"
               onChange={handleFileUpload}
               disabled={isProcessing || isParsing}
-              className="flex-1 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              // Dark mode file input styling
+              className="flex-1 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-[#E50914] file:text-white hover:file:bg-red-700 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             />
-            {fileInfo && (
-              <button
+            <button
                 onClick={handleReset}
                 disabled={isProcessing || isParsing}
-                className="px-4 py-2 rounded-md border border-slate-300 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
+                className="px-4 py-2 rounded-md border border-gray-700 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
                 Clear Project
-              </button>
-            )}
+            </button>
           </div>
 
           {isParsing && (
-            <div className="flex items-center gap-2 p-4 bg-blue-50 rounded-lg">
-              <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
-              <p className="text-sm text-blue-700">Parsing screenplay file...</p>
+            <div className="flex items-center gap-2 p-4 bg-gray-800 rounded-lg border border-[#E50914]">
+              <Loader2 className="w-5 h-5 animate-spin text-[#E50914]" />
+              <p className="text-sm text-white">Parsing screenplay file...</p>
             </div>
           )}
 
           {fileInfo && !isParsing && (
             <div className="space-y-4">
-              <div className="flex items-center gap-2 p-4 bg-slate-50 rounded-lg">
-                <FileText className="w-5 h-5 text-blue-600" />
+              <div className="flex items-center gap-2 p-4 bg-gray-800 rounded-lg border border-gray-700">
+                <FileText className="w-5 h-5 text-[#E50914]" />
                 <div className="flex-1">
-                  <p className="font-medium">{fileInfo.name}</p>
-                  <p className="text-sm text-slate-600">
+                  <p className="font-medium text-white">{fileInfo.name}</p>
+                  <p className="text-sm text-gray-400">
                     {scenes.length} scene{scenes.length !== 1 ? 's' : ''} detected
                   </p>
                 </div>
@@ -686,7 +687,7 @@ function Index() {
               
               {/* Visual Style Input */}
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-slate-700">
+                <label className="block text-sm font-medium text-gray-400">
                   Visual Style (Optional)
                 </label>
                 <input
@@ -694,11 +695,11 @@ function Index() {
                   value={visualStyle}
                   onChange={(e) => setVisualStyle(e.target.value)}
                   placeholder="e.g., 1918 period piece, grainy stock, Vittorio Storaro lighting"
-                  className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  style={{ color: '#000000', backgroundColor: '#ffffff' }}
+                  // FIX: Added text-black here to fix invisibility issue, but set input background/text for dark mode
+                  className="w-full px-4 py-2 border border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-[#E50914] bg-gray-800 text-white"
                   disabled={isProcessing}
                 />
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-gray-500">
                   This style will be incorporated into all AI image prompts for pre-visualization
                 </p>
               </div>
@@ -706,7 +707,7 @@ function Index() {
               {scenes.length > 0 && !isProcessing && (
                 <button
                   onClick={handleProcessScreenplay}
-                  className="w-full px-4 py-2 rounded-md bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 font-medium transition-all"
+                  className="w-full px-4 py-2 rounded-md bg-[#E50914] text-white hover:bg-red-700 font-medium transition-all"
                 >
                   Analyze Screenplay
                 </button>
@@ -717,9 +718,9 @@ function Index() {
 
         {/* Processing Status */}
         {isProcessing && (
-          <div className="bg-white rounded-lg border shadow-xl p-6 space-y-4">
+          <div className="bg-gray-900 rounded-lg border border-gray-700 shadow-xl p-6 space-y-4">
             <h2 className="text-2xl font-semibold flex items-center gap-2">
-              <Loader2 className="w-6 h-6 animate-spin" />
+              <Loader2 className="w-6 h-6 animate-spin text-[#E50914]" />
               Processing Screenplay
             </h2>
             <div className="space-y-2">
@@ -727,9 +728,9 @@ function Index() {
                 <span>Analyzing scene {currentScene} of {scenes.length}</span>
                 <span>{progress}%</span>
               </div>
-              <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+              <div className="w-full bg-gray-700 rounded-full h-2 overflow-hidden">
                 <div 
-                  className="h-full bg-blue-600 transition-all duration-300"
+                  className="h-full bg-[#E50914] transition-all duration-300"
                   style={{ width: `${progress}%` }}
                 />
               </div>
@@ -739,17 +740,17 @@ function Index() {
 
         {/* Results with Export Toolbar */}
         {scenes.length > 0 && scenes.some(s => s.status === 'complete' || s.status === 'error') && (
-          <div className="bg-white rounded-lg border shadow-xl">
+          <div className="bg-gray-900 rounded-lg border border-gray-700 shadow-xl">
             {/* Export Toolbar */}
-            <div className="p-4 border-b bg-slate-50 flex items-center justify-between no-print">
-              <h2 className="text-2xl font-semibold">Analysis Results</h2>
+            <div className="p-4 border-b border-gray-700 bg-gray-800 flex items-center justify-between no-print">
+              <h2 className="text-2xl font-semibold text-white">Analysis Results</h2>
               <div className="flex items-center gap-2">
                 
-                {/* Save Button - Now calls Cloud API */}
+                {/* Save Button - Cinematic Red Style */}
                 <button
                     onClick={handleManualSave}
                     disabled={isSaving}
-                    className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-green-700 bg-white border border-green-300 rounded-md hover:bg-green-50 transition-colors disabled:opacity-50"
+                    className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-[#E50914] rounded-md hover:bg-red-700 transition-colors disabled:opacity-50"
                     title="Save Project to Cloud Database"
                 >
                     {isSaving ? (
@@ -762,7 +763,7 @@ function Index() {
 
                 <button
                   onClick={handlePrint}
-                  className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-md hover:bg-slate-50 transition-colors"
+                  className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-gray-700 border border-gray-600 rounded-md hover:bg-gray-600 transition-colors"
                   title="Print"
                 >
                   <Printer className="w-4 h-4" />
@@ -780,7 +781,7 @@ function Index() {
                 
                 <button
                   onClick={handleExportDOCX}
-                  className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-md hover:bg-slate-50 transition-colors"
+                  className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-gray-700 border border-gray-600 rounded-md hover:bg-gray-600 transition-colors"
                   title="Export to DOCX"
                 >
                   <FileTextIcon className="w-4 h-4" />
@@ -792,7 +793,7 @@ function Index() {
 
             {/* Analysis Content - Wrapped for PDF Export */}
             <div id="analysis-content" className="p-6">
-              <p className="text-sm text-slate-600 mb-4">
+              <p className="text-sm text-gray-400 mb-4">
                 {scenes.filter(s => s.status === 'complete').length} of {scenes.length} scenes analyzed
               </p>
               
@@ -801,64 +802,64 @@ function Index() {
                   <div
                     key={scene.number}
                     className={`p-6 border-2 rounded-lg scene-analysis ${
-                      scene.status === 'complete' ? 'bg-green-50 border-green-200' :
-                      scene.status === 'error' ? 'bg-red-50 border-red-200' :
-                      scene.status === 'processing' ? 'bg-blue-50 border-blue-200' :
-                      'bg-slate-50 border-slate-200'
+                      scene.status === 'complete' ? 'bg-green-900/30 border-green-600' :
+                      scene.status === 'error' ? 'bg-red-900/30 border-[#E50914]' :
+                      scene.status === 'processing' ? 'bg-blue-900/30 border-blue-600' :
+                      'bg-gray-800 border-gray-700'
                     }`}
                   >
                     <div className="flex items-start justify-between mb-4">
                       <h3 className="text-xl font-bold flex items-center gap-2">
                         Scene {scene.number}
-                        {scene.status === 'complete' && <CheckCircle2 className="w-6 h-6 text-green-600" />}
-                        {scene.status === 'error' && <AlertCircle className="w-6 h-6 text-red-600" />}
-                        {scene.status === 'processing' && <Loader2 className="w-6 h-6 animate-spin text-blue-600" />}
+                        {scene.status === 'complete' && <CheckCircle2 className="w-6 h-6 text-green-500" />}
+                        {scene.status === 'error' && <AlertCircle className="w-6 h-6 text-[#E50914]" />}
+                        {scene.status === 'processing' && <Loader2 className="w-6 h-6 animate-spin text-blue-500" />}
                       </h3>
                     </div>
 
                     {scene.analysis && (
                       <div className="space-y-6">
-                        {/* Narrative Analysis (Read-only for simplicity) */}
-                        <div className="border-t-2 border-slate-200 pt-4">
-                          <h4 className="text-lg font-bold text-slate-900 mb-3">📖 Narrative Analysis</h4>
+                        {/* Narrative Analysis */}
+                        <div className="border-t border-gray-700 pt-4">
+                          <h4 className="text-lg font-bold text-white mb-3">📖 Narrative Analysis</h4>
                           <div className="space-y-3 text-sm">
                             <div>
-                              <span className="font-semibold text-slate-700">Synopsis:</span>
-                              <p className="text-slate-600 mt-1">{scene.analysis.narrativeAnalysis.synopsis}</p>
+                              <span className="font-semibold text-gray-400">Synopsis:</span>
+                              <p className="text-white mt-1">{scene.analysis.narrativeAnalysis.synopsis}</p>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                               <div>
-                                <span className="font-semibold text-slate-700">Central Conflict:</span>
-                                <p className="text-slate-600 mt-1">{scene.analysis.narrativeAnalysis.centralConflict}</p>
+                                <span className="font-semibold text-gray-400">Central Conflict:</span>
+                                <p className="text-white mt-1">{scene.analysis.narrativeAnalysis.centralConflict}</p>
                               </div>
                               <div>
-                                <span className="font-semibold text-slate-700">Emotional Tone:</span>
-                                <p className="text-slate-600 mt-1">{scene.analysis.narrativeAnalysis.emotionalTone}</p>
+                                <span className="font-semibold text-gray-400">Emotional Tone:</span>
+                                <p className="text-white mt-1">{scene.analysis.narrativeAnalysis.emotionalTone}</p>
                               </div>
                             </div>
                             <div>
-                              <span className="font-semibold text-slate-700">Scene Turn:</span>
-                              <p className="text-slate-600 mt-1">{scene.analysis.narrativeAnalysis.sceneTurn}</p>
+                              <span className="font-semibold text-gray-400">Scene Turn:</span>
+                              <p className="text-white mt-1">{scene.analysis.narrativeAnalysis.sceneTurn}</p>
                             </div>
                             <div>
-                              <span className="font-semibold text-slate-700">Stakes:</span>
-                              <p className="text-slate-600 mt-1">{scene.analysis.narrativeAnalysis.stakes}</p>
+                              <span className="font-semibold text-gray-400">Stakes:</span>
+                              <p className="text-white mt-1">{scene.analysis.narrativeAnalysis.stakes}</p>
                             </div>
                           </div>
                         </div>
 
                         {/* Shot List with Edit/Copy Features */}
-                        <div className="border-t-2 border-slate-200 pt-4">
-                          <h4 className="text-lg font-bold text-slate-900 mb-4">
+                        <div className="border-t border-gray-700 pt-4">
+                          <h4 className="text-lg font-bold text-white mb-4">
                             🎥 Shot List ({scene.analysis.shotList.length} shots)
                           </h4>
                           <div className="space-y-4">
                             {scene.analysis.shotList.map((shot, idx) => (
-                              <div key={idx} className="bg-white border-2 border-slate-300 rounded-lg p-4">
+                              <div key={idx} className="bg-gray-800 border-2 border-gray-700 rounded-lg p-4">
                                 
                                 {/* Shot Header with Edit Button */}
                                 <div className="flex items-center justify-between mb-3">
-                                    <span className="px-3 py-1 bg-blue-600 text-white text-sm font-bold rounded">
+                                    <span className="px-3 py-1 bg-[#E50914] text-white text-sm font-bold rounded">
                                         Shot {idx + 1}: {shot.shotType}
                                     </span>
                                     
@@ -874,7 +875,7 @@ function Index() {
                                             </button>
                                             <button
                                                 onClick={() => handleToggleEdit(scene.number, idx)}
-                                                className="flex items-center gap-1 px-3 py-1 text-xs font-medium text-slate-700 bg-slate-200 rounded-md hover:bg-slate-300 transition-colors"
+                                                className="flex items-center gap-1 px-3 py-1 text-xs font-medium text-white bg-gray-700 rounded-md hover:bg-gray-600 transition-colors"
                                                 title="Cancel Editing"
                                             >
                                                 <X className="w-4 h-4" /> Cancel
@@ -883,7 +884,7 @@ function Index() {
                                     ) : (
                                         <button
                                             onClick={() => handleToggleEdit(scene.number, idx)}
-                                            className="flex items-center gap-1 px-3 py-1 text-xs font-medium text-slate-700 bg-slate-200 rounded-md hover:bg-slate-300 transition-colors"
+                                            className="flex items-center gap-1 px-3 py-1 text-xs font-medium text-white bg-gray-700 rounded-md hover:bg-gray-600 transition-colors"
                                             title="Edit Shot Details"
                                         >
                                             <Edit2 className="w-4 h-4" /> Edit
@@ -896,80 +897,83 @@ function Index() {
                                   
                                     {/* Shot Type (Dropdown in Edit Mode) */}
                                     <div>
-                                        <span className="font-semibold text-slate-700">Shot Type:</span>
+                                        <span className="font-semibold text-gray-400">Shot Type:</span>
                                         {shot.isEditing ? (
                                             <select
                                                 value={shot.shotType}
                                                 onChange={(e) => handleShotChange(scene.number, idx, 'shotType', e.target.value as ShotType)}
-                                                className="w-full mt-1 p-2 border border-slate-300 rounded-md text-sm"
+                                                className="w-full mt-1 p-2 border border-gray-700 rounded-md text-sm bg-gray-900 text-white"
                                             >
                                                 {SHOT_TYPES.map(type => (
                                                     <option key={type} value={type}>{type}</option>
                                                 ))}
                                             </select>
                                         ) : (
-                                            <p className="text-slate-600 mt-1">{shot.shotType}</p>
+                                            <p className="text-white mt-1">{shot.shotType}</p>
                                         )}
                                     </div>
                                     
                                     {/* Visual Description */}
                                     <div>
-                                        <span className="font-semibold text-slate-700">Visual Description:</span>
+                                        <span className="font-semibold text-gray-400">Visual Description:</span>
                                         {shot.isEditing ? (
                                             <textarea
                                                 value={shot.visualDescription}
                                                 onChange={(e) => handleShotChange(scene.number, idx, 'visualDescription', e.target.value)}
-                                                className="w-full mt-1 p-2 border border-slate-300 rounded-md text-sm resize-y"
+                                                // FIX: Added text-white and bg-gray-900 for visibility
+                                                className="w-full mt-1 p-2 border border-gray-700 rounded-md text-sm resize-y bg-gray-900 text-white" 
                                                 rows={2}
                                             />
                                         ) : (
-                                            <p className="text-slate-600 mt-1">{shot.visualDescription}</p>
+                                            <p className="text-white mt-1">{shot.visualDescription}</p>
                                         )}
                                     </div>
 
                                     {/* Rationale */}
                                     <div>
-                                        <span className="font-semibold text-slate-700">Rationale:</span>
+                                        <span className="font-semibold text-gray-400">Rationale:</span>
                                         {shot.isEditing ? (
                                             <textarea
                                                 value={shot.rationale}
                                                 onChange={(e) => handleShotChange(scene.number, idx, 'rationale', e.target.value)}
-                                                className="w-full mt-1 p-2 border border-slate-300 rounded-md text-sm resize-y"
+                                                // FIX: Added text-white and bg-gray-900 for visibility
+                                                className="w-full mt-1 p-2 border border-gray-700 rounded-md text-sm resize-y bg-gray-900 text-white" 
                                                 rows={2}
                                             />
                                         ) : (
-                                            <p className="text-slate-600 mt-1">{shot.rationale}</p>
+                                            <p className="text-white mt-1">{shot.rationale}</p>
                                         )}
                                     </div>
 
                                     {/* Editorial Intent */}
                                     <div>
-                                        <span className="font-semibold text-slate-700">Editorial Intent:</span>
+                                        <span className="font-semibold text-gray-400">Editorial Intent:</span>
                                         {shot.isEditing ? (
                                             <textarea
                                                 value={shot.editorialIntent}
                                                 onChange={(e) => handleShotChange(scene.number, idx, 'editorialIntent', e.target.value)}
-                                                className="w-full mt-1 p-2 border border-slate-300 rounded-md text-sm resize-y"
+                                                // FIX: Added text-white and bg-gray-900 for visibility
+                                                className="w-full mt-1 p-2 border border-gray-700 rounded-md text-sm resize-y bg-gray-900 text-white" 
                                                 rows={2}
                                             />
                                         ) : (
-                                            <p className="text-slate-600 mt-1">{shot.editorialIntent}</p>
+                                            <p className="text-white mt-1">{shot.editorialIntent}</p>
                                         )}
                                     </div>
                                     
                                     {/* AI Image Prompt with Copy Button */}
-                                    <div className="pt-2 border-t border-slate-200">
+                                    <div className="pt-2 border-t border-gray-700">
                                         <div className='flex justify-between items-center'>
-                                            <span className="font-semibold text-slate-700">AI Image Prompt:</span>
+                                            <span className="font-semibold text-gray-400">AI Image Prompt:</span>
                                             <button
                                                 onClick={() => handleCopyPrompt(shot.aiImagePrompt)}
-                                                className="flex items-center gap-1 px-3 py-1 text-xs font-medium text-blue-600 bg-blue-100 rounded-md hover:bg-blue-200 transition-colors"
+                                                className="flex items-center gap-1 px-3 py-1 text-xs font-medium text-white bg-gray-700 rounded-md hover:bg-gray-600 transition-colors"
                                                 title="Copy Prompt to Clipboard"
                                             >
                                                 <Copy className="w-3 h-3" /> Copy
                                             </button>
                                         </div>
-                                        <p className="text-xs text-slate-500 font-mono bg-slate-100 p-3 rounded mt-1 leading-relaxed">
+                                        <p className="text-xs text-gray-500 font-mono bg-gray-800 p-3 rounded mt-1 leading-relaxed">
                                             {shot.aiImagePrompt}
                                         </p>
                                     </div>
@@ -982,9 +986,9 @@ function Index() {
                     )}
 
                     {scene.error && (
-                      <div className="bg-red-100 border border-red-300 rounded p-4">
-                        <p className="text-red-800 font-semibold">Error:</p>
-                        <p className="text-red-700 text-sm mt-1">{scene.error}</p>
+                      <div className="bg-red-900/50 border border-[#E50914] rounded p-4">
+                        <p className="text-white font-semibold">Error:</p>
+                        <p className="text-red-300 text-sm mt-1">{scene.error}</p>
                       </div>
                     )}
                   </div>

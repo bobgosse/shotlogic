@@ -1,4 +1,4 @@
-// src/pages/Dashboard.tsx - COMPLETE CONTENT with Cloud Fetch Logic
+// src/pages/Dashboard.tsx - COMPLETE CONTENT with Cinematic Red/Deep Black UI
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
@@ -59,26 +59,30 @@ export default function Dashboard() {
 
 
   return (
-    <div className="container mx-auto p-4 md:p-8">
-        <header className="mb-12 border-b pb-4">
-            <h1 className="text-4xl font-extrabold text-gray-900 flex items-center gap-3">
-                <List className="w-8 h-8 text-blue-600" />
+    // UPDATED: Deep Black background and text-white for entire page
+    <div className="min-h-screen bg-[#141414] text-white container mx-auto p-4 md:p-8">
+        <header className="mb-12 border-b border-gray-700 pb-4">
+            {/* UPDATED: White text and Cinematic Red accent icon */}
+            <h1 className="text-4xl font-extrabold text-white flex items-center gap-3">
+                <List className="w-8 h-8 text-[#E50914]" />
                 Project Dashboard
             </h1>
-            <p className="text-lg text-gray-600">Manage your saved analyses and start new breakdowns.</p>
+            <p className="text-lg text-gray-400">Manage your saved analyses and start new breakdowns.</p>
         </header>
 
         <main className="space-y-10">
 
             {/* --- Start New Project Section --- */}
-            <div className="p-8 bg-blue-50 border-2 border-blue-200 rounded-xl shadow-lg flex items-center justify-between">
+            {/* UPDATED: Darker background and Red border */}
+            <div className="p-8 bg-gray-900 border-2 border-[#E50914] rounded-xl shadow-lg flex items-center justify-between">
                 <div>
-                    <h2 className="text-2xl font-bold text-blue-800 mb-2">Start a New Screenplay Analysis</h2>
-                    <p className="text-blue-600">Upload a new file to begin the breakdown process.</p>
+                    <h2 className="text-2xl font-bold text-white mb-2">Start a New Screenplay Analysis</h2>
+                    <p className="text-gray-400">Upload a new file to begin the breakdown process.</p>
                 </div>
+                {/* UPDATED: Cinematic Red CTA button */}
                 <Link 
                     to="/analyze" 
-                    className="flex items-center gap-2 px-6 py-3 text-white bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg font-bold hover:from-blue-700 hover:to-purple-700 transition-colors shadow-md"
+                    className="flex items-center gap-2 px-6 py-3 text-white bg-[#E50914] rounded-lg font-bold hover:bg-red-700 transition-colors shadow-md"
                 >
                     <PlusCircle className="w-5 h-5" />
                     New Analysis
@@ -87,16 +91,17 @@ export default function Dashboard() {
 
             {/* --- Project List Section --- */}
             <div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+                <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
                     <FileText className="w-6 h-6" />
                     Saved Projects
                 </h2>
                 
-                <div className="bg-white rounded-lg shadow-xl border overflow-hidden">
+                {/* UPDATED: Dark background container and border */}
+                <div className="bg-gray-900 rounded-lg shadow-xl border border-gray-700 overflow-hidden">
                     
                     {/* Loading State */}
                     {isLoading && (
-                        <div className="flex justify-center items-center p-8 text-blue-600">
+                        <div className="flex justify-center items-center p-8 text-[#E50914]">
                             <Loader2 className="w-6 h-6 animate-spin mr-2" />
                             Fetching projects from the cloud...
                         </div>
@@ -104,7 +109,7 @@ export default function Dashboard() {
 
                     {/* Error State */}
                     {error && (
-                        <div className="p-4 bg-red-100 text-red-700 border-l-4 border-red-500">
+                        <div className="p-4 bg-red-900 text-red-300 border-l-4 border-[#E50914]">
                             <strong>Connection Error:</strong> {error} Showing limited local placeholders. Please check your MongoDB URI.
                         </div>
                     )}
@@ -118,29 +123,30 @@ export default function Dashboard() {
 
                     {/* Project Table */}
                     {!isLoading && projects.length > 0 && (
-                        <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
+                        <table className="min-w-full divide-y divide-gray-700">
+                            {/* UPDATED: Dark table header */}
+                            <thead className="bg-gray-800">
                                 <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Project Name</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Updated</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Project Name</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Last Updated</th>
                                     <th className="px-6 py-3"></th>
                                 </tr>
                             </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
+                            {/* UPDATED: Dark table body and text colors */}
+                            <tbody className="bg-gray-900 divide-y divide-gray-700">
                                 {projects.map((project) => (
-                                    <tr key={project.id} className="hover:bg-gray-50 transition-colors">
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                    <tr key={project.id} className="hover:bg-gray-800 transition-colors">
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">
                                             <Save className="w-4 h-4 mr-2 inline-block text-green-500" />
                                             {project.name}
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
                                             {formatDate(project.updatedAt)}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            {/* We will update this link to fetch the project data later */}
                                             <Link 
                                                 to={`/analyze?projectId=${project.id}`} 
-                                                className="text-blue-600 hover:text-blue-800 flex items-center justify-end gap-1"
+                                                className="text-[#E50914] hover:text-red-700 flex items-center justify-end gap-1"
                                             >
                                                 Load Analysis <ArrowRight className="w-4 h-4" />
                                             </Link>
