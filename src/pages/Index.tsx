@@ -319,6 +319,42 @@ function Index() {
     showToast("Project Cleared", "Local session data has been removed.");
   }, [])
 
+  // HANDLER: DELETE PROJECT
+const handleDeleteProject = useCallback(async (idToDelete: string, nameToDelete: string) => {
+    if (!window.confirm(`Are you sure you want to permanently delete the project: "${nameToDelete}"? This cannot be undone.`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/projects/delete?projectId=${idToDelete}`, {
+            method: 'DELETE',
+            // Note: DELETE requests often don't require a body, we pass the ID in the query params.
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || errorData.message || 'Failed to delete project from the cloud.');
+        }
+
+        // --- SUCCESS ---
+        showToast("Project Deleted", `Project '${nameToDelete}' was successfully deleted.`);
+        
+        // 1. Clear the local state if the deleted project was the currently loaded one
+        if (projectId === idToDelete) {
+            handleReset(); // Reset to clear the screen and local storage
+        } 
+        // 2. Refresh the list of projects (Requires fetching the list again, which we will simulate)
+        // Since we don't have a dedicated project list component, we assume you can refresh the page to see the new state.
+        
+        // For now, let's reset to the home view:
+        window.location.href = '/'; 
+
+    } catch (error) {
+        console.error('❌ Delete Project Error:', error);
+        showToast("Deletion Failed", error instanceof Error ? error.message : "An unknown error occurred during deletion.", "destructive");
+    }
+}, [projectId, handleReset]);
+
   // HANDLER: FILE UPLOAD
   const handleFileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const uploadedFile = event.target.files?.[0]
