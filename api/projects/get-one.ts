@@ -1,8 +1,16 @@
-// api/projects/get-one.ts - Fetches a single, complete project document by ID
+// api/projects/get-one.ts
+
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { getDb } from '../lib/mongodb';
+import { getDb } from '../../lib/mongodb.js'; // Adjust path if needed
 import { ObjectId } from 'mongodb';
 
+// CRITICAL FIX LINE
+import { MongoClient } from 'mongodb'; 
+// -----------------
+
+const DEPLOY_TIMESTAMP = '2024-12-16T12:58:00Z_GET_INIT'; 
+
+// ... rest of the file
 export default async function (req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'GET') {
         return res.status(405).json({ error: 'Method Not Allowed' });
