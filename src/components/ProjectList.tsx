@@ -1,8 +1,8 @@
 // src/components/ProjectList.tsx
-// Complete component with defensive rendering and ID validation
+// CRITICAL FIX: Added proper Link import and navigation
 
 import { useCallback, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router-dom' // ✅ CRITICAL: Must import Link
 import { Trash2, Loader2, Calendar, AlertCircle } from 'lucide-react'
 
 // ═══════════════════════════════════════════════════════════════
@@ -29,8 +29,6 @@ function isValidObjectId(id: any): boolean {
   if (!id || typeof id !== 'string') {
     return false
   }
-  
-  // MongoDB ObjectId is exactly 24 hexadecimal characters
   return /^[0-9a-fA-F]{24}$/.test(id)
 }
 
@@ -42,25 +40,43 @@ function ProjectList({ projects, setProjects, showToast }: ProjectListProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   // ---------------------------------------------------------------
-  // DELETE HANDLER - WITH ENHANCED VALIDATION
+  // DELETE HANDLER
   // ---------------------------------------------------------------
   const handleDelete = useCallback(async (projectId: string, projectName: string) => {
     console.log(`\n🗑️  Delete requested for: ${projectName}`)
+    console.log(`   Project ID: ${projectId}`)
     
-    // CRITICAL FIX: Validate ID before proceeding
-    if (!isValidObjectId(projectId)) {
-      console.error('❌ Invalid ID: Deletion blocked.')
+    // Validate ID
+    if (!projectId || typeof projectId !== 'string') {
+      console.error('❌ Invalid ID: ID is missing or not a string')
       showToast(
         'Delete Failed',
-        'Project ID format is invalid. Cannot delete project.',
+        'Project ID is missing or invalid.',
+        'destructive'
+      )
+      return
+    }
+    
+    if (projectId.length !== 24) {
+      console.error(`❌ Invalid ID length: Expected 24, got ${projectId.length}`)
+      showToast(
+        'Delete Failed',
+        'Project ID has invalid format.',
+        'destructive'
+      )
+      return
+    }
+    
+    if (!isValidObjectId(projectId)) {
+      console.error('❌ Invalid ID format')
+      showToast(
+        'Delete Failed',
+        'Project ID format is invalid.',
         'destructive'
       )
       return
     }
 
-    console.log('✅ ID validation passed')
-
-    // Confirm deletion with user
     const confirmed = window.confirm(
       `Are you sure you want to delete "${projectName}"?\n\nThis action cannot be undone.`
     )
@@ -74,7 +90,6 @@ function ProjectList({ projects, setProjects, showToast }: ProjectListProps) {
     setDeletingId(projectId)
 
     try {
-      // Call DELETE endpoint
       const response = await fetch(`/api/projects/delete?projectId=${projectId}`, {
         method: 'DELETE',
         headers: {
@@ -93,10 +108,8 @@ function ProjectList({ projects, setProjects, showToast }: ProjectListProps) {
       const result = await response.json()
       console.log('✅ Delete successful:', result)
 
-      // Optimistically update local state
       setProjects(prevProjects => prevProjects.filter(p => p._id !== projectId))
 
-      // Show success message
       showToast(
         'Project Deleted',
         `"${projectName}" has been permanently deleted.`
@@ -107,7 +120,7 @@ function ProjectList({ projects, setProjects, showToast }: ProjectListProps) {
       
       showToast(
         'Delete Failed',
-        error instanceof Error ? error.message : 'Failed to delete project from cloud database.',
+        error instanceof Error ? error.message : 'Failed to delete project.',
         'destructive'
       )
     } finally {
@@ -116,7 +129,7 @@ function ProjectList({ projects, setProjects, showToast }: ProjectListProps) {
   }, [setProjects, showToast])
 
   // ---------------------------------------------------------------
-  // FORMAT DATE FOR DISPLAY
+  // FORMAT DATE
   // ---------------------------------------------------------------
   const formatDate = (dateString: string): string => {
     try {
@@ -125,37 +138,39 @@ function ProjectList({ projects, setProjects, showToast }: ProjectListProps) {
       const diffMs = now.getTime() - date.getTime()
       const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
 
-      if (diffDays === 0) {
-        return 'Today'
-      } else if (diffDays === 1) {
-        return 'Yesterday'
-      } else if (diffDays < 7) {
-        return `${diffDays} days ago`
-      } else {
-        return date.toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric'
-        })
-      }
+      if (diffDays === 0) return 'Today'
+      if (diffDays === 1) return 'Yesterday'
+      if (diffDays < 7) return `${diffDays} days ago`
+      
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      })
     } catch (error) {
       return dateString
     }
   }
 
   // ---------------------------------------------------------------
-  // DATA VALIDATION & LOGGING
+  // DATA VALIDATION
   // ---------------------------------------------------------------
   
-  // Validate and categorize projects for defensive rendering
+  console.log(`\n📊 ProjectList Render:`)
+  console.log(`   Total projects: ${projects.length}`)
+  
   const validProjects: ProjectItem[] = []
   const invalidProjects: any[] = []
   
-  projects.forEach((project) => {
+  projects.forEach((project, index) => {
     const hasId = project && typeof project === 'object' && '_id' in project
     const idValue = hasId ? project._id : null
     const isValid = isValidObjectId(idValue)
-        
+    
+    console.log(`   [${index}] Name: "${project?.name || 'UNKNOWN'}"`)
+    console.log(`       _id: ${idValue}`)
+    console.log(`       Valid: ${isValid}`)
+    
     if (isValid) {
       validProjects.push(project)
     } else {
@@ -163,6 +178,8 @@ function ProjectList({ projects, setProjects, showToast }: ProjectListProps) {
     }
   })
   
+  console.log(`   Valid: ${validProjects.length}, Invalid: ${invalidProjects.length}\n`)
+
   // ---------------------------------------------------------------
   // RENDER
   // ---------------------------------------------------------------
@@ -187,11 +204,11 @@ function ProjectList({ projects, setProjects, showToast }: ProjectListProps) {
             <AlertCircle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
             <div>
               <h3 className="text-yellow-500 font-semibold">
-                Data Warning: Invalid Projects Found
+                Data Warning
               </h3>
               <p className="text-yellow-300 text-sm mt-1">
-                {invalidProjects.length} project{invalidProjects.length !== 1 ? 's have' : ' has'} an invalid or missing ID.
-                These projects cannot be deleted or opened. This usually means the server returned corrupted data.
+                {invalidProjects.length} project{invalidProjects.length !== 1 ? 's have' : ' has'} invalid or missing ID{invalidProjects.length !== 1 ? 's' : ''}.
+                These projects cannot be deleted or opened.
               </p>
             </div>
           </div>
@@ -201,14 +218,23 @@ function ProjectList({ projects, setProjects, showToast }: ProjectListProps) {
       {/* Project List */}
       <div className="space-y-3">
         {projects.map((project, index) => {
-          // CRITICAL: Defensive checks for project data
           if (!project || typeof project !== 'object') {
+            console.error(`⚠️  Project at index ${index} is not an object:`, project)
             return null
           }
 
           const projectId = project._id
           const projectName = project.name || 'Untitled Project'
           const hasValidId = isValidObjectId(projectId)
+
+          if (!hasValidId) {
+            console.warn(`⚠️  Invalid project at index ${index}:`, {
+              name: projectName,
+              _id: projectId,
+              idType: typeof projectId,
+              idLength: projectId?.length
+            })
+          }
 
           return (
             <div
@@ -222,7 +248,7 @@ function ProjectList({ projects, setProjects, showToast }: ProjectListProps) {
               {/* Project Info */}
               <div className="flex-1 min-w-0">
                 {hasValidId ? (
-                  // Valid project - clickable link to load
+                  // ✅ CRITICAL: Valid project with Link navigation
                   <Link 
                     to={`/?projectId=${projectId}`}
                     className="block hover:text-[#E50914] transition-colors"
@@ -232,7 +258,7 @@ function ProjectList({ projects, setProjects, showToast }: ProjectListProps) {
                     </h3>
                   </Link>
                 ) : (
-                  // Invalid project - no link, shows warning
+                  // Invalid project - no link
                   <div className="flex items-center gap-2">
                     <AlertCircle className="w-4 h-4 text-yellow-500 flex-shrink-0" />
                     <h3 className="text-lg font-semibold text-yellow-300 truncate">
@@ -248,7 +274,6 @@ function ProjectList({ projects, setProjects, showToast }: ProjectListProps) {
                   </p>
                 </div>
 
-                {/* Debug info for invalid projects */}
                 {!hasValidId && (
                   <p className="text-xs text-yellow-500 mt-1 font-mono">
                     ID: {projectId || 'MISSING'} (Length: {projectId?.length || 0})
@@ -256,7 +281,7 @@ function ProjectList({ projects, setProjects, showToast }: ProjectListProps) {
                 )}
               </div>
 
-              {/* Delete Button - Disabled if ID is invalid */}
+              {/* Delete Button */}
               <button
                 onClick={() => handleDelete(projectId, projectName)}
                 disabled={!hasValidId || deletingId === projectId}
