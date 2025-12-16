@@ -1,16 +1,62 @@
-// src/pages/Dashboard.tsx - COMPLETE CONTENT
+// src/pages/Dashboard.tsx - COMPLETE CONTENT with Cloud Fetch Logic
 
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { PlusCircle, List, FileText, ArrowRight } from 'lucide-react';
+import { PlusCircle, List, FileText, ArrowRight, Loader2, Save } from 'lucide-react';
+
+// Define the Project type expected from the backend
+interface ProjectSummary {
+    id: string;
+    name: string;
+    updatedAt: string;
+}
+
+// Utility to format the date
+const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+};
 
 export default function Dashboard() {
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Placeholder for projects loaded from local storage or backend
-  const projects = [
-      { id: 1, name: "The Last Gambit (Saved)", date: "Dec 15, 2025", scenes: 18, status: "Complete" },
-      { id: 2, name: "New Pilot: Shadow Run", date: "Dec 10, 2025", scenes: 5, status: "Draft" },
-  ];
+  // Function to fetch the list of projects from the cloud
+  const fetchProjects = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+        const response = await fetch('/api/projects/get-all');
+        const result = await response.json();
+
+        if (!response.ok || !result.projects) {
+            throw new Error(result.error || 'Failed to retrieve project list from cloud.');
+        }
+        
+        setProjects(result.projects);
+    } catch (err) {
+        console.error("Dashboard fetch error:", err);
+        setError("Failed to connect to cloud database or fetch projects.");
+        // Fallback to placeholder data if connection fails
+        setProjects([
+            { id: 'local_1', name: "Local Fallback: The Last Gambit", updatedAt: new Date().toISOString() },
+            { id: 'local_2', name: "Local Fallback: New Pilot", updatedAt: new Date(Date.now() - 86400000).toISOString() },
+        ]);
+    } finally {
+        setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchProjects();
+  }, [fetchProjects]);
+
 
   return (
     <div className="container mx-auto p-4 md:p-8">
@@ -47,47 +93,63 @@ export default function Dashboard() {
                 </h2>
                 
                 <div className="bg-white rounded-lg shadow-xl border overflow-hidden">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Project Name</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Scenes</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Saved</th>
-                                <th className="px-6 py-3"></th>
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                            {projects.map((project) => (
-                                <tr key={project.id} className="hover:bg-gray-50 transition-colors">
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                        {project.name}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        {project.scenes}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <span 
-                                            className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                                project.status === 'Complete' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                                            }`}
-                                        >
-                                            {project.status}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        {project.date}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        {/* Placeholder for loading the project */}
-                                        <Link to="/analyze" className="text-blue-600 hover:text-blue-900 flex items-center justify-end gap-1">
-                                            Load Analysis <ArrowRight className="w-4 h-4" />
-                                        </Link>
-                                    </td>
+                    
+                    {/* Loading State */}
+                    {isLoading && (
+                        <div className="flex justify-center items-center p-8 text-blue-600">
+                            <Loader2 className="w-6 h-6 animate-spin mr-2" />
+                            Fetching projects from the cloud...
+                        </div>
+                    )}
+
+                    {/* Error State */}
+                    {error && (
+                        <div className="p-4 bg-red-100 text-red-700 border-l-4 border-red-500">
+                            <strong>Connection Error:</strong> {error} Showing limited local placeholders. Please check your MongoDB URI.
+                        </div>
+                    )}
+
+                    {/* Empty State */}
+                    {!isLoading && projects.length === 0 && !error && (
+                        <div className="text-center p-8 text-gray-500">
+                            You have no saved projects in the cloud yet. Start a new analysis and click 'Save'!
+                        </div>
+                    )}
+
+                    {/* Project Table */}
+                    {!isLoading && projects.length > 0 && (
+                        <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50">
+                                <tr>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Project Name</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Updated</th>
+                                    <th className="px-6 py-3"></th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                                {projects.map((project) => (
+                                    <tr key={project.id} className="hover:bg-gray-50 transition-colors">
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                            <Save className="w-4 h-4 mr-2 inline-block text-green-500" />
+                                            {project.name}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            {formatDate(project.updatedAt)}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                            {/* We will update this link to fetch the project data later */}
+                                            <Link 
+                                                to={`/analyze?projectId=${project.id}`} 
+                                                className="text-blue-600 hover:text-blue-800 flex items-center justify-end gap-1"
+                                            >
+                                                Load Analysis <ArrowRight className="w-4 h-4" />
+                                            </Link>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
                 </div>
             </div>
 
