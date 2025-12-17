@@ -1,11 +1,11 @@
 // api/parse-screenplay.ts
-// PRODUCTION-READY: Screenplay parser for TXT, FDX, and PDF with graceful degradation
-// PDF support with safe fallback if native dependencies fail
+// PRODUCTION-READY: Screenplay parser for TXT, FDX, and PDF with ultimate stability
+// FIXED: Double try-catch for DOMMatrix import error to ensure graceful PDF degradation
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { XMLParser } from 'fast-xml-parser'
 
-const DEPLOY_TIMESTAMP = "2024-12-17T00:00:00Z_FULL_SUPPORT_SAFE_PDF"
+const DEPLOY_TIMESTAMP = "2024-12-17T00:30:00Z_FINAL_PARSER_FIX"
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB limit
 
 interface ParseRequest {
@@ -15,40 +15,41 @@ interface ParseRequest {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// PDF PARSER - WITH GRACEFUL DEGRADATION
+// PDF PARSER - WITH DOUBLE TRY-CATCH GRACEFUL DEGRADATION (FIXED)
 // ═══════════════════════════════════════════════════════════════
 
 async function parsePDF(buffer: Buffer, invocationId: string): Promise<string> {
   console.log(`📄 [${invocationId}] Parsing PDF (${buffer.length} bytes)...`)
   
+  let pdfParse: any
+  
+  // CRITICAL FIX: External try-catch to handle the immediate import/load failure (DOMMatrix)
   try {
-    // CRITICAL: Dynamic import with try-catch for native dependency safety
-    let pdfParse: any
-    
     try {
       // Attempt to load pdf-parse
       pdfParse = (await import('pdf-parse')).default
       console.log(`   [${invocationId}] pdf-parse module loaded successfully`)
     } catch (importError) {
-      console.error(`❌ [${invocationId}] Failed to import pdf-parse:`, importError)
+      console.error(`❌ [${invocationId}] Failed to import pdf-parse at load time:`, importError)
       
-      // Check if it's a native dependency error
       const errorMessage = importError instanceof Error ? importError.message : String(importError)
       
+      // Specifically target known Vercel/Node.js native dependency errors, including the DOMMatrix error
       if (
+        errorMessage.includes('DOMMatrix is not defined') || // <--- TARGETED FIX
         errorMessage.includes('MODULE_NOT_FOUND') ||
         errorMessage.includes('binding') ||
         errorMessage.includes('canvas') ||
-        errorMessage.includes('node-gyp') ||
-        errorMessage.includes('sharp')
+        errorMessage.includes('node-gyp')
       ) {
+        // Throw a specific error that the main handler will catch and convert to a clean 503
         throw new Error('PDF_NATIVE_DEPENDENCY_ERROR: PDF parsing requires native dependencies that are not available in this serverless environment. Please export your screenplay as .txt or .fdx format.')
       }
       
       throw new Error(`PDF_IMPORT_ERROR: Failed to load PDF parser - ${errorMessage}`)
     }
     
-    // Attempt to parse the PDF
+    // Attempt to parse the PDF (internal try-catch for runtime errors)
     console.log(`   [${invocationId}] Parsing PDF with pdf-parse...`)
     
     let pdfData: any
@@ -97,8 +98,9 @@ async function parsePDF(buffer: Buffer, invocationId: string): Promise<string> {
     return cleanText
     
   } catch (error) {
-    console.error(`❌ [${invocationId}] PDF parsing error:`, error)
-    throw error // Re-throw to be handled by main handler
+    // This catches the PDF_NATIVE_DEPENDENCY_ERROR or other high-level failures
+    console.error(`❌ [${invocationId}] High-level PDF parsing error caught:`, error)
+    throw error // Re-throw to be handled by main handler for 503/500 response
   }
 }
 
@@ -473,7 +475,7 @@ export default async function handler(
         
         const errorMessage = pdfError instanceof Error ? pdfError.message : String(pdfError)
         
-        // CRITICAL: Check for native dependency errors
+        // CRITICAL: Check for native dependency errors (The DOMMatrix error is caught here)
         if (errorMessage.includes('PDF_NATIVE_DEPENDENCY_ERROR')) {
           return res.status(503).json({
             error: 'PDF support temporarily unavailable',
