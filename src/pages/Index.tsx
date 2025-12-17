@@ -1,4 +1,4 @@
-// src/pages/Index.tsx - COMPLETE FINAL PRODUCTION FILE WITH REGEX PRE-PROCESSOR
+// src/pages/Index.tsx - COMPLETE FINAL PRODUCTION FILE WITH ALL FIXES
 
 import { useState, useCallback, useEffect } from 'react' 
 import { Link, useLocation } from 'react-router-dom'
@@ -6,7 +6,7 @@ import { Upload, FileText, CheckCircle2, AlertCircle, Loader2, Printer, FileDown
 import html2pdf from 'html2pdf.js'
 
 // ═══════════════════════════════════════════════════════════════
-// PDFJS CONFIGURATION AND IMPORTS 
+// PDFJS CONFIGURATION AND IMPORTS (LOCAL WORKER FIX)
 // ═══════════════════════════════════════════════════════════════
 
 import * as pdfjsLib from 'pdfjs-dist/build/pdf'
@@ -92,8 +92,8 @@ function preProcessScreenplay(rawText: string): string {
   
   console.log("🛠️ Pre-processing text to fix scene heading line breaks...");
 
-  // Regex looks for INT., EXT., or I.E. followed by a period and a space/newline,
-  // potentially preceded by some noise, but ensures it starts on a new line.
+  // Regex looks for (INT.|EXT.|I.E.) followed by a period and a space/newline,
+  // preceded by any character that is NOT a newline. This forces a newline before the heading.
   const correctedText = rawText.replace(
     /([^\n])(\s*)((INT\.|EXT\.|I\.E\.)[^.\n]+)/gi,
     (match, p1, p2, p3) => {
@@ -129,8 +129,11 @@ function extractScenes(screenplayText: string): Scene[] {
         error: null
       }))
     
-    console.log(`📝 Extracted ${scenes.length} scenes from screenplay`)
-    return scenes
+    // Filter out the empty first element if the script didn't start with a scene
+    const validScenes = scenes.filter(s => s.text.match(/(INT\.|EXT\.|I\.E\.)/i));
+
+    console.log(`📝 Extracted ${validScenes.length} scenes from screenplay`);
+    return validScenes;
 }
 
 async function fileToBase64(file: File): Promise<string> {
@@ -143,7 +146,7 @@ async function fileToBase64(file: File): Promise<string> {
 
 
 // -----------------------------------------------------------------
-// NEW HELPER: POST-PROCESSING (FOR POSITIONAL PARSER)
+// HELPER: POST-PROCESSING (FOR POSITIONAL PARSER)
 // -----------------------------------------------------------------
 function postProcessScreenplay(text: string): string {
   // This function remains largely for cleanup after positional extraction
@@ -244,7 +247,7 @@ async function extractTextFromPDF(file: File, setProgress: React.Dispatch<React.
 
 
 // ═══════════════════════════════════════════════════════════════
-// LOCAL STORAGE MANAGEMENT (UNCHANGED)
+// LOCAL STORAGE MANAGEMENT
 // ═══════════════════════════════════════════════════════════════
 
 const STORAGE_KEY = 'shotLogicAppState';
@@ -280,7 +283,7 @@ const loadState = (): AppState | undefined => {
 };
 
 // ═══════════════════════════════════════════════════════════════
-// MAIN COMPONENT (UNCHANGED)
+// MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════
 
 function Index() {
@@ -306,6 +309,7 @@ function Index() {
   useEffect(() => {
     const queryParams = new URLSearchParams(location.search);
     const idFromUrl = queryParams.get('projectId');
+
     console.log('📍 URL Check:', { idFromUrl, currentProjectId: projectId, hasLoadedFromUrl });
 
     if (idFromUrl && idFromUrl !== projectId && !hasLoadedFromUrl) {
@@ -313,12 +317,15 @@ function Index() {
         console.log(`🔄 Loading project from URL: ${idFromUrl}`)
         setIsLoadingProject(true);
         setHasLoadedFromUrl(true); 
+
         try {
           const response = await fetch(`/api/projects/get-one?projectId=${idFromUrl}`);
           const result = await response.json();
+
           if (!response.ok || !result.projectData) {
             throw new Error(result.error || 'Failed to retrieve project data.');
           }
+
           const loadedData: ProjectDataPayload = result.projectData;
           setProjectId(result.projectId);
           setProjectName(result.projectName || 'Untitled Project');
@@ -995,7 +1002,6 @@ function Index() {
                             <div>
                               <span className="font-semibold text-gray-400">Stakes:</span>
                               <p className="text-white mt-1">{scene.analysis.narrativeAnalysis.stakes}</p>
-                            </p>
                             </div>
                           </div>
                         </div>
