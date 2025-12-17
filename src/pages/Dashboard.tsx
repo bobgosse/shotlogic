@@ -1,5 +1,5 @@
 // src/pages/Dashboard.tsx
-// Complete dashboard for viewing and managing saved projects - FIXED NAVIGATION LINKS
+// Complete dashboard with ShotLogic logo and branding
 
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
@@ -14,12 +14,6 @@ interface ProjectItem {
   _id: string
   name: string
   updatedAt: string
-}
-
-interface ProjectListProps {
-    projects: ProjectItem[]
-    setProjects: React.Dispatch<React.SetStateAction<ProjectItem[]>>
-    showToast: (title: string, description?: string, variant?: 'default' | 'destructive') => void
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -113,21 +107,35 @@ function Dashboard() {
     <div className="min-h-screen bg-[#141414] text-white p-8">
       <div className="max-w-6xl mx-auto space-y-8">
         
-        {/* Header */}
+        {/* ✅ FIXED: Main Header with Logo, Branding and Action Buttons */}
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-4xl font-bold text-[#E50914]">
-              My Projects
-            </h1>
-            <p className="text-gray-400 mt-2">
-              Manage your saved screenplay analyses
-            </p>
+          <div className="flex items-center gap-4 flex-1">
+            {/* Logo */}
+            <Link to="/" className='inline-block'>
+              <img 
+                src="/images/shotlogic-logo.jpg" 
+                alt="ShotLogic Logo"
+                className="h-20 w-20 object-contain hover:opacity-80 transition-opacity cursor-pointer rounded-lg"
+              />
+            </Link>
+            
+            {/* Text Branding */}
+            <div>
+              <Link to="/" className='inline-block'>
+                <h1 className="text-5xl font-bold text-[#E50914] hover:text-red-700 transition-colors cursor-pointer">
+                  ShotLogic
+                </h1>
+              </Link>
+              <p className="text-xl text-gray-400 mt-1">
+                AI-Powered Screenplay Analysis for Production Planning
+              </p>
+            </div>
           </div>
 
-          {/* Action Buttons - FIXED LINKS */}
+          {/* Action Buttons */}
           <div className="flex items-center gap-3">
             <Link 
-              to="/analyze" // <-- FIXED: Go to Analysis/Home page
+              to="/analyze"
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gray-800 border border-gray-700 rounded-md hover:bg-gray-700 transition-colors"
             >
               <Home className="w-4 h-4" />
@@ -135,7 +143,7 @@ function Dashboard() {
             </Link>
             
             <Link
-              to="/analyze" // <-- FIXED: Go to Analysis/Upload page
+              to="/analyze"
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[#E50914] rounded-md hover:bg-red-700 transition-colors"
             >
               <Plus className="w-4 h-4" />
@@ -148,7 +156,7 @@ function Dashboard() {
         <div className="bg-gray-900 rounded-lg border border-gray-700 shadow-xl p-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-semibold text-white">
-              Saved Projects
+              My Projects
             </h2>
             {!isLoading && !error && (
               <span className="text-sm text-gray-400">
@@ -211,3 +219,20 @@ function Dashboard() {
 }
 
 export default Dashboard
+```
+
+---
+
+## What This Fixes
+
+### ✅ **Before (Bad UX)**
+```
+My Projects
+Manage your saved screenplay analyses
+```
+Users didn't see "ShotLogic" anywhere!
+
+### ✅ **After (Good UX)**
+```
+[🎬 LOGO]  ShotLogic
+           AI-Powered Screenplay Analysis for Production Planning
