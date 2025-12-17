@@ -1,4 +1,4 @@
-// src/pages/Index.tsx - COMPLETE FINAL PRODUCTION FILE WITH POSITIONAL PDF PARSING
+// src/pages/Index.tsx - COMPLETE FINAL PRODUCTION FILE WITH REGEX PRE-PROCESSOR
 
 import { useState, useCallback, useEffect } from 'react' 
 import { Link, useLocation } from 'react-router-dom'
@@ -6,14 +6,12 @@ import { Upload, FileText, CheckCircle2, AlertCircle, Loader2, Printer, FileDown
 import html2pdf from 'html2pdf.js'
 
 // ═══════════════════════════════════════════════════════════════
-// PDFJS CONFIGURATION AND IMPORTS (CRITICAL FIX)
+// PDFJS CONFIGURATION AND IMPORTS 
 // ═══════════════════════════════════════════════════════════════
 
 import * as pdfjsLib from 'pdfjs-dist/build/pdf'
-// Import the worker file directly using a build tool specific suffix (?url for Vite)
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min?url'
 
-// Set the worker source to the locally bundled asset
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
 
 // ═══════════════════════════════════════════════════════════════
@@ -69,7 +67,7 @@ interface AppState {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// UTILITY FUNCTIONS (INCLUDING NEW POSITIONAL PDF LOGIC)
+// UTILITY FUNCTIONS (INCLUDING NEW PRE-PROCESSOR LOGIC)
 // ═══════════════════════════════════════════════════════════════
 
 const showToast = (title: string, description?: string, variant?: 'default' | 'destructive') => {
@@ -85,8 +83,40 @@ const showToast = (title: string, description?: string, variant?: 'default' | 'd
   }
 }
 
+/**
+ * NEW: Pre-processes raw text to enforce line breaks before scene headings.
+ * This is CRITICAL for PDF output where line breaks are often lost.
+ */
+function preProcessScreenplay(rawText: string): string {
+  if (!rawText) return '';
+  
+  console.log("🛠️ Pre-processing text to fix scene heading line breaks...");
+
+  // Regex looks for INT., EXT., or I.E. followed by a period and a space/newline,
+  // potentially preceded by some noise, but ensures it starts on a new line.
+  const correctedText = rawText.replace(
+    /([^\n])(\s*)((INT\.|EXT\.|I\.E\.)[^.\n]+)/gi,
+    (match, p1, p2, p3) => {
+      // p1 is the character before the match (e.g., the last word of action)
+      // p3 is the scene heading itself (INT. OFFICE - DAY)
+      
+      // We only insert a newline if p1 is NOT already a newline or a space
+      if (p1.match(/[^\s\n]/)) {
+        return p1.trim() + '\n' + p3.trim();
+      }
+      return match;
+    }
+  );
+
+  // Final cleanup: ensure there are at most 3 consecutive newlines
+  return correctedText.replace(/\n{4,}/g, '\n\n\n').trim();
+}
+
 function extractScenes(screenplayText: string): Scene[] {
-    const sceneBlocks = screenplayText.split(/(?=(?:INT\.|EXT\.))/i)
+    // CRITICAL: Ensure text is pre-processed before splitting
+    const preProcessedText = preProcessScreenplay(screenplayText);
+
+    const sceneBlocks = preProcessedText.split(/(?=(?:INT\.|EXT\.|I\.E\.)\s*[A-Z0-9])/i)
     
     const scenes: Scene[] = sceneBlocks
       .map((sceneText) => sceneText.trim())
@@ -111,47 +141,37 @@ async function fileToBase64(file: File): Promise<string> {
     })
 }
 
+
 // -----------------------------------------------------------------
-// NEW HELPER: POST-PROCESSING TO RECOVER SCENE HEADINGS
+// NEW HELPER: POST-PROCESSING (FOR POSITIONAL PARSER)
 // -----------------------------------------------------------------
 function postProcessScreenplay(text: string): string {
-  // Post-process to fix common screenplay formatting issues from extraction
+  // This function remains largely for cleanup after positional extraction
   let lines = text.split('\n');
-  
-  // Rule 1: Fix scene headings that got merged with previous non-scene text
   lines = lines.map(line => {
-    // Regex matches common scene headings preceded by whitespace or text
     const sceneMatch = line.match(/(\s|^)((INT\.|EXT\.|I\.E\.)[^.]+(?:DAY|NIGHT|MORNING|EVENING|CONTINUOUS|LATER))/i);
-    
     if (sceneMatch) {
       const headingText = sceneMatch[2].trim();
       const headingStart = line.indexOf(headingText);
-      
-      // If the heading is not at the start of the line or only preceded by short text
       if (headingStart > 0) {
         const beforeText = line.substring(0, headingStart).trim();
-        
         if (beforeText.length > 0) {
-          // If there's actual text before it, split the line
           return beforeText + '\n' + line.substring(headingStart);
         }
       }
     }
-    
     return line;
   });
-  
-  // Rule 2: Ensure an extra line break after scene headings for clean scene split
   let processedText = lines.join('\n');
   
   return processedText.replace(
     /((?:INT\.|EXT\.|I\.E\.)[^.]+(?:DAY|NIGHT|MORNING|EVENING|CONTINUOUS|LATER)[^\n]*)/gi,
-    '\n$1\n' // Add newline before and after the heading
-  );
+    '$1\n' // Only ensure newline after the heading, as preProcessScreenplay handles insertion
+  ).replace(/\n{4,}/g, '\n\n\n').trim();
 }
 
 // -----------------------------------------------------------------
-// NEW CORE FUNCTION: POSITIONAL PDF PARSING
+// CORE FUNCTION: POSITIONAL PDF PARSING
 // -----------------------------------------------------------------
 
 async function extractTextFromPDF(file: File, setProgress: React.Dispatch<React.SetStateAction<number>>, setParsingMessage: React.Dispatch<React.SetStateAction<string>>): Promise<string> {
@@ -182,12 +202,8 @@ async function extractTextFromPDF(file: File, setProgress: React.Dispatch<React.
     const page = await pdf.getPage(i)
     const textContent = await page.getTextContent()
     
-    // Sort items by position (top-left to bottom-right)
     const items = textContent.items.sort((a: any, b: any) => {
-      // First by y (higher y = top of page), then by x (left)
-      // Use item.transform[5] for y and item.transform[4] for x
       const yDiff = b.transform[5] - a.transform[5];
-      // If y difference is small (e.g., less than 3 units), treat as same line
       if (Math.abs(yDiff) > 3) return yDiff; 
       return a.transform[4] - b.transform[4]; 
     });
@@ -198,23 +214,16 @@ async function extractTextFromPDF(file: File, setProgress: React.Dispatch<React.
     items.forEach((item: any, index: number) => {
       const currentY = Math.round(item.transform[5]);
       
-      // Check if we're on a new line (y difference is greater than threshold)
       if (lastY !== null && Math.abs(currentY - lastY) > 3) {
-        // New line detected, finalize the buffered line and add newline
         screenplayText += lineBuffer.trimEnd() + '\n';
         lineBuffer = '';
-      } else if (lastY !== null && index > 0 && Math.abs(currentY - lastY) <= 3) {
-          // If on the same line, check if a gap is large enough to warrant a space
-          // This prevents massive gaps from being merged incorrectly, but we rely mostly on .join(' ')
-      }
+      } 
       
-      // Add item text to current line buffer with a trailing space
       lineBuffer += item.str + ' ';
       lastY = currentY;
       
-      // Handle the very last item on the page
       if (index === items.length - 1) {
-        screenplayText += lineBuffer.trimEnd() + '\n\n'; // Add final line and page break
+        screenplayText += lineBuffer.trimEnd() + '\n\n'; 
       }
     });
   }
@@ -222,7 +231,6 @@ async function extractTextFromPDF(file: File, setProgress: React.Dispatch<React.
   setProgress(100)
   setParsingMessage('PDF text extraction complete. Reconstructing structure...')
   
-  // FINAL STEP: Apply screenplay-specific post-processing
   const rawText = screenplayText.trim();
   const finalScreenplayText = postProcessScreenplay(rawText);
 
@@ -236,7 +244,7 @@ async function extractTextFromPDF(file: File, setProgress: React.Dispatch<React.
 
 
 // ═══════════════════════════════════════════════════════════════
-// LOCAL STORAGE MANAGEMENT (REMAINS UNCHANGED)
+// LOCAL STORAGE MANAGEMENT (UNCHANGED)
 // ═══════════════════════════════════════════════════════════════
 
 const STORAGE_KEY = 'shotLogicAppState';
@@ -272,7 +280,7 @@ const loadState = (): AppState | undefined => {
 };
 
 // ═══════════════════════════════════════════════════════════════
-// MAIN COMPONENT (REMAINS UNCHANGED)
+// MAIN COMPONENT (UNCHANGED)
 // ═══════════════════════════════════════════════════════════════
 
 function Index() {
@@ -298,7 +306,6 @@ function Index() {
   useEffect(() => {
     const queryParams = new URLSearchParams(location.search);
     const idFromUrl = queryParams.get('projectId');
-
     console.log('📍 URL Check:', { idFromUrl, currentProjectId: projectId, hasLoadedFromUrl });
 
     if (idFromUrl && idFromUrl !== projectId && !hasLoadedFromUrl) {
@@ -306,14 +313,12 @@ function Index() {
         console.log(`🔄 Loading project from URL: ${idFromUrl}`)
         setIsLoadingProject(true);
         setHasLoadedFromUrl(true); 
-
         try {
           const response = await fetch(`/api/projects/get-one?projectId=${idFromUrl}`);
           const result = await response.json();
           if (!response.ok || !result.projectData) {
             throw new Error(result.error || 'Failed to retrieve project data.');
           }
-
           const loadedData: ProjectDataPayload = result.projectData;
           setProjectId(result.projectId);
           setProjectName(result.projectName || 'Untitled Project');
@@ -488,6 +493,7 @@ function Index() {
         return
       }
 
+      // CRITICAL: Call extractScenes with the raw or pre-processed text
       const extractedScenes = extractScenes(screenplayText)
       
       if (extractedScenes.length === 0) {
@@ -989,6 +995,7 @@ function Index() {
                             <div>
                               <span className="font-semibold text-gray-400">Stakes:</span>
                               <p className="text-white mt-1">{scene.analysis.narrativeAnalysis.stakes}</p>
+                            </p>
                             </div>
                           </div>
                         </div>
