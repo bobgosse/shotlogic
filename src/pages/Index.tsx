@@ -1,19 +1,22 @@
-// src/pages/Index.tsx - COMPLETE FINAL PRODUCTION FILE WITH CLIENT-SIDE PDF PARSING
+// src/pages/Index.tsx - COMPLETE FINAL PRODUCTION FILE WITH LOCAL WORKER PDF PARSING
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react-router-dom'
 import { Link, useLocation } from 'react-router-dom'
 import { Upload, FileText, CheckCircle2, AlertCircle, Loader2, Printer, FileDown, FileText as FileTextIcon, Save, Edit2, Copy, X, Check, FolderOpen } from 'lucide-react'
 import html2pdf from 'html2pdf.js'
 
 // ═══════════════════════════════════════════════════════════════
-// PDFJS CONFIGURATION AND IMPORTS
+// PDFJS CONFIGURATION AND IMPORTS (CRITICAL FIX)
 // ═══════════════════════════════════════════════════════════════
 
-import * as pdfjsLib from 'pdfjs-dist'
+import * as pdfjsLib from 'pdfjs-dist/build/pdf'
+// Import the worker file directly using a build tool specific suffix (?url for Vite)
+// If you are using Create React App (Webpack), you might need a different import syntax.
+// We will use the common Vite/Next.js dynamic import:
+import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min?url'
 
-// Set the worker source for pdfjs-dist
-// NOTE: We use a CDN link here, as serving the worker locally can be complex in some build systems (Vite/CRA)
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
+// Set the worker source to the locally bundled asset
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
 
 // ═══════════════════════════════════════════════════════════════
 // TYPE DEFINITIONS
@@ -116,7 +119,7 @@ async function fileToBase64(file: File): Promise<string> {
  * @returns A promise resolving to the full plaintext content.
  */
 async function extractTextFromPDF(file: File, setProgress: React.Dispatch<React.SetStateAction<number>>, setParsingMessage: React.Dispatch<React.SetStateAction<string>>): Promise<string> {
-  console.log('📄 Starting client-side PDF extraction...')
+  console.log('📄 Starting client-side PDF extraction with local worker...')
   
   // 1. Read file as ArrayBuffer
   const arrayBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
@@ -424,6 +427,7 @@ function Index() {
       if (extension === 'pdf') {
         // PDF FIX: Handle client-side parsing
         setParsingMessage('Extracting text from PDF (client-side)...')
+        // Pass setProgress and setParsingMessage to update UI during long process
         screenplayText = await extractTextFromPDF(uploadedFile, setProgress, setParsingMessage)
         
       } else if (extension === 'txt') {
