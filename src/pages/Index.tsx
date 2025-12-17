@@ -1,9 +1,16 @@
 // src/pages/Index.tsx - COMPLETE FINAL PRODUCTION FILE WITH LOCAL WORKER PDF PARSING
 
-import { useState, useCallback, useEffect } from 'react-router-dom'
+// src/pages/Index.tsx - COMPLETE FINAL PRODUCTION FILE WITH LOCAL WORKER PDF PARSING
+
+import { useState, useCallback, useEffect } from 'react' // <--- CRITICAL FIX: Imported from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Upload, FileText, CheckCircle2, AlertCircle, Loader2, Printer, FileDown, FileText as FileTextIcon, Save, Edit2, Copy, X, Check, FolderOpen } from 'lucide-react'
 import html2pdf from 'html2pdf.js'
+
+// ═══════════════════════════════════════════════════════════════
+// PDFJS CONFIGURATION AND IMPORTS (CRITICAL FIX)
+// ═══════════════════════════════════════════════════════════════
+// ... (rest of the file remains the same)
 
 // ═══════════════════════════════════════════════════════════════
 // PDFJS CONFIGURATION AND IMPORTS (CRITICAL FIX)
