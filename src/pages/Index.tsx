@@ -1,8 +1,19 @@
-// src/pages/Index.tsx - COMPLETE FINAL PRODUCTION FILE - FIXED NAVIGATION
+// src/pages/Index.tsx - COMPLETE FINAL PRODUCTION FILE WITH CLIENT-SIDE PDF PARSING
+
 import { useState, useCallback, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Upload, FileText, CheckCircle2, AlertCircle, Loader2, Printer, FileDown, FileText as FileTextIcon, Save, Edit2, Copy, X, Check, FolderOpen } from 'lucide-react'
 import html2pdf from 'html2pdf.js'
+
+// ═══════════════════════════════════════════════════════════════
+// PDFJS CONFIGURATION AND IMPORTS
+// ═══════════════════════════════════════════════════════════════
+
+import * as pdfjsLib from 'pdfjs-dist'
+
+// Set the worker source for pdfjs-dist
+// NOTE: We use a CDN link here, as serving the worker locally can be complex in some build systems (Vite/CRA)
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
 
 // ═══════════════════════════════════════════════════════════════
 // TYPE DEFINITIONS
@@ -99,6 +110,70 @@ async function fileToBase64(file: File): Promise<string> {
     })
 }
 
+/**
+ * NEW: Extracts raw text from a PDF file entirely on the client-side using pdfjs-dist.
+ * @param file The PDF File object from the user upload.
+ * @returns A promise resolving to the full plaintext content.
+ */
+async function extractTextFromPDF(file: File, setProgress: React.Dispatch<React.SetStateAction<number>>, setParsingMessage: React.Dispatch<React.SetStateAction<string>>): Promise<string> {
+  console.log('📄 Starting client-side PDF extraction...')
+  
+  // 1. Read file as ArrayBuffer
+  const arrayBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as ArrayBuffer)
+    reader.onerror = reject
+    reader.readAsArrayBuffer(file)
+  })
+
+  // 2. Load PDF document
+  const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer })
+  
+  const pdf = await loadingTask.promise
+  
+  let fullText = ''
+  const totalPages = pdf.numPages
+  
+  console.log(`   - Total pages detected: ${totalPages}`)
+
+  // 3. Loop through all pages and extract text
+  for (let i = 1; i <= totalPages; i++) {
+    if (i % 10 === 0 || i === totalPages) {
+      const currentProgress = Math.round((i / totalPages) * 100)
+      setProgress(currentProgress)
+      setParsingMessage(`Extracting text from PDF (Page ${i} of ${totalPages})...`)
+    }
+    
+    const page = await pdf.getPage(i)
+    const textContent = await page.getTextContent()
+    
+    // Extract strings and join them with spaces, adding a newline after each page
+    const pageText = textContent.items
+        .map(item => 'str' in item ? item.str : '') // Ensure item.str exists
+        .join(' ')
+    
+    fullText += pageText + '\n\n'
+  }
+  
+  setProgress(100)
+  setParsingMessage('PDF text extraction complete.')
+  
+  // Final cleanup and validation
+  const cleanText = fullText
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .replace(/\n{5,}/g, '\n\n\n')
+    .trim()
+
+  if (cleanText.length < 50) {
+    throw new Error('PDF_NO_TEXT: The PDF was parsed but contains no extractable text. It may be an image-based PDF (scanned document).')
+  }
+
+  console.log(`✅ Client-side PDF extracted: ${cleanText.length} chars.`)
+  return cleanText
+}
+
+
 // ═══════════════════════════════════════════════════════════════
 // LOCAL STORAGE MANAGEMENT
 // ═══════════════════════════════════════════════════════════════
@@ -148,6 +223,7 @@ function Index() {
   const [progress, setProgress] = useState(0);
   const [currentScene, setCurrentScene] = useState(0);
   const [visualStyle, setVisualStyle] = useState<string>('');
+  const [parsingMessage, setParsingMessage] = useState<string>(''); // NEW: For PDF status
   
   const [projectId, setProjectId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState<string>('Untitled Project');
@@ -156,7 +232,7 @@ function Index() {
   const [hasLoadedFromUrl, setHasLoadedFromUrl] = useState(false); // Track if we've loaded from URL
 
   // ---------------------------------------------------------------
-  // EFFECT 1: LOAD PROJECT FROM URL (FIXED DEPENDENCIES)
+  // EFFECT 1: LOAD PROJECT FROM URL
   // ---------------------------------------------------------------
   useEffect(() => {
     const queryParams = new URLSearchParams(location.search);
@@ -221,7 +297,7 @@ function Index() {
       }
       setHasLoadedFromUrl(true); // Mark as loaded to prevent re-loading
     }
-  }, [location.search]); // Only depend on location.search
+  }, [location.search]);
 
   // Reset hasLoadedFromUrl when search params change
   useEffect(() => {
@@ -323,7 +399,7 @@ function Index() {
     showToast("Project Cleared", "Local session data has been removed.");
   }, [])
 
-  // HANDLER: FILE UPLOAD
+  // HANDLER: FILE UPLOAD (CRITICAL FIX FOR PDF)
   const handleFileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const uploadedFile = event.target.files?.[0]
     if (!uploadedFile) return
@@ -336,6 +412,7 @@ function Index() {
     }
 
     setIsParsing(true)
+    setParsingMessage('Starting file processing...')
     setScenes([])
     setFileInfo({ name: uploadedFile.name, type: extension || 'txt' })
     setProjectName(uploadedFile.name.replace(/\.[^/.]+$/, ''));
@@ -344,10 +421,18 @@ function Index() {
     try {
       let screenplayText = ''
       
-      if (extension === 'txt') {
+      if (extension === 'pdf') {
+        // PDF FIX: Handle client-side parsing
+        setParsingMessage('Extracting text from PDF (client-side)...')
+        screenplayText = await extractTextFromPDF(uploadedFile, setProgress, setParsingMessage)
+        
+      } else if (extension === 'txt') {
+        // TXT: Handle client-side read and send raw text to extractScenes
         screenplayText = await uploadedFile.text()
-      } else if (extension === 'fdx' || extension === 'pdf') {
-        console.log(`Sending ${extension} file to backend for parsing...`)
+        
+      } else if (extension === 'fdx') {
+        // FDX: Send file to backend for complex XML parsing
+        console.log(`Sending FDX file to backend for parsing...`)
         const base64Data = (await fileToBase64(uploadedFile)).split(',')[1] 
         
         const response = await fetch('/api/parse-screenplay', {
@@ -361,7 +446,7 @@ function Index() {
             throw new Error(result.error || result.message || `Failed to parse ${extension} file on server.`)
         }
         screenplayText = result.screenplayText
-        console.log(`Backend parsing successful. Extracted ${screenplayText.length} characters.`)
+        console.log(`Backend FDX parsing successful. Extracted ${screenplayText.length} characters.`)
       }
 
       if (!screenplayText || screenplayText.length < 100) {
@@ -382,7 +467,7 @@ function Index() {
       setProgress(0)
       setCurrentScene(0)
 
-      showToast("File Loaded", `Found ${extractedScenes.length} scenes from the ${extension?.toUpperCase()} file.`)
+      showToast("File Loaded", `Found ${extractedScenes.length} scenes from the ${extension?.toUpperCase()} file.`);
 
     } catch (error) {
       console.error('File upload error:', error)
@@ -390,6 +475,7 @@ function Index() {
       setFileInfo(null);
     } finally {
       setIsParsing(false)
+      setParsingMessage('')
     }
   }, [])
 
@@ -618,7 +704,7 @@ function Index() {
         {/* Header with Dashboard Link */}
         <div className="flex items-center justify-between">
           <div className="flex-1 text-center">
-            <Link to="/analyze" className='inline-block'> {/* Logo/Title Link - Should link to its own page /analyze */}
+            <Link to="/analyze" className='inline-block'>
               <h1 className="text-5xl font-bold text-[#E50914] hover:text-red-700 transition-colors cursor-pointer">
                   ShotLogic
               </h1>
@@ -628,9 +714,9 @@ function Index() {
             </p>
           </div>
           
-          {/* CRITICAL: Dashboard Link Button - FIXED LINK */}
+          {/* Dashboard Link Button */}
           <Link
-            to="/" // <-- FIXED: Go to Dashboard root
+            to="/"
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gray-800 border border-gray-700 rounded-md hover:bg-gray-700 transition-colors absolute top-8 right-8"
           >
             <FolderOpen className="w-4 h-4" />
@@ -688,7 +774,15 @@ function Index() {
           {isParsing && (
             <div className="flex items-center gap-2 p-4 bg-gray-800 rounded-lg border border-[#E50914]">
               <Loader2 className="w-5 h-5 animate-spin text-[#E50914]" />
-              <p className="text-sm text-white">Parsing screenplay file...</p>
+              <p className="text-sm text-white">{parsingMessage || 'Processing screenplay file...'}</p>
+              {progress > 0 && progress < 100 && (
+                <div className="w-full bg-gray-700 rounded-full h-1.5 overflow-hidden ml-4">
+                    <div 
+                      className="h-full bg-[#E50914] transition-all duration-300"
+                      style={{ width: `${progress}%` }}
+                    />
+                </div>
+              )}
             </div>
           )}
 
@@ -702,6 +796,11 @@ function Index() {
                     {scenes.length} scene{scenes.length !== 1 ? 's' : ''} detected
                   </p>
                 </div>
+                {fileInfo.type === 'pdf' && (
+                  <span className="px-2 py-0.5 text-xs text-green-400 bg-green-900/30 rounded-full">
+                    • Processed client-side
+                  </span>
+                )}
               </div>
               
               <div className="space-y-2">
