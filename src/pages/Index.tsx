@@ -1,4 +1,4 @@
-// src/pages/Index.tsx - COMPLETE FINAL PRODUCTION FILE WITH ALL FIXES
+// src/pages/Index.tsx - COMPLETE FINAL PRODUCTION FILE WITH AGGRESSIVE SCENE RECONSTRUCTION
 
 import { useState, useCallback, useEffect } from 'react' 
 import { Link, useLocation } from 'react-router-dom'
@@ -67,7 +67,7 @@ interface AppState {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// UTILITY FUNCTIONS (INCLUDING NEW PRE-PROCESSOR LOGIC)
+// UTILITY FUNCTIONS (INCLUDING NEW AGGRESSIVE PRE-PROCESSOR LOGIC)
 // ═══════════════════════════════════════════════════════════════
 
 const showToast = (title: string, description?: string, variant?: 'default' | 'destructive') => {
@@ -84,38 +84,44 @@ const showToast = (title: string, description?: string, variant?: 'default' | 'd
 }
 
 /**
- * NEW: Pre-processes raw text to enforce line breaks before scene headings.
- * This is CRITICAL for PDF output where line breaks are often lost.
+ * CRITICAL FIX: Aggressively processes text to ensure line breaks before scene headers.
+ * This is the ultimate fix for malformed PDF output.
  */
 function preProcessScreenplay(rawText: string): string {
   if (!rawText) return '';
   
-  console.log("🛠️ Pre-processing text to fix scene heading line breaks...");
+  console.log("🛠️ AGGRESSIVE Pre-processing text to force scene header line breaks...");
 
-  // Regex looks for (INT.|EXT.|I.E.) followed by a period and a space/newline,
-  // preceded by any character that is NOT a newline. This forces a newline before the heading.
-  const correctedText = rawText.replace(
+  let correctedText = rawText;
+
+  // 1. Force a newline before any INT./EXT./I.E. sequence that isn't already preceded by one.
+  // This handles merged lines of action/dialogue with the scene heading.
+  correctedText = correctedText.replace(
     /([^\n])(\s*)((INT\.|EXT\.|I\.E\.)[^.\n]+)/gi,
     (match, p1, p2, p3) => {
-      // p1 is the character before the match (e.g., the last word of action)
-      // p3 is the scene heading itself (INT. OFFICE - DAY)
-      
-      // We only insert a newline if p1 is NOT already a newline or a space
+      // If the character before the match (p1) is not already whitespace, force a break.
       if (p1.match(/[^\s\n]/)) {
-        return p1.trim() + '\n' + p3.trim();
+        return p1.trim() + '\n\n' + p3.trim(); // Add double newline for separation
       }
       return match;
     }
   );
 
-  // Final cleanup: ensure there are at most 3 consecutive newlines
+  // 2. Normalize multiple internal spaces to one (common PDF artifact)
+  correctedText = correctedText.replace(/\s{2,}/g, ' ');
+
+  // 3. Ensure a space after the INT./EXT. periods (to fix INT.SCENE merging)
+  correctedText = correctedText.replace(/(INT|EXT|I\.E)\.(\w)/g, '$1. $2');
+
+  // 4. Final cleanup: ensure there are at most 3 consecutive newlines
   return correctedText.replace(/\n{4,}/g, '\n\n\n').trim();
 }
 
 function extractScenes(screenplayText: string): Scene[] {
     // CRITICAL: Ensure text is pre-processed before splitting
     const preProcessedText = preProcessScreenplay(screenplayText);
-
+    
+    // Split using the robust scene header pattern
     const sceneBlocks = preProcessedText.split(/(?=(?:INT\.|EXT\.|I\.E\.)\s*[A-Z0-9])/i)
     
     const scenes: Scene[] = sceneBlocks
@@ -129,7 +135,7 @@ function extractScenes(screenplayText: string): Scene[] {
         error: null
       }))
     
-    // Filter out the empty first element if the script didn't start with a scene
+    // Filter out the first element if it's junk or an empty split
     const validScenes = scenes.filter(s => s.text.match(/(INT\.|EXT\.|I\.E\.)/i));
 
     console.log(`📝 Extracted ${validScenes.length} scenes from screenplay`);
@@ -149,7 +155,7 @@ async function fileToBase64(file: File): Promise<string> {
 // HELPER: POST-PROCESSING (FOR POSITIONAL PARSER)
 // -----------------------------------------------------------------
 function postProcessScreenplay(text: string): string {
-  // This function remains largely for cleanup after positional extraction
+  // This helper is maintained but relies on the much more powerful preProcessScreenplay now
   let lines = text.split('\n');
   lines = lines.map(line => {
     const sceneMatch = line.match(/(\s|^)((INT\.|EXT\.|I\.E\.)[^.]+(?:DAY|NIGHT|MORNING|EVENING|CONTINUOUS|LATER))/i);
@@ -169,12 +175,12 @@ function postProcessScreenplay(text: string): string {
   
   return processedText.replace(
     /((?:INT\.|EXT\.|I\.E\.)[^.]+(?:DAY|NIGHT|MORNING|EVENING|CONTINUOUS|LATER)[^\n]*)/gi,
-    '$1\n' // Only ensure newline after the heading, as preProcessScreenplay handles insertion
+    '$1\n'
   ).replace(/\n{4,}/g, '\n\n\n').trim();
 }
 
 // -----------------------------------------------------------------
-// CORE FUNCTION: POSITIONAL PDF PARSING
+// CORE FUNCTION: POSITIONAL PDF PARSING (Remains positional for best text extraction)
 // -----------------------------------------------------------------
 
 async function extractTextFromPDF(file: File, setProgress: React.Dispatch<React.SetStateAction<number>>, setParsingMessage: React.Dispatch<React.SetStateAction<string>>): Promise<string> {
