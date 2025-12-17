@@ -1,11 +1,11 @@
 // api/parse-screenplay.ts
-// PRODUCTION-STABLE: Screenplay parser for TXT and FDX only
-// PDF support permanently disabled for stability
+// PRODUCTION-READY: Screenplay parser for TXT, FDX, and PDF with graceful degradation
+// PDF support with safe fallback if native dependencies fail
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { XMLParser } from 'fast-xml-parser'
 
-const DEPLOY_TIMESTAMP = "2024-12-13T03:00:00Z_STABLE_TXT_FDX_ONLY"
+const DEPLOY_TIMESTAMP = "2024-12-17T00:00:00Z_FULL_SUPPORT_SAFE_PDF"
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB limit
 
 interface ParseRequest {
@@ -14,7 +14,98 @@ interface ParseRequest {
   fileType: 'txt' | 'pdf' | 'fdx'
 }
 
-// Parse FDX (Final Draft XML) file - SIMPLIFIED AND ROBUST
+// ═══════════════════════════════════════════════════════════════
+// PDF PARSER - WITH GRACEFUL DEGRADATION
+// ═══════════════════════════════════════════════════════════════
+
+async function parsePDF(buffer: Buffer, invocationId: string): Promise<string> {
+  console.log(`📄 [${invocationId}] Parsing PDF (${buffer.length} bytes)...`)
+  
+  try {
+    // CRITICAL: Dynamic import with try-catch for native dependency safety
+    let pdfParse: any
+    
+    try {
+      // Attempt to load pdf-parse
+      pdfParse = (await import('pdf-parse')).default
+      console.log(`   [${invocationId}] pdf-parse module loaded successfully`)
+    } catch (importError) {
+      console.error(`❌ [${invocationId}] Failed to import pdf-parse:`, importError)
+      
+      // Check if it's a native dependency error
+      const errorMessage = importError instanceof Error ? importError.message : String(importError)
+      
+      if (
+        errorMessage.includes('MODULE_NOT_FOUND') ||
+        errorMessage.includes('binding') ||
+        errorMessage.includes('canvas') ||
+        errorMessage.includes('node-gyp') ||
+        errorMessage.includes('sharp')
+      ) {
+        throw new Error('PDF_NATIVE_DEPENDENCY_ERROR: PDF parsing requires native dependencies that are not available in this serverless environment. Please export your screenplay as .txt or .fdx format.')
+      }
+      
+      throw new Error(`PDF_IMPORT_ERROR: Failed to load PDF parser - ${errorMessage}`)
+    }
+    
+    // Attempt to parse the PDF
+    console.log(`   [${invocationId}] Parsing PDF with pdf-parse...`)
+    
+    let pdfData: any
+    
+    try {
+      pdfData = await pdfParse(buffer, {
+        max: 0, // Parse all pages
+        version: 'default'
+      })
+    } catch (parseError) {
+      console.error(`❌ [${invocationId}] PDF parsing failed:`, parseError)
+      
+      const errorMessage = parseError instanceof Error ? parseError.message : String(parseError)
+      
+      // Check for common PDF errors
+      if (errorMessage.includes('Invalid PDF')) {
+        throw new Error('PDF_INVALID: The file does not appear to be a valid PDF document.')
+      }
+      if (errorMessage.includes('encrypted') || errorMessage.includes('password')) {
+        throw new Error('PDF_ENCRYPTED: This PDF is password-protected and cannot be parsed.')
+      }
+      
+      throw new Error(`PDF_PARSE_ERROR: ${errorMessage}`)
+    }
+    
+    // Extract and validate text
+    const text = pdfData.text || ''
+    
+    if (!text || text.trim().length < 50) {
+      throw new Error('PDF_NO_TEXT: The PDF was parsed but contains no extractable text. It may be an image-based PDF (scanned document) or corrupted.')
+    }
+    
+    // Clean up the extracted text
+    const cleanText = text
+      .replace(/\r\n/g, '\n')        // Normalize Windows line endings
+      .replace(/\r/g, '\n')          // Normalize old Mac line endings
+      .replace(/\t/g, '    ')        // Convert tabs to spaces
+      .replace(/\n{5,}/g, '\n\n\n')  // Remove excessive blank lines
+      .trim()
+    
+    console.log(`✅ [${invocationId}] PDF parsed successfully`)
+    console.log(`   - Pages: ${pdfData.numpages || 'unknown'}`)
+    console.log(`   - Output length: ${cleanText.length} chars`)
+    console.log(`   - Preview: ${cleanText.substring(0, 100)}...`)
+    
+    return cleanText
+    
+  } catch (error) {
+    console.error(`❌ [${invocationId}] PDF parsing error:`, error)
+    throw error // Re-throw to be handled by main handler
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FDX PARSER - ROBUST AND COMPREHENSIVE
+// ═══════════════════════════════════════════════════════════════
+
 async function parseFDX(buffer: Buffer, invocationId: string): Promise<string> {
   console.log(`📝 [${invocationId}] Parsing FDX (${buffer.length} bytes)...`)
   
@@ -119,7 +210,7 @@ async function parseFDX(buffer: Buffer, invocationId: string): Promise<string> {
         
         extractedCount++
         
-        // Format based on paragraph type - simplified
+        // Format based on paragraph type
         switch (type) {
           case 'Scene Heading':
             screenplayLines.push(`\n${text.toUpperCase()}\n`)
@@ -178,7 +269,10 @@ async function parseFDX(buffer: Buffer, invocationId: string): Promise<string> {
   }
 }
 
-// Parse TXT file - ROCK SOLID
+// ═══════════════════════════════════════════════════════════════
+// TXT PARSER - ROCK SOLID
+// ═══════════════════════════════════════════════════════════════
+
 function parseTXT(buffer: Buffer, invocationId: string): string {
   console.log(`📝 [${invocationId}] Parsing TXT (${buffer.length} bytes)...`)
   
@@ -217,7 +311,10 @@ function parseTXT(buffer: Buffer, invocationId: string): string {
   }
 }
 
-// Main handler
+// ═══════════════════════════════════════════════════════════════
+// MAIN HANDLER
+// ═══════════════════════════════════════════════════════════════
+
 export default async function handler(
   req: VercelRequest,
   res: VercelResponse
@@ -229,8 +326,7 @@ export default async function handler(
   console.log(`📅 Timestamp: ${new Date().toISOString()}`)
   console.log(`🏷️  Deploy: ${DEPLOY_TIMESTAMP}`)
   console.log(`📍 Method: ${req.method}`)
-  console.log(`✅ Supported formats: TXT, FDX`)
-  console.log(`❌ PDF support: DISABLED (stability)`)
+  console.log(`✅ Supported formats: TXT, FDX, PDF (with safe fallback)`)
   
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -286,25 +382,13 @@ export default async function handler(
       })
     }
     
-    // CRITICAL: Reject PDF files permanently
-    if (fileType === 'pdf') {
-      console.error(`❌ [${invocationId}] PDF file rejected (unsupported)`)
-      return res.status(400).json({ 
-        error: 'PDF format not supported',
-        message: 'PDF files are not supported due to technical limitations. Please export your screenplay as .txt or .fdx (Final Draft) format.',
-        supportedFormats: ['txt', 'fdx'],
-        isPdfUnsupported: true,
-        deployMarker: DEPLOY_TIMESTAMP
-      })
-    }
-    
     // Validate file type
-    if (!['txt', 'fdx'].includes(fileType)) {
+    if (!['txt', 'fdx', 'pdf'].includes(fileType)) {
       console.error(`❌ [${invocationId}] Unsupported file type: ${fileType}`)
       return res.status(400).json({ 
         error: 'Unsupported file type',
-        message: `File type "${fileType}" is not supported. Please use .txt or .fdx format.`,
-        supportedFormats: ['txt', 'fdx'],
+        message: `File type "${fileType}" is not supported. Please use .txt, .fdx, or .pdf format.`,
+        supportedFormats: ['txt', 'fdx', 'pdf'],
         receivedType: fileType,
         deployMarker: DEPLOY_TIMESTAMP
       })
@@ -376,6 +460,62 @@ export default async function handler(
           message: 'Failed to parse the Final Draft file. The file may be corrupted, use an unsupported FDX version, or be formatted incorrectly.',
           details: fdxError instanceof Error ? fdxError.message : 'Unknown error',
           suggestion: 'Try exporting your screenplay from Final Draft as a .txt file instead.',
+          deployMarker: DEPLOY_TIMESTAMP
+        })
+      }
+    }
+    else if (fileType === 'pdf') {
+      console.log(`📄 [${invocationId}] Processing PDF file...`)
+      try {
+        screenplayText = await parsePDF(buffer, invocationId)
+      } catch (pdfError) {
+        console.error(`❌ [${invocationId}] PDF parsing failed:`, pdfError)
+        
+        const errorMessage = pdfError instanceof Error ? pdfError.message : String(pdfError)
+        
+        // CRITICAL: Check for native dependency errors
+        if (errorMessage.includes('PDF_NATIVE_DEPENDENCY_ERROR')) {
+          return res.status(503).json({
+            error: 'PDF support temporarily unavailable',
+            message: 'PDF parsing requires system libraries that are not available in this serverless environment. Please export your screenplay as .txt or .fdx (Final Draft) format for best results.',
+            isPdfUnavailable: true,
+            supportedFormats: ['txt', 'fdx'],
+            suggestion: 'Most screenwriting software can export to .txt format: File > Export > Plain Text',
+            deployMarker: DEPLOY_TIMESTAMP
+          })
+        }
+        
+        // Other PDF-specific errors
+        if (errorMessage.includes('PDF_INVALID')) {
+          return res.status(400).json({
+            error: 'Invalid PDF file',
+            message: 'The uploaded file does not appear to be a valid PDF document.',
+            deployMarker: DEPLOY_TIMESTAMP
+          })
+        }
+        
+        if (errorMessage.includes('PDF_ENCRYPTED')) {
+          return res.status(400).json({
+            error: 'Encrypted PDF',
+            message: 'This PDF is password-protected and cannot be parsed. Please remove the password protection or export as .txt/.fdx format.',
+            deployMarker: DEPLOY_TIMESTAMP
+          })
+        }
+        
+        if (errorMessage.includes('PDF_NO_TEXT')) {
+          return res.status(400).json({
+            error: 'No extractable text',
+            message: 'The PDF contains no text that can be extracted. It may be an image-based (scanned) PDF. Please export your screenplay as .txt or .fdx format.',
+            deployMarker: DEPLOY_TIMESTAMP
+          })
+        }
+        
+        // Generic PDF error
+        return res.status(500).json({
+          error: 'PDF parsing failed',
+          message: 'Failed to parse the PDF file. Please try exporting your screenplay as .txt or .fdx format for best results.',
+          details: errorMessage.replace('PDF_PARSE_ERROR: ', ''),
+          suggestion: 'Export from your screenwriting software: File > Export > Plain Text (.txt)',
           deployMarker: DEPLOY_TIMESTAMP
         })
       }
