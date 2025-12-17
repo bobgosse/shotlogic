@@ -1,8 +1,6 @@
-// src/pages/Index.tsx - COMPLETE FINAL PRODUCTION FILE WITH LOCAL WORKER PDF PARSING
+// src/pages/Index.tsx - COMPLETE FINAL PRODUCTION FILE WITH POSITIONAL PDF PARSING
 
-// src/pages/Index.tsx - COMPLETE FINAL PRODUCTION FILE WITH LOCAL WORKER PDF PARSING
-
-import { useState, useCallback, useEffect } from 'react' // <--- CRITICAL FIX: Imported from 'react'
+import { useState, useCallback, useEffect } from 'react' 
 import { Link, useLocation } from 'react-router-dom'
 import { Upload, FileText, CheckCircle2, AlertCircle, Loader2, Printer, FileDown, FileText as FileTextIcon, Save, Edit2, Copy, X, Check, FolderOpen } from 'lucide-react'
 import html2pdf from 'html2pdf.js'
@@ -10,16 +8,9 @@ import html2pdf from 'html2pdf.js'
 // ═══════════════════════════════════════════════════════════════
 // PDFJS CONFIGURATION AND IMPORTS (CRITICAL FIX)
 // ═══════════════════════════════════════════════════════════════
-// ... (rest of the file remains the same)
-
-// ═══════════════════════════════════════════════════════════════
-// PDFJS CONFIGURATION AND IMPORTS (CRITICAL FIX)
-// ═══════════════════════════════════════════════════════════════
 
 import * as pdfjsLib from 'pdfjs-dist/build/pdf'
 // Import the worker file directly using a build tool specific suffix (?url for Vite)
-// If you are using Create React App (Webpack), you might need a different import syntax.
-// We will use the common Vite/Next.js dynamic import:
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min?url'
 
 // Set the worker source to the locally bundled asset
@@ -78,7 +69,7 @@ interface AppState {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// UTILITY FUNCTIONS
+// UTILITY FUNCTIONS (INCLUDING NEW POSITIONAL PDF LOGIC)
 // ═══════════════════════════════════════════════════════════════
 
 const showToast = (title: string, description?: string, variant?: 'default' | 'destructive') => {
@@ -120,15 +111,52 @@ async function fileToBase64(file: File): Promise<string> {
     })
 }
 
-/**
- * NEW: Extracts raw text from a PDF file entirely on the client-side using pdfjs-dist.
- * @param file The PDF File object from the user upload.
- * @returns A promise resolving to the full plaintext content.
- */
-async function extractTextFromPDF(file: File, setProgress: React.Dispatch<React.SetStateAction<number>>, setParsingMessage: React.Dispatch<React.SetStateAction<string>>): Promise<string> {
-  console.log('📄 Starting client-side PDF extraction with local worker...')
+// -----------------------------------------------------------------
+// NEW HELPER: POST-PROCESSING TO RECOVER SCENE HEADINGS
+// -----------------------------------------------------------------
+function postProcessScreenplay(text: string): string {
+  // Post-process to fix common screenplay formatting issues from extraction
+  let lines = text.split('\n');
   
-  // 1. Read file as ArrayBuffer
+  // Rule 1: Fix scene headings that got merged with previous non-scene text
+  lines = lines.map(line => {
+    // Regex matches common scene headings preceded by whitespace or text
+    const sceneMatch = line.match(/(\s|^)((INT\.|EXT\.|I\.E\.)[^.]+(?:DAY|NIGHT|MORNING|EVENING|CONTINUOUS|LATER))/i);
+    
+    if (sceneMatch) {
+      const headingText = sceneMatch[2].trim();
+      const headingStart = line.indexOf(headingText);
+      
+      // If the heading is not at the start of the line or only preceded by short text
+      if (headingStart > 0) {
+        const beforeText = line.substring(0, headingStart).trim();
+        
+        if (beforeText.length > 0) {
+          // If there's actual text before it, split the line
+          return beforeText + '\n' + line.substring(headingStart);
+        }
+      }
+    }
+    
+    return line;
+  });
+  
+  // Rule 2: Ensure an extra line break after scene headings for clean scene split
+  let processedText = lines.join('\n');
+  
+  return processedText.replace(
+    /((?:INT\.|EXT\.|I\.E\.)[^.]+(?:DAY|NIGHT|MORNING|EVENING|CONTINUOUS|LATER)[^\n]*)/gi,
+    '\n$1\n' // Add newline before and after the heading
+  );
+}
+
+// -----------------------------------------------------------------
+// NEW CORE FUNCTION: POSITIONAL PDF PARSING
+// -----------------------------------------------------------------
+
+async function extractTextFromPDF(file: File, setProgress: React.Dispatch<React.SetStateAction<number>>, setParsingMessage: React.Dispatch<React.SetStateAction<string>>): Promise<string> {
+  console.log('📄 Starting client-side PDF extraction with positional analysis...')
+  
   const arrayBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => resolve(reader.result as ArrayBuffer)
@@ -136,17 +164,14 @@ async function extractTextFromPDF(file: File, setProgress: React.Dispatch<React.
     reader.readAsArrayBuffer(file)
   })
 
-  // 2. Load PDF document
   const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer })
-  
   const pdf = await loadingTask.promise
   
-  let fullText = ''
+  let screenplayText = ''
   const totalPages = pdf.numPages
   
   console.log(`   - Total pages detected: ${totalPages}`)
 
-  // 3. Loop through all pages and extract text
   for (let i = 1; i <= totalPages; i++) {
     if (i % 10 === 0 || i === totalPages) {
       const currentProgress = Math.round((i / totalPages) * 100)
@@ -157,35 +182,61 @@ async function extractTextFromPDF(file: File, setProgress: React.Dispatch<React.
     const page = await pdf.getPage(i)
     const textContent = await page.getTextContent()
     
-    // Extract strings and join them with spaces, adding a newline after each page
-    const pageText = textContent.items
-        .map(item => 'str' in item ? item.str : '') // Ensure item.str exists
-        .join(' ')
+    // Sort items by position (top-left to bottom-right)
+    const items = textContent.items.sort((a: any, b: any) => {
+      // First by y (higher y = top of page), then by x (left)
+      // Use item.transform[5] for y and item.transform[4] for x
+      const yDiff = b.transform[5] - a.transform[5];
+      // If y difference is small (e.g., less than 3 units), treat as same line
+      if (Math.abs(yDiff) > 3) return yDiff; 
+      return a.transform[4] - b.transform[4]; 
+    });
     
-    fullText += pageText + '\n\n'
+    let lastY: number | null = null;
+    let lineBuffer = '';
+
+    items.forEach((item: any, index: number) => {
+      const currentY = Math.round(item.transform[5]);
+      
+      // Check if we're on a new line (y difference is greater than threshold)
+      if (lastY !== null && Math.abs(currentY - lastY) > 3) {
+        // New line detected, finalize the buffered line and add newline
+        screenplayText += lineBuffer.trimEnd() + '\n';
+        lineBuffer = '';
+      } else if (lastY !== null && index > 0 && Math.abs(currentY - lastY) <= 3) {
+          // If on the same line, check if a gap is large enough to warrant a space
+          // This prevents massive gaps from being merged incorrectly, but we rely mostly on .join(' ')
+      }
+      
+      // Add item text to current line buffer with a trailing space
+      lineBuffer += item.str + ' ';
+      lastY = currentY;
+      
+      // Handle the very last item on the page
+      if (index === items.length - 1) {
+        screenplayText += lineBuffer.trimEnd() + '\n\n'; // Add final line and page break
+      }
+    });
   }
   
   setProgress(100)
-  setParsingMessage('PDF text extraction complete.')
+  setParsingMessage('PDF text extraction complete. Reconstructing structure...')
   
-  // Final cleanup and validation
-  const cleanText = fullText
-    .replace(/\r\n/g, '\n')
-    .replace(/\r/g, '\n')
-    .replace(/\n{5,}/g, '\n\n\n')
-    .trim()
+  // FINAL STEP: Apply screenplay-specific post-processing
+  const rawText = screenplayText.trim();
+  const finalScreenplayText = postProcessScreenplay(rawText);
 
-  if (cleanText.length < 50) {
-    throw new Error('PDF_NO_TEXT: The PDF was parsed but contains no extractable text. It may be an image-based PDF (scanned document).')
+  if (finalScreenplayText.length < 50) {
+    throw new Error('PDF_NO_TEXT: The PDF was parsed but contains no extractable text or structure. It may be an image-based PDF (scanned document).')
   }
 
-  console.log(`✅ Client-side PDF extracted: ${cleanText.length} chars.`)
-  return cleanText
+  console.log(`✅ Client-side PDF extracted: ${finalScreenplayText.length} chars.`)
+  return finalScreenplayText
 }
 
 
 // ═══════════════════════════════════════════════════════════════
-// LOCAL STORAGE MANAGEMENT
+// LOCAL STORAGE MANAGEMENT (REMAINS UNCHANGED)
 // ═══════════════════════════════════════════════════════════════
 
 const STORAGE_KEY = 'shotLogicAppState';
@@ -221,7 +272,7 @@ const loadState = (): AppState | undefined => {
 };
 
 // ═══════════════════════════════════════════════════════════════
-// MAIN COMPONENT
+// MAIN COMPONENT (REMAINS UNCHANGED)
 // ═══════════════════════════════════════════════════════════════
 
 function Index() {
@@ -233,13 +284,13 @@ function Index() {
   const [progress, setProgress] = useState(0);
   const [currentScene, setCurrentScene] = useState(0);
   const [visualStyle, setVisualStyle] = useState<string>('');
-  const [parsingMessage, setParsingMessage] = useState<string>(''); // NEW: For PDF status
+  const [parsingMessage, setParsingMessage] = useState<string>('');
   
   const [projectId, setProjectId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState<string>('Untitled Project');
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingProject, setIsLoadingProject] = useState(false);
-  const [hasLoadedFromUrl, setHasLoadedFromUrl] = useState(false); // Track if we've loaded from URL
+  const [hasLoadedFromUrl, setHasLoadedFromUrl] = useState(false);
 
   // ---------------------------------------------------------------
   // EFFECT 1: LOAD PROJECT FROM URL
@@ -250,49 +301,36 @@ function Index() {
 
     console.log('📍 URL Check:', { idFromUrl, currentProjectId: projectId, hasLoadedFromUrl });
 
-    // Only load if:
-    // 1. There's an ID in the URL
-    // 2. It's different from current projectId
-    // 3. We haven't already loaded this URL
     if (idFromUrl && idFromUrl !== projectId && !hasLoadedFromUrl) {
       const loadProject = async () => {
         console.log(`🔄 Loading project from URL: ${idFromUrl}`)
         setIsLoadingProject(true);
-        setHasLoadedFromUrl(true); // Prevent re-loading
+        setHasLoadedFromUrl(true); 
 
         try {
           const response = await fetch(`/api/projects/get-one?projectId=${idFromUrl}`);
           const result = await response.json();
-
-          console.log('📥 Load response:', result);
-
           if (!response.ok || !result.projectData) {
             throw new Error(result.error || 'Failed to retrieve project data.');
           }
 
           const loadedData: ProjectDataPayload = result.projectData;
-          
           setProjectId(result.projectId);
           setProjectName(result.projectName || 'Untitled Project');
           setFileInfo(loadedData.file);
           setVisualStyle(loadedData.visualStyle || '');
           setScenes(loadedData.scenes.map(s => ({ ...s, isEditing: false })));
-          
           showToast("Project Loaded", `Successfully loaded project: ${result.projectName}`);
-
         } catch (error) {
           console.error('❌ Load Project Error:', error);
           showToast("Load Failed", error instanceof Error ? error.message : "An unknown error occurred.", "destructive");
-          setHasLoadedFromUrl(false); // Allow retry on error
+          setHasLoadedFromUrl(false);
         } finally {
           setIsLoadingProject(false);
         }
       };
-      
       loadProject();
-      
     } else if (!idFromUrl && !hasLoadedFromUrl) {
-      // No URL parameter - load from localStorage
       console.log('💾 Loading from localStorage...');
       const persistedState = loadState();
       if (persistedState) {
@@ -305,11 +343,10 @@ function Index() {
             showToast("Session Restored", "Analysis results restored from your last local session.");
         }
       }
-      setHasLoadedFromUrl(true); // Mark as loaded to prevent re-loading
+      setHasLoadedFromUrl(true);
     }
   }, [location.search]);
 
-  // Reset hasLoadedFromUrl when search params change
   useEffect(() => {
     setHasLoadedFromUrl(false);
   }, [location.search]);
@@ -319,13 +356,11 @@ function Index() {
   // ---------------------------------------------------------------
   useEffect(() => {
     if (isLoadingProject) return; 
-
     const handler = setTimeout(() => {
         if (scenes.length > 0 || fileInfo) {
             saveState({ file: fileInfo, scenes, visualStyle, projectId, projectName });
         }
     }, 500);
-
     return () => clearTimeout(handler);
   }, [scenes, fileInfo, visualStyle, projectId, projectName, isLoadingProject]);
 
@@ -339,14 +374,12 @@ function Index() {
         showToast("Cannot Save", "Upload and analyze a screenplay first.", "destructive");
         return;
     }
-
     if (!projectName || projectName === 'Untitled Project') {
         showToast("Naming Required", "Please enter a descriptive name for your project before saving to the cloud.", "destructive");
         return;
     }
 
     console.log(`💾 Initiating cloud save for project: ${projectName}`)
-    
     setIsSaving(true);
     
     const projectDataPayload: ProjectDataPayload = { 
@@ -364,33 +397,26 @@ function Index() {
             name: projectName,
             projectData: projectDataPayload
         };
-
         const response = await fetch('/api/projects/save', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(requestBody)
         });
-
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
             throw new Error(errorData.error || errorData.message || 'Failed to save project to the cloud.');
         }
-
         const result = await response.json();
-
         if (!projectId && result.projectId) {
             setProjectId(result.projectId);
         }
-
         showToast("Cloud Project Saved", `Project '${projectName}' saved successfully!`);
-
     } catch (error) {
         console.error('❌ Cloud Save Error:', error);
         showToast("Cloud Save Failed", error instanceof Error ? error.message : "An unknown error occurred during cloud save.", "destructive");
     } finally {
         setIsSaving(false);
     }
-    
     saveState({ file: fileInfo, scenes, visualStyle, projectId, projectName });
   }, [scenes, fileInfo, visualStyle, projectId, projectName]);
 
@@ -432,17 +458,13 @@ function Index() {
       let screenplayText = ''
       
       if (extension === 'pdf') {
-        // PDF FIX: Handle client-side parsing
-        setParsingMessage('Extracting text from PDF (client-side)...')
-        // Pass setProgress and setParsingMessage to update UI during long process
+        setParsingMessage('Extracting text from PDF (client-side, positional analysis)...')
         screenplayText = await extractTextFromPDF(uploadedFile, setProgress, setParsingMessage)
         
       } else if (extension === 'txt') {
-        // TXT: Handle client-side read and send raw text to extractScenes
         screenplayText = await uploadedFile.text()
         
       } else if (extension === 'fdx') {
-        // FDX: Send file to backend for complex XML parsing
         console.log(`Sending FDX file to backend for parsing...`)
         const base64Data = (await fileToBase64(uploadedFile)).split(',')[1] 
         
