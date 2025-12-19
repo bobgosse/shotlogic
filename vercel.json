@@ -3,18 +3,11 @@
   "outputDirectory": "dist",
   "installCommand": "npm install",
   "framework": "vite",
+  "cleanUrls": true,
   "functions": {
-    "api/parse-screenplay.ts": {
+    "api/**/*.ts": {
       "maxDuration": 60,
       "memory": 1024
-    },
-    "api/analyze-scene.ts": {
-      "maxDuration": 60,
-      "memory": 512
-    },
-    "api/projects/*.ts": {
-      "maxDuration": 30,
-      "memory": 512
     }
   }
 }
