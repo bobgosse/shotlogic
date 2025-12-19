@@ -155,13 +155,16 @@ export default function Index() {
     console.log('🔍 Extracting scenes from screenplay text...');
     console.log(`📄 Total text length: ${text.length} characters`);
    console.log('📝 First 500 chars:', text.substring(0, 500));
-   console.log('🔍 Character codes (first 100):', Array.from(text.substring(0, 100)).map(c => c.charCodeAt(0)));
+  console.log('📝 First 500 chars:', text.substring(0, 500));
 
-// FIX: PDF has spaces between every character, multiple spaces between words
-// Split by 2+ spaces (word boundaries), remove all spaces within words, rejoin
-text = text.split(/\s{2,}/).map(word => word.replace(/\s/g, '')).join(' ');
+// FIX: Remove character-level spacing while PRESERVING newlines
+// Split by newlines, fix each line, rejoin
+text = text.split('\n').map(line => {
+  // Within each line, remove single spaces between characters
+  return line.split(/\s{2,}/).map(word => word.replace(/\s/g, '')).join(' ');
+}).join('\n');
 
-console.log('🔧 After fixing spacing:', text.substring(0, 500));
+console.log('🔧 After fixing spacing (first 500):', text.substring(0, 500));
 // Then normalize remaining multiple spaces to single space
 text = text.replace(/\s{2,}/g, ' ');
 console.log('🔧 After normalizing spaces:', text.substring(0, 200));
