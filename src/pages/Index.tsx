@@ -169,6 +169,8 @@ console.log('🔧 After fixing spacing (first 500):', text.substring(0, 500));
 text = text.replace(/\s{2,}/g, ' ');
 console.log('🔧 After normalizing spaces:', text.substring(0, 200));
 console.log('🔧 After fixing spacing:', text.substring(0, 500));
+const allSceneHeaders = text.match(/\d*\s*(?:INT\.|EXT\.)[^\n]*/gi);
+console.log('🎬 ALL SCENE HEADERS FOUND:', allSceneHeaders);
     // STEP 1: Find first scene header (handles scene numbers, skips title page)
     const firstSceneMatch = text.match(/(?:^|\n)\s*\d*\s*(?:INT\.|EXT\.|I\/E|I\.E\.)\s+/i);
     
