@@ -207,6 +207,8 @@ console.log('🔧 After fixing spacing:', text.substring(0, 500));
         error: null
       }));
     
+      console.log(`🔍 Scene blocks found: ${sceneBlocks.length}`);
+console.log('🔍 First 3 blocks:', sceneBlocks.slice(0, 3).map(b => b.substring(0, 100)));
     console.log(`📝 Extracted ${validScenes.length} scenes`);
     
     if (validScenes.length === 0) {
