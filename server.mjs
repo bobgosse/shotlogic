@@ -8,14 +8,14 @@ const __dirname = dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Serve static files from dist
+// Serve static files
 app.use(express.static(join(__dirname, 'dist')));
 
-// SPA fallback
-app.get('*', (req, res) => {
+// SPA fallback - use regex instead of '*'
+app.get('/(.*)', (req, res) => {
   res.sendFile(join(__dirname, 'dist', 'index.html'));
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ ShotLogic running on port ${PORT}`);
 });
