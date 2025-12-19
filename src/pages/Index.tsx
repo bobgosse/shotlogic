@@ -154,6 +154,7 @@ export default function Index() {
   function processExtractedText(text: string) {
     console.log('🔍 Extracting scenes from screenplay text...');
     console.log(`📄 Total text length: ${text.length} characters`);
+    console.log('📝 First 500 chars:', text.substring(0, 500));
     
     // STEP 1: Find first scene header (handles scene numbers, skips title page)
     const firstSceneMatch = text.match(/(?:^|\n)\s*\d*\s*(?:INT\.|EXT\.|I\/E|I\.E\.)\s+/i);
