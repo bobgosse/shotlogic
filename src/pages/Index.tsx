@@ -155,6 +155,7 @@ export default function Index() {
     console.log('🔍 Extracting scenes from screenplay text...');
     console.log(`📄 Total text length: ${text.length} characters`);
    console.log('📝 First 500 chars:', text.substring(0, 500));
+   console.log('🔍 Character codes (first 100):', Array.from(text.substring(0, 100)).map(c => c.charCodeAt(0)));
 
 // FIX: PDF has spaces between every character, multiple spaces between words
 // Split by 2+ spaces (word boundaries), remove all spaces within words, rejoin
