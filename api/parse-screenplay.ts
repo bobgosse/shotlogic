@@ -10,22 +10,40 @@ interface ParseRequest {
 }
 
 async function parsePDF(buffer: Buffer): Promise<string> {
-  let pdfParse: any
-  
   try {
-    pdfParse = (await import('pdf-parse')).default
+    const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.js')
+    
+    // Load PDF document
+    const loadingTask = pdfjsLib.getDocument({
+      data: new Uint8Array(buffer)
+    })
+    
+    const pdfDocument = await loadingTask.promise
+    const numPages = pdfDocument.numPages
+    
+    let fullText = ''
+    
+    // Extract text from each page
+    for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+      const page = await pdfDocument.getPage(pageNum)
+      const textContent = await page.getTextContent()
+      const pageText = textContent.items
+        .map((item: any) => item.str)
+        .join(' ')
+      
+      fullText += pageText + '\n'
+    }
+    
+    if (!fullText || fullText.trim().length < 50) {
+      throw new Error('PDF contains no extractable text')
+    }
+    
+    return fullText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim()
+    
   } catch (err) {
-    throw new Error('PDF parsing unavailable. Use .txt or .fdx format.')
+    console.error('PDF parsing error:', err)
+    throw new Error('Failed to parse PDF. Please try exporting as .txt or .fdx format.')
   }
-  
-  const pdfData = await pdfParse(buffer)
-  const text = pdfData.text || ''
-  
-  if (!text || text.trim().length < 50) {
-    throw new Error('PDF contains no extractable text')
-  }
-  
-  return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim()
 }
 
 async function parseFDX(buffer: Buffer): Promise<string> {
@@ -125,7 +143,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const buffer = Buffer.from(fileData, 'base64')
     
     if (buffer.length > MAX_FILE_SIZE) {
-      return res.status(413).json({ error: 'File too large' })
+      return res.status(413).json({ error: 'File too large (max 10MB)' })
     }
     
     let screenplayText = ''
@@ -139,7 +157,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     
     if (!screenplayText || screenplayText.length < 100) {
-      return res.status(500).json({ error: 'Insufficient content' })
+      return res.status(500).json({ error: 'Insufficient content extracted from file' })
     }
     
     return res.status(200).json({
