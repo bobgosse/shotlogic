@@ -216,7 +216,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } else if (fileType === 'fdx') {
       screenplayText = await parseFDX(buffer)
     } else if (fileType === 'pdf') {
-      screenplayText = await parsePDF(buffer, id)
+      screenplayText = await parsePDF(buffer)
     }
     
     if (!screenplayText || screenplayText.length < 100) {
