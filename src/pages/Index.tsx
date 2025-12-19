@@ -215,10 +215,6 @@ export default function Index() {
     setParsingMessage('');
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // RENDER (UI)
-  // ═══════════════════════════════════════════════════════════════
-
   return (
     <div className="min-h-screen bg-[#141414] text-white p-8">
       <div className="max-w-6xl mx-auto space-y-8">
