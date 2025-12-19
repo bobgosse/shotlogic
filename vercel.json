@@ -1,5 +1,19 @@
 {
+  "functions": {
+    "api/parse-screenplay.ts": {
+      "maxDuration": 60,
+      "memory": 1024
+    },
+    "api/analyze-scene.ts": {
+      "maxDuration": 60,
+      "memory": 512
+    }
+  },
   "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    },
     {
       "source": "/(.*)",
       "destination": "/index.html"
