@@ -193,7 +193,7 @@ export default function Index() {
         error: null
       }));
     
-console.log(`📝 Extracted ${validScenes.length} scenes`);
+    console.log(`📝 Extracted ${validScenes.length} scenes`);
     
     if (validScenes.length === 0) {
       showToast(
