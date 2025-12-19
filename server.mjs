@@ -11,8 +11,8 @@ const PORT = process.env.PORT || 3000;
 // Serve static files
 app.use(express.static(join(__dirname, 'dist')));
 
-// SPA fallback - use regex instead of '*'
-app.get('/(.*)', (req, res) => {
+// SPA fallback - use middleware instead of route
+app.use((req, res) => {
   res.sendFile(join(__dirname, 'dist', 'index.html'));
 });
 
