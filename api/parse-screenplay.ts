@@ -1,10 +1,6 @@
-// api/parse-screenplay.ts
-// Direct PDF/FDX/TXT parsing on Vercel
-
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { XMLParser } from 'fast-xml-parser'
 
-const DEPLOY_TIMESTAMP = "2024-12-18T00:00:00Z_DIRECT_PDF"
 const MAX_FILE_SIZE = 10 * 1024 * 1024
 
 interface ParseRequest {
@@ -13,82 +9,7 @@ interface ParseRequest {
   fileType: 'txt' | 'pdf' | 'fdx'
 }
 
-async function parsePDF(buffer: Buffer, id: string): Promise<string> {
-  console.log(`📄 [${id}] Parsing PDF (${buffer.length} bytes)...`)
-  
-  let pdfParse: any
-  
-  try {
-    pdfParse = (await import('pdf-parse')).default
-  } catch (err) {
-    throw new Error('PDF parsing unavailable. Use .txt or .fdx format.')
-  }
-  
-  const pdfData = await pdfParse(buffer)
-  const text = pdfData.text || ''
-  
-  if (!text || text.trim().length < 50) {
-    throw new Error('PDF contains no extractable text')
-  }
-  
-  return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim()
-}
-
-async function parseFDX(buffer: Buffer): Promise<string> {
-  const xmlText = buffer.toString('utf-8')
-  
-  if (!xmlText.includes('<?xml') && !xmlText.includes('<FinalDraft')) {
-    throw new Error('Not a valid FDX file')
-  }
-  
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '@_',
-    textNodeName: '#text'
-  })
-  
-  const xmlDoc = parser.parse(xmlText)
-  let paragraphs: any[] = []
-  
-  if (xmlDoc.FinalDraft?.Content?.Paragraph) {
-    paragraphs = Array.isArray(xmlDoc.FinalDraft.Content.Paragraph) 
-      ? xmlDoc.FinalDraft.Content.Paragraph 
-      : [xmlDoc.FinalDraft.Content.Paragraph]
-  }
-  
-  const lines: string[] = []
-  
-  for (const para of paragraphs) {
-    const type = para['@_Type'] || 'Unknown'
-    let text = ''
-    
-    if (para['#text']) text = para['#text']
-    else if (para.Text) {
-      if (typeof para.Text === 'string') text = para.Text
-      else if (Array.isArray(para.Text)) {
-        text = para.Text.map((t: any) => 
-          typeof t === 'string' ? t : t['#text'] || ''
-        ).join('')
-      } else if (para.Text['#text']) {
-cat > api/parse-screenplay.ts << 'EOF'
-// api/parse-screenplay.ts
-// Direct PDF/FDX/TXT parsing on Vercel
-
-import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { XMLParser } from 'fast-xml-parser'
-
-const DEPLOY_TIMESTAMP = "2024-12-18T00:00:00Z_DIRECT_PDF"
-const MAX_FILE_SIZE = 10 * 1024 * 1024
-
-interface ParseRequest {
-  fileData: string
-  fileName: string
-  fileType: 'txt' | 'pdf' | 'fdx'
-}
-
-async function parsePDF(buffer: Buffer, id: string): Promise<string> {
-  console.log(`📄 [${id}] Parsing PDF (${buffer.length} bytes)...`)
-  
+async function parsePDF(buffer: Buffer): Promise<string> {
   let pdfParse: any
   
   try {
@@ -187,8 +108,6 @@ function parseTXT(buffer: Buffer): string {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const id = Date.now().toString()
-  
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
@@ -228,19 +147,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       meta: {
         fileName,
         fileType,
-        textLength: screenplayText.length,
-        deployMarker: DEPLOY_TIMESTAMP
+        textLength: screenplayText.length
       }
     })
     
   } catch (error) {
+    console.error('Parse error:', error)
     return res.status(500).json({ 
       error: error instanceof Error ? error.message : 'Processing failed'
     })
   }
-}
-
-export const config = {
-  maxDuration: 60,
-  memory: 1024
 }
