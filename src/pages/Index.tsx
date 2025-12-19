@@ -153,17 +153,37 @@ export default function Index() {
   // UTILITY: Extract scenes from screenplay text
   function processExtractedText(text: string) {
     console.log('🔍 Extracting scenes from screenplay text...');
+    console.log(`📄 Total text length: ${text.length} characters`);
     
-    // Split on scene headers (INT., EXT., I/E, I.E.)
-    const scenePattern = /(?=(?:INT\.|EXT\.|I\/E|I\.E\.)\s+[A-Z0-9])/i;
-    const sceneBlocks = text.split(scenePattern);
+    // STEP 1: Find first scene header (handles scene numbers, skips title page)
+    const firstSceneMatch = text.match(/(?:^|\n)\s*\d*\s*(?:INT\.|EXT\.|I\/E|I\.E\.)\s+/i);
+    
+    if (!firstSceneMatch) {
+      console.log('❌ No scene headers found in entire document');
+      showToast(
+        "No Scenes Found",
+        "Could not find any scene headers (INT. or EXT.). Make sure your screenplay follows standard formatting.",
+        "destructive"
+      );
+      setFileInfo(null);
+      setIsParsing(false);
+      return;
+    }
+    
+    // STEP 2: Start from first scene header (auto-skips title page)
+    const firstSceneIndex = firstSceneMatch.index!;
+    const scriptText = text.substring(firstSceneIndex);
+    console.log(`✂️ Skipped ${firstSceneIndex} characters (title page)`);
+    
+    // STEP 3: Split on scene headers - handles optional scene numbers
+    const scenePattern = /(?=(?:^|\n)\s*\d*\s*(?:INT\.|EXT\.|I\/E|I\.E\.)\s+)/gim;
+    const sceneBlocks = scriptText.split(scenePattern);
     
     const validScenes = sceneBlocks
       .filter(block => {
-        // Must have reasonable length
-        if (block.trim().length < 20) return false;
-        // Must start with a scene header
-        return /^(?:INT\.|EXT\.|I\/E|I\.E\.)\s+/i.test(block.trim());
+        const trimmed = block.trim();
+        if (trimmed.length < 20) return false;
+        return /^\s*\d*\s*(?:INT\.|EXT\.|I\/E|I\.E\.)\s+/i.test(trimmed);
       })
       .map((block, index) => ({
         number: index + 1,
@@ -172,13 +192,13 @@ export default function Index() {
         status: 'pending' as const,
         error: null
       }));
-
+    
     console.log(`📝 Extracted ${validScenes.length} scenes`);
-
+    
     if (validScenes.length === 0) {
       showToast(
         "No Scenes Found",
-        "Could not find any scene headers (INT. or EXT.). Make sure your screenplay follows standard formatting.",
+        "Found scene headers but couldn't parse them. The screenplay format may be non-standard.",
         "destructive"
       );
       setFileInfo(null);
@@ -186,6 +206,10 @@ export default function Index() {
       setScenes(validScenes);
       showToast("Scenes Loaded", `Found ${validScenes.length} scenes in screenplay`);
     }
+    
+    setIsParsing(false);
+    setParsingMessage('');
+  }
 
     setIsParsing(false);
     setParsingMessage('');
