@@ -1,3 +1,4 @@
+import React from 'react';
 // src/pages/Dashboard.tsx
 // Complete dashboard with ShotLogic logo and branding - CLEAN CODE
 

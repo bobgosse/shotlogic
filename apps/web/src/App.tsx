@@ -1,3 +1,4 @@
+import React from 'react';
 // src/App.tsx
 // CRITICAL: Main application component with React Router setup
 // Dashboard is now the landing page at "/"
