@@ -211,9 +211,7 @@ export default function Index() {
     setParsingMessage('');
   }
 
-    setIsParsing(false);
-    setParsingMessage('');
-  }
+  
 
   return (
     <div className="min-h-screen bg-[#141414] text-white p-8">
