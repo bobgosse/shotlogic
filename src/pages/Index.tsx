@@ -1,4 +1,4 @@
-cat > src/pages/Index.tsx << 'ENDOFFILE'
+
 import React from 'react';
 import { useState, useCallback, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
