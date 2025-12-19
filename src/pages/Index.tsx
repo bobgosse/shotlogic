@@ -188,7 +188,7 @@ console.log('🔧 After fixing spacing:', text.substring(0, 500));
     const firstSceneIndex = firstSceneMatch.index!;
     const scriptText = text.substring(firstSceneIndex);
     console.log(`✂️ Skipped ${firstSceneIndex} characters (title page)`);
-    
+     console.log('📋 Script text after skip (first 300 chars):', scriptText.substring(0, 300));
     // STEP 3: Split on scene headers - handles optional scene numbers
     const scenePattern = /(?=(?:^|\n)\s*\d*\s*(?:INT\.|EXT\.|I\/E|I\.E\.)\s+)/gim;
     const sceneBlocks = scriptText.split(scenePattern);
