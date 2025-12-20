@@ -51,6 +51,56 @@ export default function Index() {
   const location = useLocation();
   const [fileInfo, setFileInfo] = useState<{ name: string, type: string } | null>(null);
   const [scenes, setScenes] = useState<Scene[]>([]);
+  // Auto-analyze scenes when they're detected
+useEffect(() => {
+  if (scenes.length > 0 && scenes.some(s => s.status === 'pending')) {
+    console.log('🤖 Starting auto-analysis for', scenes.length, 'scenes');
+    analyzeAllScenes();
+  }
+}, [scenes.length]); // Trigger when scenes are first detected
+
+// Function to analyze all scenes
+async function analyzeAllScenes() {
+  for (let i = 0; i < scenes.length; i++) {
+    const scene = scenes[i];
+    if (scene.status !== 'pending') continue;
+
+    console.log(`🎬 Analyzing scene ${scene.number}...`);
+    
+    // Update status to processing
+    setScenes(prev => prev.map(s => 
+      s.number === scene.number ? { ...s, status: 'processing' } : s
+    ));
+
+    try {
+      const response = await fetch('/api/analyze-scene', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sceneText: scene.text })
+      });
+
+      if (!response.ok) throw new Error(`API error: ${response.status}`);
+      
+      const analysis = await response.json();
+      console.log(`✅ Scene ${scene.number} analyzed`);
+
+      // Update with analysis results
+      setScenes(prev => prev.map(s => 
+        s.number === scene.number 
+          ? { ...s, status: 'complete', analysis } 
+          : s
+      ));
+
+    } catch (error: any) {
+      console.error(`❌ Error analyzing scene ${scene.number}:`, error);
+      setScenes(prev => prev.map(s => 
+        s.number === scene.number 
+          ? { ...s, status: 'error', error: error.message } 
+          : s
+      ));
+    }
+  }
+}
   const [isProcessing, setIsProcessing] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
   const [progress, setProgress] = useState(0);
