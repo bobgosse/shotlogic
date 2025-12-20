@@ -169,7 +169,7 @@ console.log('🔧 After fixing spacing (first 500):', text.substring(0, 500));
 text = text.replace(/\s{2,}/g, ' ');
 console.log('🔧 After normalizing spaces:', text.substring(0, 200));
 console.log('🔧 After fixing spacing:', text.substring(0, 500));
-const allSceneHeaders = text.match(/\d*\s*(?:INT\.|EXT\.)[^\n]*/gi);
+const allSceneHeaders = text.match(/\d*[ \t]*(?:INT\.|EXT\.)[^\n]*/gi);
 console.log('🎬 FOUND', allSceneHeaders?.length, 'SCENE HEADERS:');
 allSceneHeaders?.forEach((h, i) => console.log(`  ${i+1}. ${h}`));
     // STEP 1: Find first scene header (handles scene numbers, skips title page)
@@ -193,14 +193,14 @@ allSceneHeaders?.forEach((h, i) => console.log(`  ${i+1}. ${h}`));
     console.log(`✂️ Skipped ${firstSceneIndex} characters (title page)`);
      console.log('📋 Script text after skip (first 300 chars):', scriptText.substring(0, 300));
     // STEP 3: Split on scene headers - handles optional scene numbers
-    const scenePattern = /(?=(?:^|\n)\s*\d*\s*(?:INT\.|EXT\.|I\/E|I\.E\.)\s+)/gim;
+const scenePattern = /(?=(?:^|\n)[ \t]*\d*[ \t]*(?:INT\.|EXT\.|I\/E|I\.E\.)[ \t]+)/gim;
     const sceneBlocks = scriptText.split(scenePattern);
     
     const validScenes = sceneBlocks
       .filter(block => {
         const trimmed = block.trim();
         if (trimmed.length < 20) return false;
-        return /^\s*\d*\s*(?:INT\.|EXT\.|I\/E|I\.E\.)\s+/i.test(trimmed);
+return /^[ \t]*\d*[ \t]*(?:INT\.|EXT\.|I\/E|I\.E\.)[ \t]+/i.test(trimmed);
       })
       .map((block, index) => ({
         number: index + 1,
