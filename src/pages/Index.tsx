@@ -165,6 +165,13 @@ text = text.split('\n').map(line => {
 }).join('\n');
 
 console.log('🔧 After fixing spacing (first 1500):', text.substring(0, 1500));
+
+// Force newlines before scene headers (in case PDF has them on same line)
+text = text.replace(/(INT\.|EXT\.)/gi, '\n$1');
+// Clean up any double newlines
+text = text.replace(/\n{3,}/g, '\n\n');
+
+console.log('🔧 After adding scene breaks:', text.substring(0, 1500));
 console.log('🔧 Scene headers should be separated by newlines. Checking for double-INT...');
 if (text.includes('INT.KITCHEN') || text.includes('INT. KITCHEN')) {
   console.log('⚠️ Found scenes running together!');
