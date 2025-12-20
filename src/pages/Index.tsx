@@ -177,9 +177,6 @@ if (text.includes('INT.KITCHEN') || text.includes('INT. KITCHEN')) {
   console.log('⚠️ Found scenes running together!');
 }
 // Then normalize remaining multiple spaces to single space
-text = text.replace(/\s{2,}/g, ' ');
-console.log('🔧 After normalizing spaces:', text.substring(0, 200));
-console.log('🔧 After fixing spacing:', text.substring(0, 500));
 const allSceneHeaders = text.match(/\d*[ \t]*(?:INT\.|EXT\.)[^\n]*/gi);
 console.log('🎬 FOUND', allSceneHeaders?.length, 'SCENE HEADERS:');
 allSceneHeaders?.forEach((h, i) => console.log(`  ${i+1}. ${h}`));
