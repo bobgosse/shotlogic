@@ -164,7 +164,11 @@ text = text.split('\n').map(line => {
   return line.split(/\s{2,}/).map(word => word.replace(/\s/g, '')).join(' ');
 }).join('\n');
 
-console.log('🔧 After fixing spacing (first 500):', text.substring(0, 500));
+console.log('🔧 After fixing spacing (first 1500):', text.substring(0, 1500));
+console.log('🔧 Scene headers should be separated by newlines. Checking for double-INT...');
+if (text.includes('INT.KITCHEN') || text.includes('INT. KITCHEN')) {
+  console.log('⚠️ Found scenes running together!');
+}
 // Then normalize remaining multiple spaces to single space
 text = text.replace(/\s{2,}/g, ' ');
 console.log('🔧 After normalizing spaces:', text.substring(0, 200));
