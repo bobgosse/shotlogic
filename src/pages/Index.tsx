@@ -44,10 +44,10 @@ export default function Index() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          projectName: projectName,
-          scenes: scenes,
-          createdAt: new Date().toISOString()
-        })
+  name: projectName,  // ← Changed to "name"
+  scenes: scenes,
+  createdAt: new Date().toISOString()
+})
       });
 
       if (!response.ok) {
