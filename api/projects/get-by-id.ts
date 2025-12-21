@@ -1,4 +1,3 @@
-cat > api/projects/get-by-id.ts << 'EOF'
 // api/projects/get-by-id.ts
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { getDb } from '../lib/mongodb.js';
@@ -59,4 +58,3 @@ export default async function handler(
     });
   }
 }
-EOF
