@@ -80,7 +80,7 @@ export default function Index() {
       if (!response.ok) throw new Error(`API error: ${response.status}`);
       
       const analysis = await response.json();
-      console.log(`✅ Scene ${sceneNumber} analyzed`);
+console.log(`✅ Scene ${sceneNumber} analyzed:`, analysis);
 
       setScenes(prev => prev.map(s => 
         s.number === sceneNumber 
@@ -356,7 +356,10 @@ export default function Index() {
                 <div 
                   key={scene.number} 
                   className="p-4 bg-gray-800 rounded-lg border border-gray-700 hover:border-[#E50914] transition-colors cursor-pointer"
-                  onClick={() => setExpandedScene(expandedScene === scene.number ? null : scene.number)}
+                  onClick={() => {
+  console.log('🔍 Clicked scene:', scene.number, 'Current expanded:', expandedScene, 'Has analysis:', !!scene.analysis);
+  setExpandedScene(expandedScene === scene.number ? null : scene.number);
+}}
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
