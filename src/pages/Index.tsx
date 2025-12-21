@@ -1,48 +1,18 @@
 import React from 'react';
-import { useState, useCallback, useEffect } from 'react'
-import { Link, useLocation } from 'react-router-dom'
-import { Upload, FileText, CheckCircle2, AlertCircle, Loader2, Printer, FileDown, FileText as FileTextIcon, Save, Edit2, Copy, X, Check, FolderOpen } from 'lucide-react'
-import html2pdf from 'html2pdf.js'
+import { useState, useCallback } from 'react'
+import { Link } from 'react-router-dom'
+import { Upload, CheckCircle2, AlertCircle, Loader2, FolderOpen } from 'lucide-react'
 
 // ═══════════════════════════════════════════════════════════════
 // TYPE DEFINITIONS
 // ═══════════════════════════════════════════════════════════════
 
-type ShotType = 'WIDE' | 'MEDIUM' | 'CLOSE_UP' | 'INSERT' | 'TRACKING' | 'CRANE' | 'OTHER';
-const SHOT_TYPES: ShotType[] = ['WIDE', 'MEDIUM', 'CLOSE_UP', 'INSERT', 'TRACKING', 'CRANE', 'OTHER'];
-
-interface Shot {
-  shotNumber?: number
-  shotType: ShotType
-  description: string
-  cameraMovement?: string
-  visualDescription?: string
-  rationale?: string
-  editorialIntent?: string
-  aiImagePrompt?: string
-  isEditing?: boolean
-}
-
-interface NarrativeAnalysis {
-  synopsis: string
-  centralConflict: string
-  sceneTurn: string
-  emotionalTone: string
-  stakes: string
-}
-
-interface SceneAnalysis {
-  narrativeAnalysis: NarrativeAnalysis
-  shotList: Shot[]
-}
-
 interface Scene {
   number: number
   text: string
-  analysis: SceneAnalysis | null
+  analysis: any | null  // Using 'any' to accept whatever OpenAI sends
   status: 'pending' | 'processing' | 'complete' | 'error'
   error: string | null
-  isEditing?: boolean
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -50,12 +20,16 @@ interface Scene {
 // ═══════════════════════════════════════════════════════════════
 
 export default function Index() {
-  const location = useLocation();
   const [fileInfo, setFileInfo] = useState<{ name: string, type: string } | null>(null);
   const [scenes, setScenes] = useState<Scene[]>([]);
   const [expandedScene, setExpandedScene] = useState<number | null>(null);
+  const [isParsing, setIsParsing] = useState(false);
+  const [parsingMessage, setParsingMessage] = useState<string>('');
+
+  // ═══════════════════════════════════════════════════════════════
+  // ANALYZE SINGLE SCENE
+  // ═══════════════════════════════════════════════════════════════
   
-  // Function to analyze a single scene
   async function analyzeSingleScene(sceneNumber: number) {
     const scene = scenes.find(s => s.number === sceneNumber);
     if (!scene || scene.status !== 'pending') return;
@@ -80,7 +54,7 @@ export default function Index() {
       if (!response.ok) throw new Error(`API error: ${response.status}`);
       
       const analysis = await response.json();
-console.log(`✅ Scene ${sceneNumber} analyzed:`, analysis);
+      console.log(`✅ Scene ${sceneNumber} analyzed:`, analysis);
 
       setScenes(prev => prev.map(s => 
         s.number === sceneNumber 
@@ -98,24 +72,10 @@ console.log(`✅ Scene ${sceneNumber} analyzed:`, analysis);
     }
   }
 
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [isParsing, setIsParsing] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [currentScene, setCurrentScene] = useState(0);
-  const [visualStyle, setVisualStyle] = useState<string>('');
-  const [parsingMessage, setParsingMessage] = useState<string>('');
-  const [projectName, setProjectName] = useState<string>('Untitled Project');
+  // ═══════════════════════════════════════════════════════════════
+  // UTILITY FUNCTIONS
+  // ═══════════════════════════════════════════════════════════════
 
-  // UTILITY: Show Alert/Toast
-  const showToast = (title: string, description?: string, variant?: 'default' | 'destructive') => {
-    const message = description ? `${title}: ${description}` : title;
-    if (variant === 'destructive') {
-      console.error(message);
-    }
-    alert(message);
-  };
-
-  // UTILITY: File to Base64
   async function fileToBase64(file: File): Promise<string> {
     return new Promise((resolve) => {
       const reader = new FileReader();
@@ -125,7 +85,7 @@ console.log(`✅ Scene ${sceneNumber} analyzed:`, analysis);
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // HANDLER: FILE UPLOAD - FIXED FOR SERVER API
+  // FILE UPLOAD HANDLER
   // ═══════════════════════════════════════════════════════════════
 
   const handleFileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -135,12 +95,11 @@ console.log(`✅ Scene ${sceneNumber} analyzed:`, analysis);
     const extension = uploadedFile.name.split('.').pop()?.toLowerCase();
     
     if (!['txt', 'fdx', 'pdf'].includes(extension || '')) {
-      showToast("Unsupported File Type", `${extension?.toUpperCase()} files are not supported.`, "destructive");
+      alert(`${extension?.toUpperCase()} files are not supported.`);
       return;
     }
 
     setFileInfo({ name: uploadedFile.name, type: extension || 'txt' });
-    setProjectName(uploadedFile.name.replace(/\.[^/.]+$/, ''));
     setIsParsing(true);
     setScenes([]);
 
@@ -148,12 +107,10 @@ console.log(`✅ Scene ${sceneNumber} analyzed:`, analysis);
       let screenplayText = '';
       
       if (extension === 'txt') {
-        // TXT: Parse locally (instant)
         setParsingMessage('Reading text file...');
         screenplayText = await uploadedFile.text();
       } 
       else if (extension === 'fdx' || extension === 'pdf') {
-        // FDX/PDF: Send to server API
         setParsingMessage(`Parsing ${extension.toUpperCase()} file on server...`);
         console.log(`📤 Sending ${extension.toUpperCase()} to /api/parse-screenplay...`);
         
@@ -180,68 +137,60 @@ console.log(`✅ Scene ${sceneNumber} analyzed:`, analysis);
       }
 
       if (!screenplayText || screenplayText.length < 100) {
-        showToast("Invalid File", "The file appears to be empty or too short.", "destructive");
+        alert("The file appears to be empty or too short.");
         setFileInfo(null);
         setIsParsing(false);
         return;
       }
 
-      // Extract scenes - WRAPPED IN TRY-CATCH
+      // Extract scenes
       try {
         processExtractedText(screenplayText);
       } catch (extractError: any) {
         console.error('❌ Scene extraction error:', extractError);
-        showToast("Extraction Failed", extractError.message || "Failed to extract scenes", "destructive");
+        alert(extractError.message || "Failed to extract scenes");
         setFileInfo(null);
         setIsParsing(false);
       }
 
     } catch (error: any) {
       console.error('❌ File upload error:', error);
-      showToast("Upload Failed", error.message || "Failed to read file", "destructive");
+      alert(error.message || "Failed to read file");
       setFileInfo(null);
       setIsParsing(false);
     }
   }, []);
 
-  // UTILITY: Extract scenes from screenplay text
+  // ═══════════════════════════════════════════════════════════════
+  // SCENE EXTRACTION
+  // ═══════════════════════════════════════════════════════════════
+
   function processExtractedText(text: string) {
     console.log('🔍 Extracting scenes from screenplay text...');
     console.log(`📄 Total text length: ${text.length} characters`);
-    console.log('📝 First 500 chars:', text.substring(0, 500));
 
-    // FIX: Remove character-level spacing while PRESERVING newlines
+    // Fix spacing issues
     text = text.split('\n').map(line => {
       return line.split(/\s{2,}/).map(word => word.replace(/\s/g, '')).join(' ');
     }).join('\n');
-
-    console.log('🔧 After fixing spacing (first 1500):', text.substring(0, 1500));
 
     // Force newlines before scene headers
     text = text.replace(/(INT\.|EXT\.)/gi, '\n$1');
     text = text.replace(/\n{3,}/g, '\n\n');
 
-    console.log('🔧 After adding scene breaks:', text.substring(0, 1500));
-
-    const allSceneHeaders = text.match(/\d*[ \t]*(?:INT\.|EXT\.)[^\n]*/gi);
-    console.log('🎬 FOUND', allSceneHeaders?.length, 'SCENE HEADERS:');
-    allSceneHeaders?.forEach((h, i) => console.log(`  ${i+1}. ${h}`));
-
-    // STEP 1: Find first scene header
+    // Find first scene header
     const firstSceneMatch = text.match(/(?:^|\n)\s*\d*\s*(?:INT\.|EXT\.|I\/E|I\.E\.)\s+/i);
     
     if (!firstSceneMatch) {
-      console.log('❌ No scene headers found in entire document');
       throw new Error("No scene headers found. Make sure your screenplay has INT. or EXT. headers.");
     }
     
-    // STEP 2: Start from first scene header
+    // Start from first scene header
     const firstSceneIndex = firstSceneMatch.index!;
     const scriptText = text.substring(firstSceneIndex);
     console.log(`✂️ Skipped ${firstSceneIndex} characters (title page)`);
-    console.log('📋 Script text after skip (first 300 chars):', scriptText.substring(0, 300));
 
-    // STEP 3: Split on scene headers
+    // Split on scene headers
     const scenePattern = /(?=(?:^|\n)[ \t]*\d*[ \t]*(?:INT\.|EXT\.|I\/E|I\.E\.)[ \t]+)/gim;
     const sceneBlocks = scriptText.split(scenePattern);
     
@@ -259,22 +208,84 @@ console.log(`✅ Scene ${sceneNumber} analyzed:`, analysis);
         error: null
       }));
     
-    console.log(`🔍 Scene blocks found: ${sceneBlocks.length}`);
-    console.log('🔍 Block 0 (first 200 chars):', sceneBlocks[0]?.substring(0, 200));
-    console.log('🔍 Block 1 (first 200 chars):', sceneBlocks[1]?.substring(0, 200));
-    console.log('🔍 Block 2 (first 200 chars):', sceneBlocks[2]?.substring(0, 200));
     console.log(`📝 Extracted ${validScenes.length} scenes`);
     
     if (validScenes.length === 0) {
       throw new Error("Found scene headers but couldn't parse them. The format may be non-standard.");
     } else {
       setScenes(validScenes);
-      showToast("Scenes Loaded", `Found ${validScenes.length} scenes in screenplay`);
+      alert(`Found ${validScenes.length} scenes in screenplay`);
     }
     
     setIsParsing(false);
     setParsingMessage('');
   }
+
+  // ═══════════════════════════════════════════════════════════════
+  // RENDER ANALYSIS
+  // ═══════════════════════════════════════════════════════════════
+
+  function renderAnalysis(analysis: any) {
+    if (!analysis) return null;
+
+    console.log('🎨 Rendering analysis:', analysis);
+
+    return (
+      <div className="mt-4 pt-4 border-t border-gray-700 space-y-4">
+        {/* Narrative Analysis */}
+        {analysis.narrativeAnalysis && (
+          <div className="bg-gray-900 p-4 rounded border border-gray-600">
+            <h4 className="font-semibold text-white mb-3">📖 Narrative Analysis</h4>
+            <div className="space-y-2 text-sm">
+              {Object.entries(analysis.narrativeAnalysis).map(([key, value]) => (
+                <div key={key}>
+                  <span className="text-gray-400 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
+                  <span className="ml-2 text-gray-200">{String(value)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Shot List */}
+        {analysis.shotList && Array.isArray(analysis.shotList) && analysis.shotList.length > 0 && (
+          <div className="bg-gray-900 p-4 rounded border border-gray-600">
+            <h4 className="font-semibold text-white mb-3">🎬 Shot List ({analysis.shotList.length} shots)</h4>
+            <div className="space-y-2">
+              {analysis.shotList.map((shot: any, idx: number) => (
+                <div key={idx} className="bg-gray-800 p-3 rounded border border-gray-700">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <span className="font-mono text-xs text-[#E50914]">
+                      Shot {shot.shotNumber || idx + 1}
+                    </span>
+                    <span className="text-xs text-gray-400">{shot.shotType || 'N/A'}</span>
+                  </div>
+                  <p className="text-sm text-gray-300">{shot.description || 'No description'}</p>
+                  {shot.cameraMovement && (
+                    <div className="text-xs text-gray-400 mt-2">
+                      📹 {shot.cameraMovement}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Raw JSON (for debugging) */}
+        <details className="text-xs">
+          <summary className="text-gray-500 cursor-pointer">Show Raw JSON</summary>
+          <pre className="mt-2 p-2 bg-black text-green-400 rounded overflow-auto max-h-64">
+            {JSON.stringify(analysis, null, 2)}
+          </pre>
+        </details>
+      </div>
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // MAIN RENDER
+  // ═══════════════════════════════════════════════════════════════
 
   return (
     <div className="min-h-screen bg-[#141414] text-white p-8">
@@ -293,7 +304,6 @@ console.log(`✅ Scene ${sceneNumber} analyzed:`, analysis);
             </p>
           </div>
 
-          {/* Dashboard Link */}
           <Link
             to="/"
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gray-800 border border-gray-700 rounded-md hover:bg-gray-700 transition-colors"
@@ -314,11 +324,11 @@ console.log(`✅ Scene ${sceneNumber} analyzed:`, analysis);
               type="file"
               accept=".txt,.fdx,.pdf"
               onChange={handleFileUpload}
-              disabled={isParsing || isProcessing}
+              disabled={isParsing}
               className="w-full file:bg-[#E50914] file:text-white file:border-0 file:py-2 file:px-4 file:rounded file:cursor-pointer cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             />
             <p className="text-sm text-gray-400">
-              Supported formats: .TXT (plain text), .FDX (Final Draft), .PDF (parsed on server)
+              Supported formats: .TXT, .FDX (Final Draft), .PDF (parsed on server)
             </p>
           </div>
 
@@ -345,11 +355,9 @@ console.log(`✅ Scene ${sceneNumber} analyzed:`, analysis);
         {/* Scene List */}
         {scenes.length > 0 && (
           <div className="bg-gray-900 rounded-lg border border-gray-700 p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-2xl font-semibold">
-                Detected Scenes ({scenes.length})
-              </h3>
-            </div>
+            <h3 className="text-2xl font-semibold">
+              Detected Scenes ({scenes.length})
+            </h3>
             
             <div className="space-y-3">
               {scenes.map(scene => (
@@ -357,9 +365,9 @@ console.log(`✅ Scene ${sceneNumber} analyzed:`, analysis);
                   key={scene.number} 
                   className="p-4 bg-gray-800 rounded-lg border border-gray-700 hover:border-[#E50914] transition-colors cursor-pointer"
                   onClick={() => {
-  console.log('🔍 Clicked scene:', scene.number, 'Current expanded:', expandedScene, 'Has analysis:', !!scene.analysis);
-  setExpandedScene(expandedScene === scene.number ? null : scene.number);
-}}
+                    console.log('🖱️ Clicked scene:', scene.number, 'Expanded:', expandedScene, 'Has analysis:', !!scene.analysis);
+                    setExpandedScene(expandedScene === scene.number ? null : scene.number);
+                  }}
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
@@ -404,54 +412,8 @@ console.log(`✅ Scene ${sceneNumber} analyzed:`, analysis);
                     </div>
                   </div>
                   
-                  {/* Analysis Display (Expanded) - WITH SAFETY CHECKS */}
-                  {expandedScene === scene.number && scene.analysis && (
-                    <div className="mt-4 pt-4 border-t border-gray-700 space-y-4">
-                      {/* Narrative Analysis */}
-                      {scene.analysis.narrativeAnalysis && (
-                        <div className="space-y-2">
-                          <h4 className="font-semibold text-white">Narrative Analysis</h4>
-                          <div className="grid grid-cols-1 gap-2 text-sm">
-                            <div>
-                              <span className="text-gray-400">Scene Turn:</span>
-                              <span className="ml-2 text-gray-200">{scene.analysis.narrativeAnalysis.sceneTurn || 'N/A'}</span>
-                            </div>
-                            <div>
-                              <span className="text-gray-400">Emotional Tone:</span>
-                              <span className="ml-2 text-gray-200">{scene.analysis.narrativeAnalysis.emotionalTone || 'N/A'}</span>
-                            </div>
-                            <div>
-                              <span className="text-gray-400">Stakes:</span>
-                              <span className="ml-2 text-gray-200">{scene.analysis.narrativeAnalysis.stakes || 'N/A'}</span>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Shot List - WITH ARRAY CHECK */}
-                      {scene.analysis.shotList && Array.isArray(scene.analysis.shotList) && scene.analysis.shotList.length > 0 && (
-                        <div className="space-y-2">
-                          <h4 className="font-semibold text-white">Shot List ({scene.analysis.shotList.length} shots)</h4>
-                          <div className="space-y-2">
-                            {scene.analysis.shotList.map((shot, idx) => (
-                              <div key={idx} className="bg-gray-900 p-3 rounded border border-gray-600">
-                                <div className="flex items-start justify-between gap-2 mb-2">
-                                  <span className="font-mono text-xs text-[#E50914]">Shot {shot.shotNumber || idx + 1}</span>
-                                  <span className="text-xs text-gray-400">{shot.shotType || 'N/A'}</span>
-                                </div>
-                                <p className="text-sm text-gray-300 mb-2">{shot.description || 'No description'}</p>
-                                {shot.cameraMovement && (
-                                  <div className="text-xs text-gray-400">
-                                    Camera: {shot.cameraMovement}
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  {/* Expanded Analysis */}
+                  {expandedScene === scene.number && scene.analysis && renderAnalysis(scene.analysis)}
                   
                 </div>
               ))}
@@ -470,7 +432,6 @@ console.log(`✅ Scene ${sceneNumber} analyzed:`, analysis);
               <li>• ShotLogic will automatically detect scenes (INT./EXT. headers)</li>
               <li>• Click "Analyze" on each scene to get shot lists and narrative breakdown</li>
               <li>• Click on completed scenes to expand and view the analysis</li>
-              <li>• All projects are automatically saved to the cloud</li>
             </ul>
           </div>
         )}
