@@ -13,11 +13,14 @@ type ShotType = 'WIDE' | 'MEDIUM' | 'CLOSE_UP' | 'INSERT' | 'TRACKING' | 'CRANE'
 const SHOT_TYPES: ShotType[] = ['WIDE', 'MEDIUM', 'CLOSE_UP', 'INSERT', 'TRACKING', 'CRANE', 'OTHER'];
 
 interface Shot {
+  shotNumber?: number
   shotType: ShotType
-  visualDescription: string
-  rationale: string
-  editorialIntent: string
-  aiImagePrompt: string
+  description: string
+  cameraMovement?: string
+  visualDescription?: string
+  rationale?: string
+  editorialIntent?: string
+  aiImagePrompt?: string
   isEditing?: boolean
 }
 
@@ -52,7 +55,51 @@ export default function Index() {
   const [fileInfo, setFileInfo] = useState<{ name: string, type: string } | null>(null);
   const [scenes, setScenes] = useState<Scene[]>([]);
 const [expandedScene, setExpandedScene] = useState<number | null>(null);
-  // Auto-analyze scenes when they're detected
+  // Function to analyze a single scene
+async function analyzeSingleScene(sceneNumber: number) {
+  const scene = scenes.find(s => s.number === sceneNumber);
+  if (!scene || scene.status !== 'pending') return;
+
+  console.log(`🎬 Analyzing scene ${sceneNumber}...`);
+  
+  setScenes(prev => prev.map(s => 
+    s.number === sceneNumber ? { ...s, status: 'processing' } : s
+  ));
+
+  try {
+    const response = await fetch('/api/analyze-scene', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        sceneText: scene.text,
+        sceneNumber: scene.number,
+        totalScenes: scenes.length
+      })
+    });
+
+    if (!response.ok) throw new Error(`API error: ${response.status}`);
+    
+    const analysis = await response.json();
+    console.log(`✅ Scene ${sceneNumber} analyzed`);
+
+    setScenes(prev => prev.map(s => 
+      s.number === sceneNumber 
+        ? { ...s, status: 'complete', analysis } 
+        : s
+    ));
+
+  } catch (error: any) {
+    console.error(`❌ Error analyzing scene ${sceneNumber}:`, error);
+    setScenes(prev => prev.map(s => 
+      s.number === sceneNumber 
+        ? { ...s, status: 'error', error: error.message } 
+        : s
+    ));
+  }
+}
+
+// Auto-analyze scenes when they're detected
+
 async function analyzeAllScenes() {
   for (let i = 0; i < scenes.length; i++) {
     const scene = scenes[i];
@@ -366,14 +413,6 @@ console.log('🔍 Block 2 (first 200 chars):', sceneBlocks[2]?.substring(0, 200)
               <h3 className="text-2xl font-semibold">
                 Detected Scenes ({scenes.length})
               </h3>
-              {scenes.some(s => s.status === 'pending') && (
-                <button
-                  onClick={() => analyzeAllScenes()}
-                  className="px-4 py-2 bg-[#E50914] text-white rounded hover:bg-red-700 transition-colors"
-                >
-                  Analyze All Scenes
-                </button>
-              )}
             </div>
             
             <div className="space-y-3">
@@ -395,9 +434,15 @@ onClick={() => setExpandedScene(expandedScene === scene.number ? null : scene.nu
                     
                     <div className="flex items-center gap-2">
                       {scene.status === 'pending' && (
-                        <span className="px-3 py-1 text-xs bg-gray-700 text-gray-300 rounded">
-                          Pending
-                        </span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            analyzeSingleScene(scene.number);
+                          }}
+                          className="px-4 py-2 bg-[#E50914] text-white text-sm rounded hover:bg-red-700 transition-colors"
+                        >
+                          Analyze
+                        </button>
                       )}
                       {scene.status === 'processing' && (
                         <span className="px-3 py-1 text-xs bg-blue-900 text-blue-300 rounded flex items-center gap-2">
