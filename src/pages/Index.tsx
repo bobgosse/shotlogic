@@ -1,6 +1,6 @@
 import React from 'react';
-import { useState, useCallback } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, useCallback, useEffect } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Upload, CheckCircle2, AlertCircle, Loader2, FolderOpen, Save, Edit2 } from 'lucide-react'
 
 // ═══════════════════════════════════════════════════════════════
@@ -20,6 +20,9 @@ interface Scene {
 // ═══════════════════════════════════════════════════════════════
 
 export default function Index() {
+  const [searchParams] = useSearchParams();
+  const projectId = searchParams.get('projectId');
+
   const [fileInfo, setFileInfo] = useState<{ name: string, type: string } | null>(null);
   const [scenes, setScenes] = useState<Scene[]>([]);
   const [expandedScene, setExpandedScene] = useState<number | null>(null);
@@ -29,9 +32,56 @@ export default function Index() {
   const [isEditingName, setIsEditingName] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string>('');
+  const [isLoadingProject, setIsLoadingProject] = useState(false);
+  const [loadedProjectId, setLoadedProjectId] = useState<string | null>(null);
 
   // ═══════════════════════════════════════════════════════════════
-  // SAVE PROJECT
+  // LOAD EXISTING PROJECT ON MOUNT
+  // ═══════════════════════════════════════════════════════════════
+  
+  useEffect(() => {
+    if (!projectId) return;
+
+    async function loadProject() {
+      console.log('📂 Loading project:', projectId);
+      setIsLoadingProject(true);
+
+      try {
+        const response = await fetch(`/api/projects/get-by-id?projectId=${projectId}`);
+        
+        if (!response.ok) {
+          throw new Error('Failed to load project');
+        }
+
+        const result = await response.json();
+        console.log('✅ Project loaded:', result);
+
+        if (result.success && result.project) {
+          const project = result.project;
+          
+          // Load project data into state
+          setProjectName(project.name || 'Untitled Project');
+          setScenes(project.scenes || []);
+          setLoadedProjectId(projectId);
+          setFileInfo({ 
+            name: project.name || 'Untitled Project', 
+            type: 'loaded' 
+          });
+        }
+
+      } catch (error) {
+        console.error('❌ Load error:', error);
+        alert('Failed to load project');
+      } finally {
+        setIsLoadingProject(false);
+      }
+    }
+
+    loadProject();
+  }, [projectId]);
+
+  // ═══════════════════════════════════════════════════════════════
+  // SAVE PROJECT (UPDATE IF LOADED, CREATE IF NEW)
   // ═══════════════════════════════════════════════════════════════
   
   async function saveProject() {
@@ -44,10 +94,11 @@ export default function Index() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-  name: projectName,  // ← Changed to "name"
-  scenes: scenes,
-  createdAt: new Date().toISOString()
-})
+          _id: loadedProjectId, // Include ID if updating existing project
+          name: projectName,
+          scenes: scenes,
+          createdAt: new Date().toISOString()
+        })
       });
 
       if (!response.ok) {
@@ -57,6 +108,12 @@ export default function Index() {
 
       const result = await response.json();
       console.log('✅ Project saved:', result);
+      
+      // If this was a new project, store the ID
+      if (!loadedProjectId && result.id) {
+        setLoadedProjectId(result.id);
+      }
+
       setSaveMessage('✅ Project saved successfully!');
       
       // Clear success message after 3 seconds
@@ -148,6 +205,7 @@ export default function Index() {
     setIsParsing(true);
     setScenes([]);
     setSaveMessage('');
+    setLoadedProjectId(null); // Clear loaded project ID when uploading new file
 
     try {
       let screenplayText = '';
@@ -343,6 +401,17 @@ export default function Index() {
   // MAIN RENDER
   // ═══════════════════════════════════════════════════════════════
 
+  if (isLoadingProject) {
+    return (
+      <div className="min-h-screen bg-[#141414] text-white p-8 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 animate-spin text-[#E50914] mx-auto mb-4" />
+          <p className="text-xl">Loading project...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#141414] text-white p-8">
       <div className="max-w-6xl mx-auto space-y-8">
@@ -397,6 +466,7 @@ export default function Index() {
                 )}
                 <p className="text-sm text-gray-400 mt-1">
                   {completedScenesCount} of {scenes.length} scenes analyzed
+                  {loadedProjectId && <span className="ml-2 text-green-400">• Saved</span>}
                 </p>
               </div>
 
@@ -415,7 +485,7 @@ export default function Index() {
                   ) : (
                     <>
                       <Save className="w-5 h-5" />
-                      Save Project
+                      {loadedProjectId ? 'Update Project' : 'Save Project'}
                     </>
                   )}
                 </button>
@@ -436,43 +506,45 @@ export default function Index() {
         )}
 
         {/* Upload Section */}
-        <div className="bg-gray-900 rounded-lg border border-gray-700 p-6 space-y-4">
-          <h2 className="text-2xl font-semibold flex items-center gap-2">
-            <Upload className="w-6 h-6" /> Upload Screenplay
-          </h2>
-          
-          <div className="space-y-2">
-            <input
-              type="file"
-              accept=".txt,.fdx,.pdf"
-              onChange={handleFileUpload}
-              disabled={isParsing}
-              className="w-full file:bg-[#E50914] file:text-white file:border-0 file:py-2 file:px-4 file:rounded file:cursor-pointer cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-            />
-            <p className="text-sm text-gray-400">
-              Supported formats: .TXT, .FDX (Final Draft), .PDF (parsed on server)
-            </p>
-          </div>
-
-          {isParsing && (
-            <div className="flex items-center gap-3 p-4 bg-gray-800 rounded border border-[#E50914]">
-              <Loader2 className="w-5 h-5 animate-spin text-[#E50914]" />
-              <p className="text-white">{parsingMessage}</p>
+        {!loadedProjectId && (
+          <div className="bg-gray-900 rounded-lg border border-gray-700 p-6 space-y-4">
+            <h2 className="text-2xl font-semibold flex items-center gap-2">
+              <Upload className="w-6 h-6" /> Upload Screenplay
+            </h2>
+            
+            <div className="space-y-2">
+              <input
+                type="file"
+                accept=".txt,.fdx,.pdf"
+                onChange={handleFileUpload}
+                disabled={isParsing}
+                className="w-full file:bg-[#E50914] file:text-white file:border-0 file:py-2 file:px-4 file:rounded file:cursor-pointer cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+              <p className="text-sm text-gray-400">
+                Supported formats: .TXT, .FDX (Final Draft), .PDF (parsed on server)
+              </p>
             </div>
-          )}
 
-          {fileInfo && !isParsing && (
-            <div className="flex items-center gap-3 p-4 bg-gray-800 rounded border border-green-600">
-              <CheckCircle2 className="w-5 h-5 text-green-500" />
-              <div>
-                <p className="font-semibold text-white">{fileInfo.name}</p>
-                <p className="text-sm text-gray-400">
-                  {fileInfo.type.toUpperCase()} • {scenes.length} scene{scenes.length !== 1 ? 's' : ''} detected
-                </p>
+            {isParsing && (
+              <div className="flex items-center gap-3 p-4 bg-gray-800 rounded border border-[#E50914]">
+                <Loader2 className="w-5 h-5 animate-spin text-[#E50914]" />
+                <p className="text-white">{parsingMessage}</p>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+
+            {fileInfo && !isParsing && (
+              <div className="flex items-center gap-3 p-4 bg-gray-800 rounded border border-green-600">
+                <CheckCircle2 className="w-5 h-5 text-green-500" />
+                <div>
+                  <p className="font-semibold text-white">{fileInfo.name}</p>
+                  <p className="text-sm text-gray-400">
+                    {fileInfo.type.toUpperCase()} • {scenes.length} scene{scenes.length !== 1 ? 's' : ''} detected
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Scene List */}
         {scenes.length > 0 && (
@@ -544,7 +616,7 @@ export default function Index() {
         )}
 
         {/* Info Section */}
-        {scenes.length === 0 && !isParsing && (
+        {scenes.length === 0 && !isParsing && !loadedProjectId && (
           <div className="bg-gray-900 rounded-lg border border-gray-700 p-6">
             <h3 className="text-lg font-semibold text-white mb-3">
               💡 How to Use ShotLogic
