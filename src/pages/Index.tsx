@@ -250,9 +250,9 @@ export default function Index() {
         {/* Shot List */}
         {analysis.data?.shotList && Array.isArray(analysis.data.shotList) && analysis.data.shotList.length > 0 && (
           <div className="bg-gray-900 p-4 rounded border border-gray-600">
-            <h4 className="font-semibold text-white mb-3">🎬 Shot List ({analysis.shotList.length} shots)</h4>
+            <h4 className="font-semibold text-white mb-3">🎬 Shot List ({analysis.data.shotList.length} shots)</h4>
             <div className="space-y-2">
-              {analysis.data.shotList.map((shot: any, idx: number) => (
+              {(analysis.data.shotList || []).map((shot: any, idx: number) => (
                 <div key={idx} className="bg-gray-800 p-3 rounded border border-gray-700">
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <span className="font-mono text-xs text-[#E50914]">
