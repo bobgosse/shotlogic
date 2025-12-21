@@ -260,7 +260,13 @@ export default function Index() {
                     </span>
                     <span className="text-xs text-gray-400">{shot.shotType || 'N/A'}</span>
                   </div>
-                  <p className="text-sm text-gray-300">{shot.description || 'No description'}</p>
+                  <p className="text-sm text-gray-300">{shot.visualDescription || 'No description'}</p>
+{shot.rationale && (
+  <p className="text-xs text-gray-400 mt-1 italic">💡 {shot.rationale}</p>
+)}
+{shot.editorialIntent && (
+  <p className="text-xs text-gray-400 mt-1">🎯 {shot.editorialIntent}</p>
+)}
                   {shot.cameraMovement && (
                     <div className="text-xs text-gray-400 mt-2">
                       📹 {shot.cameraMovement}
