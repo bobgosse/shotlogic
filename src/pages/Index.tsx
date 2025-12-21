@@ -53,14 +53,6 @@ export default function Index() {
   const [scenes, setScenes] = useState<Scene[]>([]);
 const [expandedScene, setExpandedScene] = useState<number | null>(null);
   // Auto-analyze scenes when they're detected
-useEffect(() => {
-  if (scenes.length > 0 && scenes.some(s => s.status === 'pending')) {
-    console.log('🤖 Starting auto-analysis for', scenes.length, 'scenes');
-    analyzeAllScenes();
-  }
-}, [scenes.length]); // Trigger when scenes are first detected
-
-// Function to analyze all scenes
 async function analyzeAllScenes() {
   for (let i = 0; i < scenes.length; i++) {
     const scene = scenes[i];
@@ -369,10 +361,19 @@ console.log('🔍 Block 2 (first 200 chars):', sceneBlocks[2]?.substring(0, 200)
 
         {/* Scene List */}
         {scenes.length > 0 && (
-          <div className="bg-gray-900 rounded-lg border border-gray-700 p-6 space-y-4">
-            <h3 className="text-2xl font-semibold">
-              Detected Scenes ({scenes.length})
-            </h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-2xl font-semibold">
+                Detected Scenes ({scenes.length})
+              </h3>
+              {scenes.some(s => s.status === 'pending') && (
+                <button
+                  onClick={() => analyzeAllScenes()}
+                  className="px-4 py-2 bg-[#E50914] text-white rounded hover:bg-red-700 transition-colors"
+                >
+                  Analyze All Scenes
+                </button>
+              )}
+            </div>
             
             <div className="space-y-3">
               {scenes.map(scene => (
