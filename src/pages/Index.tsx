@@ -361,6 +361,7 @@ console.log('🔍 Block 2 (first 200 chars):', sceneBlocks[2]?.substring(0, 200)
 
         {/* Scene List */}
         {scenes.length > 0 && (
+          <div className="bg-gray-900 rounded-lg border border-gray-700 p-6 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-2xl font-semibold">
                 Detected Scenes ({scenes.length})
