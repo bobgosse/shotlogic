@@ -459,7 +459,6 @@ onClick={() => setExpandedScene(expandedScene === scene.number ? null : scene.nu
                     </div>
                   )}
                   
-                  </div>
                 </div>
               ))}
             </div>
