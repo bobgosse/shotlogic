@@ -68,7 +68,6 @@ async function analyzeAllScenes() {
 
     console.log(`🎬 Analyzing scene ${scene.number}...`);
     
-    // Update status to processing
     setScenes(prev => prev.map(s => 
       s.number === scene.number ? { ...s, status: 'processing' } : s
     ));
@@ -77,11 +76,11 @@ async function analyzeAllScenes() {
       const response = await fetch('/api/analyze-scene', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-body: JSON.stringify({ 
-  sceneText: scene.text,
-  sceneNumber: scene.number,
-  totalScenes: scenes.length
-})
+        body: JSON.stringify({ 
+          sceneText: scene.text,
+          sceneNumber: scene.number,
+          totalScenes: scenes.length
+        })
       });
 
       if (!response.ok) throw new Error(`API error: ${response.status}`);
@@ -89,7 +88,6 @@ body: JSON.stringify({
       const analysis = await response.json();
       console.log(`✅ Scene ${scene.number} analyzed`);
 
-      // Update with analysis results
       setScenes(prev => prev.map(s => 
         s.number === scene.number 
           ? { ...s, status: 'complete', analysis } 
@@ -103,6 +101,12 @@ body: JSON.stringify({
           ? { ...s, status: 'error', error: error.message } 
           : s
       ));
+    }
+
+    // Wait 3 seconds between scenes
+    if (i < scenes.length - 1) {
+      console.log(`⏱️ Waiting 3 seconds before next scene...`);
+      await new Promise(resolve => setTimeout(resolve, 3000));
     }
   }
 }
