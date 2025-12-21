@@ -76,7 +76,11 @@ async function analyzeAllScenes() {
       const response = await fetch('/api/analyze-scene', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sceneText: scene.text })
+body: JSON.stringify({ 
+  sceneText: scene.text,
+  sceneNumber: scene.number,
+  totalScenes: scenes.length
+})
       });
 
       if (!response.ok) throw new Error(`API error: ${response.status}`);
