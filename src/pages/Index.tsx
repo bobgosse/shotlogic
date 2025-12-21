@@ -51,7 +51,6 @@ export default function Index() {
   const location = useLocation();
   const [fileInfo, setFileInfo] = useState<{ name: string, type: string } | null>(null);
   const [scenes, setScenes] = useState<Scene[]>([]);
-const [scenes, setScenes] = useState<Scene[]>([]);
 const [expandedScene, setExpandedScene] = useState<number | null>(null);
   // Auto-analyze scenes when they're detected
 useEffect(() => {
@@ -461,7 +460,6 @@ onClick={() => setExpandedScene(expandedScene === scene.number ? null : scene.nu
                   )}
                   
                 </div>
-                      )}
                     </div>
                   </div>
                 </div>
