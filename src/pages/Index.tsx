@@ -51,6 +51,8 @@ export default function Index() {
   const location = useLocation();
   const [fileInfo, setFileInfo] = useState<{ name: string, type: string } | null>(null);
   const [scenes, setScenes] = useState<Scene[]>([]);
+const [scenes, setScenes] = useState<Scene[]>([]);
+const [expandedScene, setExpandedScene] = useState<number | null>(null);
   // Auto-analyze scenes when they're detected
 useEffect(() => {
   if (scenes.length > 0 && scenes.some(s => s.status === 'pending')) {
@@ -373,7 +375,8 @@ console.log('🔍 Block 2 (first 200 chars):', sceneBlocks[2]?.substring(0, 200)
               {scenes.map(scene => (
                 <div 
                   key={scene.number} 
-                  className="p-4 bg-gray-800 rounded-lg border border-gray-700 hover:border-[#E50914] transition-colors"
+className="p-4 bg-gray-800 rounded-lg border border-gray-700 hover:border-[#E50914] transition-colors cursor-pointer"
+onClick={() => setExpandedScene(expandedScene === scene.number ? null : scene.number)}
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
@@ -408,6 +411,56 @@ console.log('🔍 Block 2 (first 200 chars):', sceneBlocks[2]?.substring(0, 200)
                           <AlertCircle className="w-3 h-3" />
                           Error
                         </span>
+                        )}
+                    </div>
+                  </div>
+                  
+                  {/* Analysis Display (Expanded) */}
+                  {expandedScene === scene.number && scene.analysis && (
+                    <div className="mt-4 pt-4 border-t border-gray-700 space-y-4">
+                      {/* Narrative Analysis */}
+                      <div className="space-y-2">
+                        <h4 className="font-semibold text-white">Narrative Analysis</h4>
+                        <div className="grid grid-cols-1 gap-2 text-sm">
+                          <div>
+                            <span className="text-gray-400">Scene Turn:</span>
+                            <span className="ml-2 text-gray-200">{scene.analysis.narrativeAnalysis.sceneTurn}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-400">Emotional Tone:</span>
+                            <span className="ml-2 text-gray-200">{scene.analysis.narrativeAnalysis.emotionalTone}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-400">Stakes:</span>
+                            <span className="ml-2 text-gray-200">{scene.analysis.narrativeAnalysis.stakes}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Shot List */}
+                      <div className="space-y-2">
+                        <h4 className="font-semibold text-white">Shot List ({scene.analysis.shotList.length} shots)</h4>
+                        <div className="space-y-2">
+                          {scene.analysis.shotList.map((shot, idx) => (
+                            <div key={idx} className="bg-gray-900 p-3 rounded border border-gray-600">
+                              <div className="flex items-start justify-between gap-2 mb-2">
+                                <span className="font-mono text-xs text-[#E50914]">Shot {shot.shotNumber}</span>
+                                <span className="text-xs text-gray-400">{shot.shotType}</span>
+                              </div>
+                              <p className="text-sm text-gray-300 mb-2">{shot.description}</p>
+                              {shot.cameraMovement && (
+                                <div className="text-xs text-gray-400">
+                                  Camera: {shot.cameraMovement}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                </div>
                       )}
                     </div>
                   </div>
