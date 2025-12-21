@@ -52,6 +52,9 @@ app.post('/api/analyze-scene', (req, res) =>
 app.get('/api/projects/get-all', (req, res) => 
   apiHandler(req, res, join(__dirname, 'api/projects/get-all.ts'))
 );
+app.get('/api/projects/get-by-id', (req, res) => 
+  apiHandler(req, res, join(__dirname, 'api/projects/get-by-id.ts'))
+);
 
 app.get('/api/projects/get-one', (req, res) => 
   apiHandler(req, res, join(__dirname, 'api/projects/get-one.ts'))
