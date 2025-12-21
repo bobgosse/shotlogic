@@ -1,7 +1,7 @@
 import React from 'react';
 import { useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Upload, CheckCircle2, AlertCircle, Loader2, FolderOpen } from 'lucide-react'
+import { Upload, CheckCircle2, AlertCircle, Loader2, FolderOpen, Save, Edit2 } from 'lucide-react'
 
 // ═══════════════════════════════════════════════════════════════
 // TYPE DEFINITIONS
@@ -10,7 +10,7 @@ import { Upload, CheckCircle2, AlertCircle, Loader2, FolderOpen } from 'lucide-r
 interface Scene {
   number: number
   text: string
-  analysis: any | null  // Using 'any' to accept whatever OpenAI sends
+  analysis: any | null
   status: 'pending' | 'processing' | 'complete' | 'error'
   error: string | null
 }
@@ -25,6 +25,50 @@ export default function Index() {
   const [expandedScene, setExpandedScene] = useState<number | null>(null);
   const [isParsing, setIsParsing] = useState(false);
   const [parsingMessage, setParsingMessage] = useState<string>('');
+  const [projectName, setProjectName] = useState<string>('Untitled Project');
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string>('');
+
+  // ═══════════════════════════════════════════════════════════════
+  // SAVE PROJECT
+  // ═══════════════════════════════════════════════════════════════
+  
+  async function saveProject() {
+    console.log('💾 Saving project:', projectName);
+    setIsSaving(true);
+    setSaveMessage('');
+
+    try {
+      const response = await fetch('/api/projects/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectName: projectName,
+          scenes: scenes,
+          createdAt: new Date().toISOString()
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to save project');
+      }
+
+      const result = await response.json();
+      console.log('✅ Project saved:', result);
+      setSaveMessage('✅ Project saved successfully!');
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setSaveMessage(''), 3000);
+
+    } catch (error: any) {
+      console.error('❌ Save error:', error);
+      setSaveMessage(`❌ Error: ${error.message}`);
+    } finally {
+      setIsSaving(false);
+    }
+  }
 
   // ═══════════════════════════════════════════════════════════════
   // ANALYZE SINGLE SCENE
@@ -100,8 +144,10 @@ export default function Index() {
     }
 
     setFileInfo({ name: uploadedFile.name, type: extension || 'txt' });
+    setProjectName(uploadedFile.name.replace(/\.[^/.]+$/, ''));
     setIsParsing(true);
     setScenes([]);
+    setSaveMessage('');
 
     try {
       let screenplayText = '';
@@ -261,12 +307,12 @@ export default function Index() {
                     <span className="text-xs text-gray-400">{shot.shotType || 'N/A'}</span>
                   </div>
                   <p className="text-sm text-gray-300">{shot.visualDescription || 'No description'}</p>
-{shot.rationale && (
-  <p className="text-xs text-gray-400 mt-1 italic">💡 {shot.rationale}</p>
-)}
-{shot.editorialIntent && (
-  <p className="text-xs text-gray-400 mt-1">🎯 {shot.editorialIntent}</p>
-)}
+                  {shot.rationale && (
+                    <p className="text-xs text-gray-400 mt-1 italic">💡 {shot.rationale}</p>
+                  )}
+                  {shot.editorialIntent && (
+                    <p className="text-xs text-gray-400 mt-1">🎯 {shot.editorialIntent}</p>
+                  )}
                   {shot.cameraMovement && (
                     <div className="text-xs text-gray-400 mt-2">
                       📹 {shot.cameraMovement}
@@ -288,6 +334,10 @@ export default function Index() {
       </div>
     );
   }
+
+  // Count completed scenes
+  const completedScenesCount = scenes.filter(s => s.status === 'complete').length;
+  const hasAnalyzedScenes = completedScenesCount > 0;
 
   // ═══════════════════════════════════════════════════════════════
   // MAIN RENDER
@@ -318,6 +368,72 @@ export default function Index() {
             My Projects
           </Link>
         </div>
+
+        {/* Project Name Section */}
+        {fileInfo && !isParsing && (
+          <div className="bg-gray-900 rounded-lg border border-gray-700 p-6">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex-1">
+                {isEditingName ? (
+                  <input
+                    type="text"
+                    value={projectName}
+                    onChange={(e) => setProjectName(e.target.value)}
+                    onBlur={() => setIsEditingName(false)}
+                    onKeyDown={(e) => e.key === 'Enter' && setIsEditingName(false)}
+                    className="text-2xl font-bold bg-gray-800 text-white px-3 py-1 rounded border border-gray-600 w-full"
+                    autoFocus
+                  />
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-2xl font-bold text-white">{projectName}</h2>
+                    <button
+                      onClick={() => setIsEditingName(true)}
+                      className="p-1 hover:bg-gray-700 rounded"
+                    >
+                      <Edit2 className="w-4 h-4 text-gray-400" />
+                    </button>
+                  </div>
+                )}
+                <p className="text-sm text-gray-400 mt-1">
+                  {completedScenesCount} of {scenes.length} scenes analyzed
+                </p>
+              </div>
+
+              {/* Save Button */}
+              {hasAnalyzedScenes && (
+                <button
+                  onClick={saveProject}
+                  disabled={isSaving}
+                  className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-5 h-5" />
+                      Save Project
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+
+            {/* Save Message */}
+            {saveMessage && (
+              <div className={`mt-3 p-3 rounded ${
+                saveMessage.startsWith('✅') 
+                  ? 'bg-green-900 border border-green-600' 
+                  : 'bg-red-900 border border-red-600'
+              }`}>
+                <p className="text-sm">{saveMessage}</p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Upload Section */}
         <div className="bg-gray-900 rounded-lg border border-gray-700 p-6 space-y-4">
@@ -438,6 +554,7 @@ export default function Index() {
               <li>• ShotLogic will automatically detect scenes (INT./EXT. headers)</li>
               <li>• Click "Analyze" on each scene to get shot lists and narrative breakdown</li>
               <li>• Click on completed scenes to expand and view the analysis</li>
+              <li>• Click "Save Project" to save your work to the cloud</li>
             </ul>
           </div>
         )}
