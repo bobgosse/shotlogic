@@ -99,43 +99,57 @@ const ProjectDetails = () => {
   const isTablet = useMediaQuery("(max-width: 1024px)");
 
   const { data: projectData, isLoading, error } = useQuery({
-  queryKey: ['project', id],
-  queryFn: async () => {
-    console.log('[ProjectDetails] Fetching project with ID:', id);
-    
-    // Fetch project from Railway API
-    const projectResponse = await fetch(`/api/projects/get-one?projectId=${id}`);
-    if (!projectResponse.ok) {
-      throw new Error('Failed to fetch project');
-    }
-    const projectResult = await projectResponse.json();
-    
-    if (!projectResult.success || !projectResult.project) {
-      console.warn('[ProjectDetails] No project found with ID:', id);
-      return { project: null, scenes: [] };
-    }
+    queryKey: ['project', id],
+    queryFn: async () => {
+      console.log('[ProjectDetails] Fetching project with ID:', id);
+      
+      // Check current auth status
+      const { data: { user } } = await supabase.auth.getUser();
+      console.log('[ProjectDetails] Current authenticated user:', user?.id);
+      
+      const { data: project, error: projectError } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
 
-    const project = projectResult.project;
-    
-    // Extract scenes from project
-    const scenes = project.scenes || [];
-    
-    console.log('[ProjectDetails] Project loaded:', { 
-      projectId: project._id, 
-      scenesCount: scenes.length 
-    });
+      console.log('[ProjectDetails] Project query result:', { project, projectError });
 
-    return { project, scenes };
-  },
-  refetchInterval: (query) => {
-    const data = query.state.data;
-    // NEVER refetch while editing - this prevents input interruption
-    if (editingVisualStyle) return false;
-    return data?.project?.status !== 'COMPLETED' ? 3000 : false;
-  },
-  enabled: !!id && !editingVisualStyle,
-  retry: 1,
-});
+      if (projectError) {
+        console.error('[ProjectDetails] Project query error:', projectError);
+        throw projectError;
+      }
+
+      if (!project) {
+        console.warn('[ProjectDetails] No project found with ID:', id);
+        return { project: null, scenes: [] };
+      }
+
+      const { data: scenes, error: scenesError } = await supabase
+        .from('scenes')
+        .select('*')
+        .eq('project_id', id)
+        .order('scene_number');
+
+      console.log('[ProjectDetails] Scenes query result:', { scenesCount: scenes?.length, scenesError });
+
+      if (scenesError) {
+        console.error('[ProjectDetails] Scenes query error:', scenesError);
+        throw scenesError;
+      }
+
+      return { project, scenes: scenes || [] };
+    },
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      // NEVER refetch while editing - this prevents input interruption
+      if (editingVisualStyle) return false;
+      return data?.project?.status !== 'COMPLETED' ? 3000 : false;
+    },
+    // Completely pause the query while editing to prevent ANY re-renders
+    enabled: !!id && !editingVisualStyle,
+    retry: 1,
+  });
 
   const project = projectData?.project || null;
   const scenes = projectData?.scenes || [];
@@ -224,46 +238,14 @@ const ProjectDetails = () => {
       setEditingVisualStyle(false);
       return;
     }
+
     try {
-      const response = await fetch('/api/projects/update-style', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectId: id,
-          visualStyle: tempVisualStyle.trim() || null
-        })
-      });
+      const { error } = await supabase
+        .from('projects')
+        .update({ visual_style: tempVisualStyle.trim() || null })
+        .eq('id', project.id);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update');
-      }
-
-      // Update local state
-      queryClient.setQueryData(['project', id], (oldData: any) => ({
-        ...oldData,
-        project: { ...oldData.project, visual_style: tempVisualStyle.trim() || null }
-      }));
-      setEditingVisualStyle(false);
-      
-      // Re-enable query and force refetch after editing is done
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['project', id] });
-      }, 100);
-      
-      toast({
-        title: "Visual style updated",
-        description: "Image prompts will now use this aesthetic",
-      });
-    } catch (error: any) {
-      console.error('Error updating visual style:', error);
-      toast({
-        title: "Update failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
+      if (error) throw error;
 
       // Update local state
       queryClient.setQueryData(['project', id], (oldData: any) => ({
@@ -752,42 +734,18 @@ const ProjectDetails = () => {
     
     setIsSaving(true);
     try {
-      // Save to Railway/MongoDB API
-      const response = await fetch('/api/projects/save-scene', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectId: id,
-          sceneUpdates: editedScenes
-        })
-      });
+      // Update each edited scene
+      for (const [sceneId, analysisData] of Object.entries(editedScenes)) {
+        const { error } = await supabase
+          .from('scenes')
+          .update({ 
+            analysis: JSON.stringify(analysisData),
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', sceneId);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to save');
+        if (error) throw error;
       }
-
-      toast({
-        title: "Changes saved",
-        description: `Updated ${Object.keys(editedScenes).length} scene(s)`,
-      });
-
-      // Clear edited scenes and exit edit mode
-      setEditedScenes({});
-      setIsEditMode(false);
-      
-      // Refetch data to show updated content
-      queryClient.invalidateQueries({ queryKey: ['project', id] });
-    } catch (error: any) {
-      toast({
-        title: "Save failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setIsSaving(false);
-    }
-  };
 
       toast({
         title: "Changes saved",

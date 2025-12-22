@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 8%;
+    --foreground: 0 0% 100%;
+    --border: 0 0% 20%;
+  }
+}
+
+@layer base {
+  body {
+    background-color: #141414;
+    color: white;
+  }
+}
+
+/* This line tells the app what "bg-background" means */
+.bg-background { background-color: #141414; }
+.text-foreground { color: white; }
+.border-border { border-color: #333; }

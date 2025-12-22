@@ -1,0 +1,52 @@
+// api/projects/update-style.ts
+// Updates project visual style in MongoDB
+
+import { VercelRequest, VercelResponse } from '@vercel/node'
+import { getDb } from '../lib/mongodb.js'
+import { ObjectId } from 'mongodb'
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+
+  if (req.method === 'OPTIONS') return res.status(200).end()
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
+
+  try {
+    const { projectId, visualStyle } = req.body
+
+    if (!projectId) {
+      return res.status(400).json({ error: 'projectId is required' })
+    }
+
+    console.log(`🎨 Updating visual style for project ${projectId}`)
+
+    const db = await getDb()
+    const collection = db.collection('projects')
+
+    const result = await collection.updateOne(
+      { _id: new ObjectId(projectId) },
+      { 
+        $set: { 
+          visual_style: visualStyle || null,
+          updatedAt: new Date()
+        }
+      }
+    )
+
+    console.log(`✅ Visual style updated`)
+
+    return res.status(200).json({
+      success: true,
+      message: 'Visual style updated'
+    })
+
+  } catch (error) {
+    console.error('Update error:', error)
+    return res.status(500).json({
+      error: 'Failed to update',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    })
+  }
+}
