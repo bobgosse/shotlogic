@@ -87,20 +87,17 @@ app.post('/api/projects/save-scene', async (req, res) => {
   await apiHandler(req, res, join(__dirname, 'api/projects/save-scene.ts'));
 });
 
+
 // Update visual style
-app.post('/api/projects/update-style', async (req, res) => {
+app.post("/api/projects/update-style", async (req, res) => {
+  await apiHandler(req, res, join(__dirname, "api/projects/update-style.ts"));
+});
 
 // Update scene analysis
 app.post("/api/projects/update-scene-analysis", async (req, res) => {
   await apiHandler(req, res, join(__dirname, "api/projects/update-scene-analysis.ts"));
 });
-  await apiHandler(req, res, join(__dirname, 'api/projects/update-style.ts'));
 
-// Update scene analysis
-app.post("/api/projects/update-scene-analysis", async (req, res) => {
-  await apiHandler(req, res, join(__dirname, "api/projects/update-scene-analysis.ts"));
-});
-});
 // Serve static files
 app.use(express.static(join(__dirname, 'dist')));
 
