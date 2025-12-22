@@ -722,7 +722,40 @@ const ProjectDetails = () => {
 
   const handleSaveEdits = async () => {
     if (!id) return;
+    const handleDeleteProject = async () => {
+    if (!id) return;
     
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${project?.title || 'this project'}"? This action cannot be undone.`
+    );
+    
+    if (!confirmed) return;
+    
+    try {
+      const response = await fetch(`/api/projects/delete?projectId=${id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete');
+      }
+
+      toast({
+        title: "Project deleted",
+        description: "Redirecting to dashboard...",
+      });
+
+      // Redirect to dashboard
+      setTimeout(() => navigate('/'), 1000);
+    } catch (error: any) {
+      toast({
+        title: "Delete failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
     setIsSaving(true);
     try {
       // Save to Railway/MongoDB API
@@ -1031,13 +1064,21 @@ const ProjectDetails = () => {
                   <RefreshCw className={`w-4 h-4 mr-2 ${reanalyzing ? 'animate-spin' : ''}`} />
                   {reanalyzing ? 'Re-analyzing...' : 'Re-analyze'}
                 </Button>
-                <Button 
+            <Button 
                   variant="outline" 
                   onClick={handleExportModalOpen}
                   className="bg-netflix-red hover:bg-netflix-red/90 text-white border-netflix-red"
                 >
                   <Download className="w-4 h-4 mr-2" />
                   Export
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={handleDeleteProject}
+                  className="text-red-500 hover:text-red-600 hover:bg-red-50 border-red-300"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete
                 </Button>
               </div>
             </div>
