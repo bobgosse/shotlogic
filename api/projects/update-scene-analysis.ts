@@ -24,6 +24,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     console.log(`📝 Updating analysis for project ${projectId}, scene ${sceneNumber}`)
+    console.log(`   Scene number type: ${typeof sceneNumber}`)
 
     const db = await getDb()
     const collection = db.collection('projects')
@@ -35,16 +36,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(404).json({ error: 'Project not found' })
     }
 
-    // Update the specific scene's analysis
-    const updatedScenes = (project.scenes || []).map((scene: any) => {
-      if (scene.number === sceneNumber) {
-        console.log(`  ✏️ Updating scene ${sceneNumber}`)
+    console.log(`   Project has ${project.scenes?.length || 0} scenes`)
+
+    // Update the specific scene's analysis - match by number with type coercion
+    let matchFound = false
+    const updatedScenes = (project.scenes || []).map((scene: any, index: number) => {
+      // Try multiple matching strategies
+      const sceneNum = scene.number || scene.scene_number || (index + 1)
+      const targetNum = Number(sceneNumber)
+      
+      console.log(`   Checking scene index ${index}: number=${scene.number}, scene_number=${scene.scene_number}, comparing to ${targetNum}`)
+      
+      if (Number(sceneNum) === targetNum) {
+        matchFound = true
+        console.log(`   ✅ MATCH FOUND - Updating scene ${sceneNum}`)
         return {
           ...scene,
           analysis: {
             data: analysis,
             meta: {
-              sceneNumber,
+              sceneNumber: targetNum,
               updatedAt: new Date().toISOString()
             }
           },
@@ -53,6 +64,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       return scene
     })
+
+    if (!matchFound) {
+      console.log(`   ❌ No matching scene found for scene number ${sceneNumber}`)
+      return res.status(404).json({ 
+        error: 'Scene not found',
+        message: `No scene with number ${sceneNumber} found in project`
+      })
+    }
 
     await collection.updateOne(
       { _id: objectId },
@@ -64,7 +83,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     )
 
-    console.log(`✅ Scene ${sceneNumber} analysis updated`)
+    console.log(`✅ Scene ${sceneNumber} analysis updated and saved to MongoDB`)
 
     return res.status(200).json({
       success: true,
