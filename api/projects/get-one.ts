@@ -120,15 +120,64 @@ export default async function handler(
     console.log(`═══════════════════════════════════════════════════════\n`)
 
     // Return the full project - data is stored directly on project, not in projectData
+  // Transform scenes to match frontend expectations
+    const transformedScenes = (project.scenes || []).map((scene: any, index: number) => {
+      // Extract header from text (first line or scene heading)
+      const textLines = (scene.text || '').split('\n');
+      const header = textLines[0] || `Scene ${scene.number || index + 1}`;
+      
+      // Transform analysis data to match expected structure
+      let analysisData = null;
+      if (scene.analysis?.data) {
+        const data = scene.analysis.data;
+        analysisData = {
+          story_analysis: {
+            stakes: data.narrativeAnalysis?.stakes || '',
+            ownership: data.narrativeAnalysis?.centralConflict || '',
+            breaking_point: data.narrativeAnalysis?.sceneTurn || '',
+            key_props: ''
+          },
+          producing_logistics: {
+            red_flags: [],
+            resource_impact: 'Medium',
+            departments_affected: []
+          },
+          directing_vision: {
+            visual_metaphor: data.narrativeAnalysis?.emotionalTone || '',
+            editorial_intent: data.narrativeAnalysis?.synopsis || '',
+            shot_motivation: ''
+          },
+          shot_list: (data.shotList || []).map((shot: any) => ({
+            shot_type: shot.shotType || 'WIDE',
+            visual: shot.visualDescription || '',
+            rationale: shot.rationale || '',
+            image_prompt: shot.aiImagePrompt || ''
+          }))
+        };
+      }
+
+      return {
+        id: `scene-${scene.number || index + 1}`,
+        scene_number: scene.number || index + 1,
+        header: header,
+        content: scene.text || '',
+        analysis: analysisData ? JSON.stringify(analysisData) : null,
+        status: scene.status === 'complete' ? 'COMPLETED' : (scene.status || 'PENDING').toUpperCase()
+      };
+    });
+
+    // Return the full project with transformed scenes
     return res.status(200).json({
       success: true,
       project: {
         _id: project._id.toHexString(),
+        id: project._id.toHexString(),
         title: project.name || 'Untitled Project',
         name: project.name || 'Untitled Project',
-        scenes: project.scenes || [],
-        total_scenes: project.scenes?.length || 0,
-        status: project.status || 'COMPLETED',
+        scenes: transformedScenes,
+        total_scenes: transformedScenes.length,
+        current_scene: transformedScenes.length,
+        status: 'COMPLETED',
         visual_style: project.visual_style || null,
         createdAt: project.createdAt,
         updatedAt: project.updatedAt
