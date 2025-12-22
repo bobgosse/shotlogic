@@ -346,47 +346,58 @@ const ProjectDetails = () => {
         title: "Analyzing scene...",
         description: `Generating structured analysis for Scene ${sceneNumber}`
       });
-
-      console.log('[handleReanalyzeScene] Calling analyze-scene function for scene', sceneNumber);
-
-      const { data, error } = await supabase.functions.invoke('analyze-scene', {
-        body: {
-          sceneContent,
-          sceneNumber,
-          projectId: id,
+      console.log("[handleReanalyzeScene] Calling Railway analyze-scene API for scene", sceneNumber);
+      
+      // Call Railway API to analyze scene
+      const analyzeResponse = await fetch("/api/analyze-scene", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sceneText: sceneContent,
+          sceneNumber: sceneNumber,
+          totalScenes: project?.total_scenes || 1,
           visualStyle: project?.visual_style || null
-        }
-      });
-
-      console.log('[handleReanalyzeScene] API Response:', { data, error });
-
-      if (error) throw error;
-
-      // Update the scene in the database
-      const { error: updateError } = await supabase
-        .from('scenes')
-        .update({
-          analysis: data.analysis,
-          status: data.status || 'COMPLETED'
         })
-        .eq('id', sceneId);
-
-      if (updateError) throw updateError;
-
-      console.log('[handleReanalyzeScene] Database updated successfully for scene', sceneNumber);
-
+      });
+      
+      if (!analyzeResponse.ok) {
+        const errorData = await analyzeResponse.json();
+        throw new Error(errorData.error || "Analysis failed");
+      }
+      
+      const analysisResult = await analyzeResponse.json();
+      console.log("[handleReanalyzeScene] Analysis result:", analysisResult);
+      
+      // Save analysis to MongoDB
+      const saveResponse = await fetch("/api/projects/update-scene-analysis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId: id,
+          sceneNumber: sceneNumber,
+          analysis: analysisResult.analysis || analysisResult
+        })
+      });
+      
+      if (!saveResponse.ok) {
+        const errorData = await saveResponse.json();
+        throw new Error(errorData.error || "Failed to save analysis");
+      }
+      
+      console.log("[handleReanalyzeScene] Analysis saved successfully for scene", sceneNumber);
+      
       // Invalidate and refetch the project data to update UI
-      await queryClient.invalidateQueries({ queryKey: ['project', id] });
-
+      await queryClient.invalidateQueries({ queryKey: ["project", id] });
+      
       toast({
         title: "Analysis complete!",
-        description: `Scene ${sceneNumber} has been analyzed with the latest format`
+        description: `Scene ${sceneNumber} has been analyzed`
       });
     } catch (error: any) {
-      console.error('[handleReanalyzeScene] Error:', error);
+      console.error("[handleReanalyzeScene] Error:", error);
       toast({
         title: "Analysis failed",
-        description: error.message || 'Failed to generate analysis',
+        description: error.message || "Failed to generate analysis",
         variant: "destructive"
       });
     } finally {
