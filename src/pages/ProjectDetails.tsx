@@ -104,7 +104,7 @@ const ProjectDetails = () => {
     console.log('[ProjectDetails] Fetching project with ID:', id);
     
     // Fetch project from Railway API
-    const projectResponse = await fetch(`/api/projects/get-one?id=${id}`);
+    const projectResponse = await fetch(`/api/projects/get-one?projectId=${id}`);
     if (!projectResponse.ok) {
       throw new Error('Failed to fetch project');
     }
