@@ -722,40 +722,6 @@ const ProjectDetails = () => {
 
   const handleSaveEdits = async () => {
     if (!id) return;
-    const handleDeleteProject = async () => {
-    if (!id) return;
-    
-    const confirmed = window.confirm(
-      `Are you sure you want to delete "${project?.title || 'this project'}"? This action cannot be undone.`
-    );
-    
-    if (!confirmed) return;
-    
-    try {
-      const response = await fetch(`/api/projects/delete?projectId=${id}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to delete');
-      }
-
-      toast({
-        title: "Project deleted",
-        description: "Redirecting to dashboard...",
-      });
-
-      // Redirect to dashboard
-      setTimeout(() => navigate('/'), 1000);
-    } catch (error: any) {
-      toast({
-        title: "Delete failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
     setIsSaving(true);
     try {
       // Save to Railway/MongoDB API
@@ -792,6 +758,34 @@ const ProjectDetails = () => {
       });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleDeleteProject = async () => {
+    if (!id) return;
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${project?.title || "this project"}"? This action cannot be undone.`
+    );
+    if (!confirmed) return;
+    try {
+      const response = await fetch(`/api/projects/delete?projectId=${id}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to delete");
+      }
+      toast({
+        title: "Project deleted",
+        description: "Redirecting to dashboard...",
+      });
+      setTimeout(() => navigate("/"), 1000);
+    } catch (error: any) {
+      toast({
+        title: "Delete failed",
+        description: error.message,
+        variant: "destructive",
+      });
     }
   };
 
