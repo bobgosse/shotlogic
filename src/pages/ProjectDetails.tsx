@@ -20,6 +20,7 @@ import { Trash2, ArrowLeft, Film, Camera, Printer, Download, RefreshCw, FileText
 import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { exportShotListPDF, exportShotListCSV } from "@/utils/shotListExporter";
+import { generatePromptPair } from "@/utils/promptBuilder";
 import { generateStoryboardPDF } from "@/utils/storyboardPdfGenerator";
 import { requestNotificationPermission, notifyAnalysisComplete } from "@/utils/notifications";
 import jsPDF from "jspdf";
@@ -1553,20 +1554,33 @@ const ProjectDetails = () => {
                                       <span className="text-sm font-bold text-primary uppercase tracking-wide">
                                         {shot.shot_type}
                                       </span>
-                                      {shot.image_prompt && (
+                                      <div className="flex gap-1">
                                         <Button
                                           size="sm"
                                           variant="ghost"
                                           className="h-7 px-2 text-xs"
                                           onClick={() => {
-                                            navigator.clipboard.writeText(shot.image_prompt);
-                                            toast({ title: "Copied!", description: "Image prompt copied to clipboard" });
+                                            const prompts = generatePromptPair(shot, scene, analysis);
+                                            navigator.clipboard.writeText(prompts.previs);
+                                            toast({ title: "Previs Prompt Copied!", description: "Cinematic Midjourney prompt ready to paste" });
                                           }}
                                         >
                                           <ImageIcon className="h-3 w-3 mr-1" />
-                                          Copy Prompt
+                                          Previs
                                         </Button>
-                                      )}
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          className="h-7 px-2 text-xs"
+                                          onClick={() => {
+                                            const prompts = generatePromptPair(shot, scene, analysis);
+                                            navigator.clipboard.writeText(prompts.storyboard);
+                                            toast({ title: "Storyboard Prompt Copied!", description: "Clean storyboard prompt ready to paste" });
+                                          }}
+                                        >
+                                          Board
+                                        </Button>
+                                      </div>
                                     </div>
                                     <p className="text-sm text-foreground leading-relaxed">
                                       {shot.visual}
