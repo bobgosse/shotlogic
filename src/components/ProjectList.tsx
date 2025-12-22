@@ -250,7 +250,7 @@ function ProjectList({ projects, setProjects, showToast }: ProjectListProps) {
                 {hasValidId ? (
                   // Valid project - clickable link - FIXED LINK
                   <Link 
-                    to={`/analyze?projectId=${projectId}`} // <-- FIXED: Go to /analyze with query param
+to={`/project/${projectId}`} 
                     className="block hover:text-[#E50914] transition-colors"
                   >
                     <h3 className="text-lg font-semibold text-white truncate">

@@ -1,21 +1,21 @@
 import React from 'react';
-// src/App.tsx
-// CRITICAL: Main application component with React Router setup
-// Dashboard is now the landing page at "/"
-
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import Index from './pages/Index'
 import Dashboard from './pages/Dashboard'
+import ProjectDetails from './pages/ProjectDetails'
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Dashboard (Project List) is now the landing page */}
+        {/* Dashboard (Project List) is the landing page */}
         <Route path="/" element={<Dashboard />} />
         
-        {/* Analysis/Upload page moved to /analyze */}
+        {/* Analysis/Upload page */}
         <Route path="/analyze" element={<Index />} />
+        
+        {/* Project Details page */}
+        <Route path="/project/:id" element={<ProjectDetails />} />
       </Routes>
     </BrowserRouter>
   )
