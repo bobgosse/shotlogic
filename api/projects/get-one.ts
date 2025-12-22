@@ -173,6 +173,7 @@ export default async function handler(
             duration: shot.duration || 'MEDIUM',
             image_prompt: shot.aiImagePrompt || ''
           }))
+        };
       }
 
       return {
