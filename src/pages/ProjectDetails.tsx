@@ -900,18 +900,16 @@ const ProjectDetails = () => {
   const handleExport = async (type: "full-report" | "storyboard" | "shot-list") => {
     try {
       if (type === "full-report") {
-        await handleExportPDF();
-      } else if (type === "storyboard") {
-        toast({
-          title: "Storyboard feature temporarily disabled",
-          description: "Storyboards are being updated for the new analysis format",
-          variant: "destructive",
-        });
-      } else if (type === "shot-list") {
         exportShotListPDF(scenes, project?.title || "Untitled");
         toast({
-          title: "Analysis report exported",
-          description: "Your analysis report has been downloaded",
+          title: "Full report exported",
+          description: "Your complete analysis report has been downloaded",
+        });
+      } else if (type === "shot-list") {
+        exportShotListCSV(scenes, project?.title || "Untitled");
+        toast({
+          title: "CSV exported",
+          description: "Shot list CSV has been downloaded",
         });
       }
     } catch (error) {
