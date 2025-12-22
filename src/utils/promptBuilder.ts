@@ -175,7 +175,7 @@ export const buildMidjourneyPrompt = (
   ].filter(Boolean);
   
   // Negative prompt
-  const negatives = '--no text --no subtitles --no watermark --no logo --no UI --no caption --no signature';
+  const negatives = '--no text, subtitles, watermark, logo, UI, caption, signature, frame border';
   
   // Parameters
   const ar = options.aspectRatio || '16:9';
