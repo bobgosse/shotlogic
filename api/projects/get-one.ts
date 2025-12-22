@@ -114,29 +114,26 @@ export default async function handler(
     console.log(`✅ [${invocationId}] Project found: ${project.name || 'Untitled'}`)
 
     // Validate project structure
-    if (!project.projectData) {
-      console.error(`❌ [${invocationId}] Project has no projectData field`)
-      return res.status(500).json({
-        error: 'Invalid project structure',
-        message: 'Project exists but has no data',
-        deployMarker: DEPLOY_TIMESTAMP
-      })
-    }
-
-    const duration = Date.now() - startTime
+   const duration = Date.now() - startTime
     console.log(`⏱️  [${invocationId}] Total: ${duration}ms`)
     console.log(`✅ [${invocationId}] SUCCESS`)
     console.log(`═══════════════════════════════════════════════════════\n`)
 
-    // CRITICAL: Return structure that matches frontend expectations
+    // Return the full project - data is stored directly on project, not in projectData
     return res.status(200).json({
       success: true,
-      projectId: project._id.toHexString(),
-      projectName: project.name || 'Untitled Project',
-      projectData: project.projectData,
-      meta: {
+      project: {
+        _id: project._id.toHexString(),
+        title: project.name || 'Untitled Project',
+        name: project.name || 'Untitled Project',
+        scenes: project.scenes || [],
+        total_scenes: project.scenes?.length || 0,
+        status: project.status || 'COMPLETED',
+        visual_style: project.visual_style || null,
         createdAt: project.createdAt,
-        updatedAt: project.updatedAt,
+        updatedAt: project.updatedAt
+      },
+      meta: {
         processingTime: duration,
         deployMarker: DEPLOY_TIMESTAMP
       }
