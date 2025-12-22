@@ -135,23 +135,46 @@ export default async function handler(
             stakes: data.narrativeAnalysis?.stakes || '',
             ownership: data.narrativeAnalysis?.centralConflict || '',
             breaking_point: data.narrativeAnalysis?.sceneTurn || '',
-            key_props: ''
+            key_props: (data.producingAnalysis?.keyProps || []).join(', '),
+            subtext: data.narrativeAnalysis?.subtext || '',
+            synopsis: data.narrativeAnalysis?.synopsis || ''
           },
           producing_logistics: {
-            red_flags: [],
-            resource_impact: 'Medium',
-            departments_affected: []
+            red_flags: data.producingAnalysis?.budgetFlags || [],
+            resource_impact: data.producingAnalysis?.budgetFlags?.length > 2 ? 'High' : (data.producingAnalysis?.budgetFlags?.length > 0 ? 'Medium' : 'Low'),
+            departments_affected: Object.entries(data.producingAnalysis?.departmentAlerts || {})
+              .filter(([k, v]) => v && v !== '')
+              .map(([k, v]) => k),
+            key_props: data.producingAnalysis?.keyProps || [],
+            wardrobe: data.producingAnalysis?.wardrobe || [],
+            locations: data.producingAnalysis?.locations || {},
+            cast: data.producingAnalysis?.cast || {},
+            special_requirements: data.producingAnalysis?.specialRequirements || [],
+            department_alerts: data.producingAnalysis?.departmentAlerts || {}
           },
           directing_vision: {
             visual_metaphor: data.narrativeAnalysis?.emotionalTone || '',
             editorial_intent: data.narrativeAnalysis?.synopsis || '',
-            shot_motivation: ''
+            shot_motivation: data.directingAnalysis?.sceneObjective || '',
+            visual_approach: data.directingAnalysis?.visualApproach || '',
+            key_moments: data.directingAnalysis?.keyMoments || [],
+            performance_notes: data.directingAnalysis?.performanceNotes || '',
+            blocking_ideas: data.directingAnalysis?.blockingIdeas || ''
           },
-          shot_list: (data.shotList || []).map((shot: any) => ({
+          shot_list: (data.shotList || []).map((shot: any, idx: number) => ({
+            shot_number: shot.shotNumber || idx + 1,
             shot_type: shot.shotType || 'WIDE',
+            movement: shot.movement || 'STATIC',
+            subject: shot.subject || '',
+            action: shot.action || '',
             visual: shot.visualDescription || '',
             rationale: shot.rationale || '',
+            editorial_intent: shot.editorialIntent || '',
+            duration: shot.duration || 'MEDIUM',
             image_prompt: shot.aiImagePrompt || ''
+          }))
+        };
+      }
           }))
         };
       }
