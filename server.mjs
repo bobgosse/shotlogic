@@ -26,10 +26,23 @@ app.use('/api', (req, res, next) => {
 });
 
 // API Routes - dynamically import TypeScript handlers
-const apiHandler = async (req, res, modulePath) => {
-  try {
+// CRITICAL FIX: Register tsx ONCE at startup, not on every request
+let tsxRegistered = false;
+const registerTsx = async () => {
+  if (!tsxRegistered) {
     const { register } = await import('tsx/esm/api');
     register();
+    tsxRegistered = true;
+    console.log('✅ TypeScript runtime registered');
+  }
+};
+
+// Call registration immediately
+await registerTsx();
+
+// API Routes - dynamically import TypeScript handlers  
+const apiHandler = async (req, res, modulePath) => {
+  try {
     const handler = await import(modulePath);
     await handler.default(req, res);
   } catch (error) {
