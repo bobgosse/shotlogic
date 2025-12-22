@@ -285,24 +285,30 @@ const ProjectDetails = () => {
 
     for (const scene of scenes) {
       try {
-        const { data, error } = await supabase.functions.invoke('analyze-scene', {
-          body: {
-            sceneContent: scene.content,
+        // Call Railway API to analyze scene
+        const analyzeResponse = await fetch('/api/analyze-scene', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sceneText: scene.content,
             sceneNumber: scene.scene_number,
-            projectId: id,
+            totalScenes: scenes.length,
             visualStyle: project?.visual_style || null
-          }
-        });
-
-        if (error) throw error;
-
-        await supabase
-          .from('scenes')
-          .update({
-            analysis: data.analysis,
-            status: data.status || 'COMPLETED'
           })
-          .eq('id', scene.id);
+        });
+        if (!analyzeResponse.ok) throw new Error('Analysis failed');
+        const analysisResult = await analyzeResponse.json();
+        // Save to MongoDB
+        const saveResponse = await fetch('/api/projects/update-scene-analysis', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            projectId: id,
+            sceneNumber: scene.scene_number,
+            analysis: analysisResult.analysis || analysisResult
+          })
+        });
+        if (!saveResponse.ok) throw new Error('Save failed');
 
         successCount++;
         
