@@ -161,6 +161,29 @@ export const exportShotListPDF = async (scenes: Scene[], projectTitle: string) =
       checkPageBreak(20);
     }
 
+    // Tone
+    if (analysis.directing_vision?.visual_metaphor) {
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Tone:", margin, yPosition);
+      pdf.setFont("helvetica", "normal");
+      const toneLines = pdf.splitTextToSize(analysis.directing_vision.visual_metaphor, maxWidth - 5);
+      yPosition += 4;
+      pdf.text(toneLines, margin + 2, yPosition);
+      yPosition += toneLines.length * 3.5 + 4;
+      checkPageBreak(20);
+    }
+
+    // Conflict Type
+    if (analysis.story_analysis?.ownership) {
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Conflict:", margin, yPosition);
+      pdf.setFont("helvetica", "normal");
+      yPosition += 4;
+      pdf.text(analysis.story_analysis.ownership, margin + 2, yPosition);
+      yPosition += 6;
+      checkPageBreak(20);
+    }
+
     // Stakes
     if (analysis.story_analysis?.stakes) {
       pdf.setFont("helvetica", "bold");
