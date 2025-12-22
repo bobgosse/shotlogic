@@ -39,34 +39,36 @@ const apiHandler = async (req, res, modulePath) => {
 };
 
 // Parse screenplay endpoint
-app.post('/api/parse-screenplay', (req, res) => 
-  apiHandler(req, res, join(__dirname, 'api/parse-screenplay.ts'))
-);
+// Parse screenplay endpoint
+app.post('/api/parse-screenplay', async (req, res) => {
+  await apiHandler(req, res, join(__dirname, 'api/parse-screenplay.ts'));
+});
 
 // Analyze scene endpoint
-app.post('/api/analyze-scene', (req, res) => 
-  apiHandler(req, res, join(__dirname, 'api/analyze-scene.ts'))
-);
+app.post('/api/analyze-scene', async (req, res) => {
+  await apiHandler(req, res, join(__dirname, 'api/analyze-scene.ts'));
+});
 
 // Project endpoints
-app.get('/api/projects/get-all', (req, res) => 
-  apiHandler(req, res, join(__dirname, 'api/projects/get-all.ts'))
-);
-app.get('/api/projects/get-by-id', (req, res) => 
-  apiHandler(req, res, join(__dirname, 'api/projects/get-by-id.ts'))
-);
+app.get('/api/projects/get-all', async (req, res) => {
+  await apiHandler(req, res, join(__dirname, 'api/projects/get-all.ts'));
+});
 
-app.get('/api/projects/get-one', (req, res) => 
-  apiHandler(req, res, join(__dirname, 'api/projects/get-one.ts'))
-);
+app.get('/api/projects/get-by-id', async (req, res) => {
+  await apiHandler(req, res, join(__dirname, 'api/projects/get-by-id.ts'));
+});
 
-app.post('/api/projects/save', (req, res) => 
-  apiHandler(req, res, join(__dirname, 'api/projects/save.ts'))
-);
+app.get('/api/projects/get-one', async (req, res) => {
+  await apiHandler(req, res, join(__dirname, 'api/projects/get-one.ts'));
+});
 
-app.delete('/api/projects/delete', (req, res) => 
-  apiHandler(req, res, join(__dirname, 'api/projects/delete.ts'))
-);
+app.post('/api/projects/save', async (req, res) => {
+  await apiHandler(req, res, join(__dirname, 'api/projects/save.ts'));
+});
+
+app.delete('/api/projects/delete', async (req, res) => {
+  await apiHandler(req, res, join(__dirname, 'api/projects/delete.ts'));
+});
 
 // Serve static files
 app.use(express.static(join(__dirname, 'dist')));
