@@ -116,21 +116,55 @@ Your combined expertise produces analysis that is PRACTICAL, SPECIFIC, and PRODU
 
     // Determine scene complexity for shot count scaling
     const sceneLength = sceneText.length
-    const hasAction = /\b(runs?|fights?|chases?|crashes?|explodes?|falls?|grabs?|throws?|hits?|punches?)\b/i.test(sceneText)
-    const dialogueMatches = sceneText.match(/[A-Z]{2,}(?:\s*\([^)]*\))?\s*$/gm) || []
-    const characterCount = new Set(dialogueMatches.map(m => m.split(/\s/)[0])).size
+    const hasAction = /\b(runs?|fights?|chases?|crashes?|explodes?|falls?|grabs?|throws?|hits?|punches?|shoots?|drives?|jumps?|climbs?|escapes?)\b/i.test(sceneText)
+    const hasVehicle = /\b(car|truck|van|suv|vehicle|motorcycle|bike|bus|taxi|uber)\b/i.test(sceneText)
+    const hasWeapon = /\b(gun|knife|weapon|pistol|rifle|sword)\b/i.test(sceneText)
+    const hasEmotionalBeat = /\b(cries?|crying|tears|screams?|yells?|whispers?|kisses?|hugs?|slaps?|laughs?)\b/i.test(sceneText)
     
-    let shotCountGuidance = "5-7 shots"
+    // Count unique character names (all caps words that appear before dialogue)
+    const dialogueMatches = sceneText.match(/^[A-Z][A-Z\s]+(?=\n)/gm) || []
+    const characterCount = new Set(dialogueMatches.map(m => m.trim())).size
+    
+    // Count dialogue exchanges
+    const dialogueExchanges = dialogueMatches.length
+    
+    let shotCountGuidance = "6-8 shots"
     let complexity = "MEDIUM"
+    let sceneType = "DIALOGUE"
     
-    if (sceneLength > 2000 || hasAction || characterCount > 4) {
-      shotCountGuidance = "8-12 shots"
+    // Determine scene type
+    if (hasAction || hasVehicle || hasWeapon) {
+      sceneType = "ACTION"
+    } else if (dialogueExchanges > 6) {
+      sceneType = "DIALOGUE_HEAVY"
+    } else if (sceneLength < 200) {
+      sceneType = "TRANSITION"
+    }
+    
+    // Scale shots based on complexity factors
+    let complexityScore = 0
+    if (sceneLength > 1500) complexityScore += 2
+    else if (sceneLength > 800) complexityScore += 1
+    if (hasAction) complexityScore += 3
+    if (hasVehicle) complexityScore += 2
+    if (hasWeapon) complexityScore += 1
+    if (hasEmotionalBeat) complexityScore += 1
+    if (characterCount > 3) complexityScore += 2
+    else if (characterCount > 1) complexityScore += 1
+    if (dialogueExchanges > 8) complexityScore += 2
+    else if (dialogueExchanges > 4) complexityScore += 1
+    
+    if (complexityScore >= 6) {
+      shotCountGuidance = "10-15 shots"
       complexity = "HIGH"
-    } else if (sceneLength > 1000 || characterCount > 2) {
-      shotCountGuidance = "6-8 shots"
+    } else if (complexityScore >= 4) {
+      shotCountGuidance = "8-10 shots"
       complexity = "MEDIUM-HIGH"
-    } else if (sceneLength < 300) {
-      shotCountGuidance = "3-5 shots"
+    } else if (complexityScore >= 2) {
+      shotCountGuidance = "6-8 shots"
+      complexity = "MEDIUM"
+    } else {
+      shotCountGuidance = "4-6 shots"
       complexity = "LOW"
     }
     
@@ -161,7 +195,7 @@ Return a JSON object with this EXACT structure:
   },
   
   "producingAnalysis": {
-    "keyProps": ["List EVERY prop characters interact with - be exhaustive"],
+    "keyProps": ["EXHAUSTIVE list - include: phones, keys, wallets, bags, drinks, food, papers, weapons, tools, anything TOUCHED or USED"],
     "wardrobe": ["Notable costume elements mentioned or implied"],
     "locations": {
       "setting": "Primary location with specific requirements",
@@ -220,12 +254,21 @@ Return a JSON object with this EXACT structure:
 SHOT LIST REQUIREMENTS (Generate ${shotCountGuidance}):
 ═══════════════════════════════════════════════════════
 
-COVERAGE RULES:
-- NEW LOCATION = Start with WIDE establishing shot
-- DIALOGUE = Over-shoulders and clean singles for each speaker
-- EMOTION = CLOSE_UP on reactions, not just speakers  
-- OBJECTS = INSERT shots for props that matter to plot
-- ACTION = Break complex action into clear beats
+SCENE TYPE DETECTED: ${sceneType} (Complexity: ${complexity})
+
+COVERAGE RULES FOR THIS SCENE:
+- ALWAYS start with WIDE/ESTABLISHING shot for spatial context
+- For DIALOGUE: Include OTS (over-the-shoulder) for EACH speaker + clean SINGLES + REACTION shots
+- For ACTION: Break into clear beats - wide for geography, medium for action, close for impact
+- For EMOTION: Lead with the speaker, but CUT TO the listener's REACTION (this is often more powerful)
+- INSERT shots for: phones, documents, weapons, keys, money, food - anything a character TOUCHES
+- MATCH CUTS: Consider how each shot leads to the next
+
+MINIMUM SHOT REQUIREMENTS:
+- 2+ characters talking = minimum 4 shots (establishing, 2 singles, reaction)
+- Physical action = minimum 3 shots per action beat
+- Emotional revelation = build with at least 3 shots (context → delivery → reaction)
+- Character enters/exits = dedicated shot for the movement
 
 PACING:
 - Vary shot sizes for rhythm (avoid 3+ same sizes in a row)
@@ -262,7 +305,7 @@ Return ONLY valid JSON. No markdown, no explanation outside JSON.`
           { role: 'user', content: userPrompt }
         ],
         temperature: 0.7,
-        max_tokens: 4000,
+        max_tokens: 5000,
         response_format: { type: 'json_object' }
       }),
     })
