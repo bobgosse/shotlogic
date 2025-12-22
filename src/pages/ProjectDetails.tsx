@@ -265,33 +265,6 @@ const ProjectDetails = () => {
     }
   };
 
-      // Update local state
-      queryClient.setQueryData(['project', id], (oldData: any) => ({
-        ...oldData,
-        project: { ...oldData.project, visual_style: tempVisualStyle.trim() || null }
-      }));
-
-      setEditingVisualStyle(false);
-      
-      // Re-enable query and force refetch after editing is done
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['project', id] });
-      }, 100);
-      
-      toast({
-        title: "Visual style updated",
-        description: "Image prompts will now use this aesthetic",
-      });
-    } catch (error: any) {
-      console.error('Error updating visual style:', error);
-      toast({
-        title: "Update failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
   const handleRegenerateAll = async () => {
     if (!project || !id || scenes.length === 0) return;
 
@@ -778,28 +751,6 @@ const ProjectDetails = () => {
       
       // Refetch data to show updated content
       queryClient.invalidateQueries({ queryKey: ['project', id] });
-    } catch (error: any) {
-      toast({
-        title: "Save failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-      toast({
-        title: "Changes saved",
-        description: `Updated ${Object.keys(editedScenes).length} scene(s)`,
-      });
-
-      // Clear edited scenes and exit edit mode
-      setEditedScenes({});
-      setIsEditMode(false);
-      
-      // Refetch data to show updated content
-      window.location.reload();
     } catch (error: any) {
       toast({
         title: "Save failed",
