@@ -283,7 +283,7 @@ export default function Index() {
     }).join('\n');
 
     // Force newlines before scene headers
-    text = text.replace(/(INT\.|EXT\.)/gi, '\n$1');
+    text = text.replace(/(INT\.|EXT\.)/g, '\n$1');
     text = text.replace(/\n{3,}/g, '\n\n');
 
     // Find first scene header
