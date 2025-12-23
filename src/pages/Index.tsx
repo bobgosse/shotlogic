@@ -337,7 +337,7 @@ export default function Index() {
     return (
       <div className="mt-4 pt-4 border-t border-gray-700 space-y-4">
         {/* Narrative Analysis */}
-        {analysis.data?.narrativeAnalysis && (
+        {(analysis.analysis?.narrativeAnalysis || analysis.data?.narrativeAnalysis) && (
           <div className="bg-gray-900 p-4 rounded border border-gray-600">
             <h4 className="font-semibold text-white mb-3">📖 Narrative Analysis</h4>
             <div className="space-y-2 text-sm">
@@ -352,7 +352,7 @@ export default function Index() {
         )}
 
         {/* Shot List */}
-        {analysis.data?.shotList && Array.isArray(analysis.data.shotList) && analysis.data.shotList.length > 0 && (
+        {(analysis.analysis?.shotList || analysis.data?.shotList) && Array.isArray(analysis.data.shotList) && analysis.data.shotList.length > 0 && (
           <div className="bg-gray-900 p-4 rounded border border-gray-600">
             <h4 className="font-semibold text-white mb-3">🎬 Shot List ({analysis.data.shotList.length} shots)</h4>
             <div className="space-y-2">
