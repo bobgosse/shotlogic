@@ -140,26 +140,52 @@ export default async function handler(
             synopsis: data.narrativeAnalysis?.synopsis || ''
           },
           producing_logistics: {
+            // Locations
+            locations: data.producingAnalysis?.locations || {},
+            // Cast
+            cast: data.producingAnalysis?.cast || {},
+            // Props & Vehicles
+            key_props: data.producingAnalysis?.keyProps || [],
+            vehicles: data.producingAnalysis?.vehicles || [],
+            // SFX
+            sfx: data.producingAnalysis?.sfx || {},
+            // Wardrobe & Makeup
+            wardrobe: data.producingAnalysis?.wardrobe || {},
+            makeup: data.producingAnalysis?.makeup || {},
+            // Scheduling & Budget
+            scheduling_concerns: data.producingAnalysis?.schedulingConcerns || {},
+            budget_flags: data.producingAnalysis?.budgetFlags || [],
+            // Legacy fields for backwards compatibility
             red_flags: data.producingAnalysis?.budgetFlags || [],
             resource_impact: data.producingAnalysis?.budgetFlags?.length > 2 ? 'High' : (data.producingAnalysis?.budgetFlags?.length > 0 ? 'Medium' : 'Low'),
-            departments_affected: Object.entries(data.producingAnalysis?.departmentAlerts || {})
-              .filter(([k, v]) => v && v !== '')
-              .map(([k, v]) => k),
-            key_props: data.producingAnalysis?.keyProps || [],
-            wardrobe: data.producingAnalysis?.wardrobe || [],
-            locations: data.producingAnalysis?.locations || {},
-            cast: data.producingAnalysis?.cast || {},
-            special_requirements: data.producingAnalysis?.specialRequirements || [],
-            department_alerts: data.producingAnalysis?.departmentAlerts || {}
+            departments_affected: Object.keys(data.producingAnalysis?.sfx || {}).filter(k => {
+              const val = data.producingAnalysis?.sfx?.[k];
+              return Array.isArray(val) ? val.length > 0 : !!val;
+            }),
+            special_requirements: [
+              ...(data.producingAnalysis?.sfx?.practical || []),
+              ...(data.producingAnalysis?.sfx?.vfx || []),
+              ...(data.producingAnalysis?.sfx?.stunts || [])
+            ]
           },
           directing_vision: {
-            visual_metaphor: data.narrativeAnalysis?.emotionalTone || '',
-            editorial_intent: data.narrativeAnalysis?.synopsis || '',
-            shot_motivation: data.directingAnalysis?.sceneObjective || '',
-            visual_approach: data.directingAnalysis?.visualApproach || '',
+            // Character & Conflict
+            character_motivations: data.directingAnalysis?.characterMotivations || [],
+            conflict: data.directingAnalysis?.conflict || {},
+            subtext: data.directingAnalysis?.subtext || data.narrativeAnalysis?.subtext || '',
+            // Tone & Mood
+            tone_and_mood: data.directingAnalysis?.toneAndMood || {},
+            // Visual Strategy
+            visual_strategy: data.directingAnalysis?.visualStrategy || {},
+            // Key Moments & Performance
             key_moments: data.directingAnalysis?.keyMoments || [],
-            performance_notes: data.directingAnalysis?.performanceNotes || '',
-            blocking_ideas: data.directingAnalysis?.blockingIdeas || ''
+            performance_notes: data.directingAnalysis?.performanceNotes || {},
+            blocking_ideas: data.directingAnalysis?.blockingIdeas || {},
+            // Legacy fields for backwards compatibility
+            visual_metaphor: data.directingAnalysis?.toneAndMood?.opening || data.narrativeAnalysis?.emotionalTone || '',
+            editorial_intent: data.narrativeAnalysis?.synopsis || '',
+            shot_motivation: data.directingAnalysis?.conflict?.description || '',
+            visual_approach: data.directingAnalysis?.visualStrategy?.approach || data.directingAnalysis?.visualApproach || ''
           },
           shot_list: (data.shotList || []).map((shot: any, idx: number) => ({
             shot_number: shot.shotNumber || idx + 1,

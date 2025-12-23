@@ -195,43 +195,91 @@ Return a JSON object with this EXACT structure:
   },
   
   "producingAnalysis": {
-    "keyProps": ["EXHAUSTIVE list - include: phones, keys, wallets, bags, drinks, food, papers, weapons, tools, anything TOUCHED or USED"],
-    "wardrobe": ["Notable costume elements mentioned or implied"],
     "locations": {
-      "setting": "Primary location with specific requirements",
-      "timeOfDay": "DAY | NIGHT | DAWN | DUSK",
-      "intExt": "INT | EXT | INT/EXT"
+      "primary": "Main location with SPECIFIC requirements (size, features, practical considerations)",
+      "secondary": ["Any additional locations within this scene"],
+      "timeOfDay": "DAY | NIGHT | DAWN | DUSK | MAGIC_HOUR",
+      "intExt": "INT | EXT | INT/EXT",
+      "weatherConditions": "Any weather elements needed (rain, snow, fog, wind)",
+      "practicalConsiderations": "Parking, power, permits, noise restrictions"
     },
     "cast": {
-      "speaking": ["Characters with dialogue"],
-      "silent": ["Characters present but without dialogue"],
-      "background": "Description of extras needed, if any"
+      "principal": ["Characters with dialogue - list NAME and brief description"],
+      "silent": ["Characters present without dialogue"],
+      "extras": {
+        "count": "Estimated number needed",
+        "description": "Types of extras (pedestrians, diners, office workers, etc.)",
+        "specialSkills": "Any special requirements (dancing, sports, period-appropriate)"
+      }
     },
-    "specialRequirements": ["Stunts, VFX, SFX, animals, children, vehicles, weather effects, etc."],
-    "budgetFlags": ["Items that will significantly impact budget - be specific about WHY"],
-    "departmentAlerts": {
-      "camera": "Special equipment needs",
-      "grip": "Rigging, cranes, dollies needed",
-      "electric": "Special lighting setups",
-      "art": "Set dressing requirements",
-      "props": "Hero props or multiples needed",
-      "wardrobe": "Special costume needs",
-      "makeup": "Special makeup/prosthetics",
-      "sound": "Production sound challenges"
-    }
+    "keyProps": ["EXHAUSTIVE list of EVERY prop - phones, keys, wallets, bags, drinks, food, papers, weapons, tools, anything TOUCHED, HELD, or REFERENCED"],
+    "vehicles": ["Any vehicles in scene - make/model if specified, condition, action required (parked, driving, crash)"],
+    "sfx": {
+      "practical": ["Practical effects: rain, fog, fire, breakaway items, squibs, etc."],
+      "vfx": ["Visual effects: green screen, wire removal, CGI elements"],
+      "stunts": ["Stunt work: falls, fights, driving, wire work"]
+    },
+    "wardrobe": {
+      "principal": ["Detailed costume descriptions for each main character"],
+      "changes": "Any costume changes within the scene",
+      "special": "Period, damaged, wet, multiples needed"
+    },
+    "makeup": {
+      "standard": ["Basic makeup/grooming notes"],
+      "special": ["Special effects makeup: wounds, aging, prosthetics, tattoos"],
+      "continuity": "Any continuity concerns (sweat, dirt, blood progression)"
+    },
+    "schedulingConcerns": {
+      "timeConstraints": "Day/night shoots, golden hour, child labor restrictions",
+      "locationAccess": "Limited hours, permits, weather windows",
+      "actorAvailability": "Multiple characters, stunt doubles needed",
+      "specialEquipment": "Crane, Steadicam, underwater housing, etc."
+    },
+    "budgetFlags": ["Items that will SIGNIFICANTLY impact budget - be SPECIFIC about cost driver and estimated impact (LOW/MEDIUM/HIGH)"]
   },
   
   "directingAnalysis": {
-    "sceneObjective": "What MUST the audience understand/feel by the end of this scene?",
-    "visualApproach": "Overall visual strategy (e.g., 'Handheld intimacy', 'Static formality', 'Dynamic pursuit')",
-    "keyMoments": [
+    "characterMotivations": [
       {
-        "beat": "Specific moment or line",
-        "emphasis": "How to shoot it for maximum impact"
+        "character": "Character name",
+        "wants": "What they want in THIS scene",
+        "obstacle": "What's preventing them",
+        "tactic": "How they're trying to get it"
       }
     ],
-    "performanceNotes": "Key emotional beats actors must hit",
-    "blockingIdeas": "Suggested character movement and positioning"
+    "conflict": {
+      "type": "Internal | External | Both",
+      "description": "The core dramatic tension - who wants what from whom",
+      "resolution": "How the conflict shifts or resolves by scene end"
+    },
+    "subtext": "What's REALLY being communicated beneath the surface - the unspoken tension, hidden agendas, emotional undercurrents",
+    "toneAndMood": {
+      "opening": "How the scene BEGINS emotionally",
+      "shift": "Where and how the tone CHANGES (if it does)",
+      "closing": "How the scene ENDS emotionally",
+      "energy": "LOW | BUILDING | HIGH | DECLINING | VOLATILE"
+    },
+    "visualStrategy": {
+      "approach": "Overall visual philosophy (e.g., 'Observational distance', 'Claustrophobic intimacy', 'Kinetic chaos')",
+      "cameraPersonality": "Is the camera objective observer, subjective POV, omniscient, or character-aligned?",
+      "lightingMood": "Naturalistic, expressionistic, high-key, low-key, motivated sources"
+    },
+    "keyMoments": [
+      {
+        "beat": "Specific moment, line, or action",
+        "emphasis": "How to shoot it for maximum emotional/story impact",
+        "why": "Why this moment matters to the scene/story"
+      }
+    ],
+    "performanceNotes": {
+      "general": "Overall performance tone and energy",
+      "specific": ["Character-specific notes for actors"]
+    },
+    "blockingIdeas": {
+      "geography": "How characters use the space - who has power, who's trapped",
+      "movement": "Key character movements and what they communicate",
+      "eyelines": "Important looks, glances, avoided eye contact"
+    }
   },
   
   "shotList": [

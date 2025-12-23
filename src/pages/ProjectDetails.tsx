@@ -1265,56 +1265,271 @@ const ProjectDetails = () => {
                                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-netflix-red"></div>
                                 <p className="text-sm text-muted-foreground">Generating Production Analysis...</p>
                               </div>
-                            ) : analysis?.producing_logistics && 
-                               !analysis.producing_logistics.red_flags?.some(f => f.includes('Analysis')) ? (
-                              <>
-                                {/* Red Flags */}
+                            ) : analysis?.producing_logistics ? (
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {/* Locations */}
                                 <div className="space-y-2">
-                                  <h3 className="text-sm font-semibold text-primary">Production Red Flags</h3>
-                                  {analysis.producing_logistics.red_flags && analysis.producing_logistics.red_flags.length > 0 ? (
-                                    <ul className="list-disc list-inside space-y-1">
-                                      {analysis.producing_logistics.red_flags.map((flag, idx) => (
-                                        <li key={idx} className="text-sm text-foreground">{flag}</li>
-                                      ))}
-                                    </ul>
+                                  <h3 className="text-sm font-semibold text-primary flex items-center gap-2">📍 Locations</h3>
+                                  {isEditMode ? (
+                                    <Textarea
+                                      value={editedScenes[scene.id]?.producing_logistics?.locations_text || 
+                                        (typeof analysis.producing_logistics.locations === 'object' 
+                                          ? JSON.stringify(analysis.producing_logistics.locations, null, 2)
+                                          : analysis.producing_logistics.locations || '')}
+                                      onChange={(e) => {
+                                        const updated = editedScenes[scene.id] || JSON.parse(JSON.stringify(analysis));
+                                        if (!updated.producing_logistics) updated.producing_logistics = {};
+                                        updated.producing_logistics.locations_text = e.target.value;
+                                        setEditedScenes(prev => ({ ...prev, [scene.id]: updated }));
+                                      }}
+                                      className="min-h-[100px] text-sm font-mono"
+                                      placeholder="Location details..."
+                                    />
                                   ) : (
-                                    <p className="text-sm text-muted-foreground italic">No production challenges identified</p>
-                                  )}
-                                </div>
-
-                                {/* Resource Impact */}
-                                <div className="space-y-2">
-                                  <h3 className="text-sm font-semibold text-primary">Resource Impact</h3>
-                                  {analysis.producing_logistics.resource_impact ? (
-                                  <Badge 
-                                    variant="outline" 
-                                    className={`text-sm px-3 py-1 ${
-                                      analysis.producing_logistics.resource_impact === 'High' ? 'bg-red-500/20 text-red-400 border-red-500/30' :
-                                      analysis.producing_logistics.resource_impact === 'Medium' ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' :
-                                      'bg-green-500/20 text-green-400 border-green-500/30'
-                                    }`}
-                                  >
-                                    {analysis.producing_logistics.resource_impact}
-                                  </Badge>
-                                  ) : <p className="text-sm text-muted-foreground">No analysis available</p>}
-                                </div>
-
-                                {/* Departments Affected */}
-                                <div className="space-y-2">
-                                  <h3 className="text-sm font-semibold text-primary">Departments Affected</h3>
-                                  {analysis.producing_logistics.departments_affected && analysis.producing_logistics.departments_affected.length > 0 ? (
-                                    <div className="flex flex-wrap gap-2">
-                                      {analysis.producing_logistics.departments_affected.map((dept, idx) => (
-                                        <Badge key={idx} variant="secondary" className="text-sm">
-                                          {dept}
-                                        </Badge>
-                                      ))}
+                                    <div className="text-sm text-foreground bg-muted/30 rounded p-3">
+                                      {analysis.producing_logistics.locations?.primary || analysis.producing_logistics.locations?.setting || 'No location specified'}
+                                      {analysis.producing_logistics.locations?.timeOfDay && <Badge variant="outline" className="ml-2">{analysis.producing_logistics.locations.timeOfDay}</Badge>}
+                                      {analysis.producing_logistics.locations?.intExt && <Badge variant="outline" className="ml-2">{analysis.producing_logistics.locations.intExt}</Badge>}
                                     </div>
-                                  ) : (
-                                    <p className="text-sm text-muted-foreground italic">No department information</p>
                                   )}
                                 </div>
-                              </>
+
+                                {/* Cast */}
+                                <div className="space-y-2">
+                                  <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🎭 Cast</h3>
+                                  {isEditMode ? (
+                                    <Textarea
+                                      value={editedScenes[scene.id]?.producing_logistics?.cast_text || 
+                                        (typeof analysis.producing_logistics.cast === 'object'
+                                          ? JSON.stringify(analysis.producing_logistics.cast, null, 2)
+                                          : analysis.producing_logistics.cast || '')}
+                                      onChange={(e) => {
+                                        const updated = editedScenes[scene.id] || JSON.parse(JSON.stringify(analysis));
+                                        if (!updated.producing_logistics) updated.producing_logistics = {};
+                                        updated.producing_logistics.cast_text = e.target.value;
+                                        setEditedScenes(prev => ({ ...prev, [scene.id]: updated }));
+                                      }}
+                                      className="min-h-[100px] text-sm font-mono"
+                                      placeholder="Cast details..."
+                                    />
+                                  ) : (
+                                    <div className="text-sm text-foreground bg-muted/30 rounded p-3 space-y-1">
+                                      {analysis.producing_logistics.cast?.principal?.length > 0 && <p><span className="text-muted-foreground">Principal:</span> {analysis.producing_logistics.cast.principal.join(', ')}</p>}
+                                      {analysis.producing_logistics.cast?.speaking?.length > 0 && <p><span className="text-muted-foreground">Speaking:</span> {analysis.producing_logistics.cast.speaking.join(', ')}</p>}
+                                      {analysis.producing_logistics.cast?.silent?.length > 0 && <p><span className="text-muted-foreground">Silent:</span> {analysis.producing_logistics.cast.silent.join(', ')}</p>}
+                                      {analysis.producing_logistics.cast?.extras && <p><span className="text-muted-foreground">Extras:</span> {typeof analysis.producing_logistics.cast.extras === 'object' ? analysis.producing_logistics.cast.extras.description : analysis.producing_logistics.cast.extras}</p>}
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Key Props */}
+                                <div className="space-y-2">
+                                  <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🎬 Key Props</h3>
+                                  {isEditMode ? (
+                                    <Textarea
+                                      value={editedScenes[scene.id]?.producing_logistics?.key_props_text || 
+                                        (Array.isArray(analysis.producing_logistics.key_props) 
+                                          ? analysis.producing_logistics.key_props.join('\n')
+                                          : analysis.producing_logistics.key_props || '')}
+                                      onChange={(e) => {
+                                        const updated = editedScenes[scene.id] || JSON.parse(JSON.stringify(analysis));
+                                        if (!updated.producing_logistics) updated.producing_logistics = {};
+                                        updated.producing_logistics.key_props_text = e.target.value;
+                                        setEditedScenes(prev => ({ ...prev, [scene.id]: updated }));
+                                      }}
+                                      className="min-h-[80px] text-sm font-mono"
+                                      placeholder="One prop per line..."
+                                    />
+                                  ) : (
+                                    <div className="flex flex-wrap gap-1">
+                                      {(analysis.producing_logistics.key_props || []).map((prop, idx) => (
+                                        <Badge key={idx} variant="secondary" className="text-xs">{prop}</Badge>
+                                      ))}
+                                      {(!analysis.producing_logistics.key_props || analysis.producing_logistics.key_props.length === 0) && 
+                                        <p className="text-sm text-muted-foreground italic">No props listed</p>}
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Vehicles */}
+                                <div className="space-y-2">
+                                  <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🚗 Vehicles</h3>
+                                  {isEditMode ? (
+                                    <Textarea
+                                      value={editedScenes[scene.id]?.producing_logistics?.vehicles_text || 
+                                        (Array.isArray(analysis.producing_logistics.vehicles) 
+                                          ? analysis.producing_logistics.vehicles.join('\n')
+                                          : '')}
+                                      onChange={(e) => {
+                                        const updated = editedScenes[scene.id] || JSON.parse(JSON.stringify(analysis));
+                                        if (!updated.producing_logistics) updated.producing_logistics = {};
+                                        updated.producing_logistics.vehicles_text = e.target.value;
+                                        setEditedScenes(prev => ({ ...prev, [scene.id]: updated }));
+                                      }}
+                                      className="min-h-[60px] text-sm font-mono"
+                                      placeholder="One vehicle per line..."
+                                    />
+                                  ) : (
+                                    <div className="flex flex-wrap gap-1">
+                                      {(analysis.producing_logistics.vehicles || []).map((v, idx) => (
+                                        <Badge key={idx} variant="outline" className="text-xs">{v}</Badge>
+                                      ))}
+                                      {(!analysis.producing_logistics.vehicles || analysis.producing_logistics.vehicles.length === 0) && 
+                                        <p className="text-sm text-muted-foreground italic">No vehicles</p>}
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* SFX */}
+                                <div className="space-y-2">
+                                  <h3 className="text-sm font-semibold text-primary flex items-center gap-2">✨ SFX / VFX / Stunts</h3>
+                                  {isEditMode ? (
+                                    <Textarea
+                                      value={editedScenes[scene.id]?.producing_logistics?.sfx_text || 
+                                        (typeof analysis.producing_logistics.sfx === 'object'
+                                          ? JSON.stringify(analysis.producing_logistics.sfx, null, 2)
+                                          : '')}
+                                      onChange={(e) => {
+                                        const updated = editedScenes[scene.id] || JSON.parse(JSON.stringify(analysis));
+                                        if (!updated.producing_logistics) updated.producing_logistics = {};
+                                        updated.producing_logistics.sfx_text = e.target.value;
+                                        setEditedScenes(prev => ({ ...prev, [scene.id]: updated }));
+                                      }}
+                                      className="min-h-[80px] text-sm font-mono"
+                                      placeholder="SFX requirements..."
+                                    />
+                                  ) : (
+                                    <div className="text-sm text-foreground bg-muted/30 rounded p-3 space-y-1">
+                                      {analysis.producing_logistics.sfx?.practical?.length > 0 && <p><span className="text-muted-foreground">Practical:</span> {analysis.producing_logistics.sfx.practical.join(', ')}</p>}
+                                      {analysis.producing_logistics.sfx?.vfx?.length > 0 && <p><span className="text-muted-foreground">VFX:</span> {analysis.producing_logistics.sfx.vfx.join(', ')}</p>}
+                                      {analysis.producing_logistics.sfx?.stunts?.length > 0 && <p><span className="text-muted-foreground">Stunts:</span> {analysis.producing_logistics.sfx.stunts.join(', ')}</p>}
+                                      {analysis.producing_logistics.special_requirements?.length > 0 && <p>{analysis.producing_logistics.special_requirements.join(', ')}</p>}
+                                      {!analysis.producing_logistics.sfx?.practical?.length && !analysis.producing_logistics.sfx?.vfx?.length && !analysis.producing_logistics.sfx?.stunts?.length && !analysis.producing_logistics.special_requirements?.length &&
+                                        <p className="text-muted-foreground italic">No special effects required</p>}
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Wardrobe */}
+                                <div className="space-y-2">
+                                  <h3 className="text-sm font-semibold text-primary flex items-center gap-2">👔 Wardrobe</h3>
+                                  {isEditMode ? (
+                                    <Textarea
+                                      value={editedScenes[scene.id]?.producing_logistics?.wardrobe_text || 
+                                        (typeof analysis.producing_logistics.wardrobe === 'object'
+                                          ? JSON.stringify(analysis.producing_logistics.wardrobe, null, 2)
+                                          : Array.isArray(analysis.producing_logistics.wardrobe)
+                                            ? analysis.producing_logistics.wardrobe.join('\n')
+                                            : '')}
+                                      onChange={(e) => {
+                                        const updated = editedScenes[scene.id] || JSON.parse(JSON.stringify(analysis));
+                                        if (!updated.producing_logistics) updated.producing_logistics = {};
+                                        updated.producing_logistics.wardrobe_text = e.target.value;
+                                        setEditedScenes(prev => ({ ...prev, [scene.id]: updated }));
+                                      }}
+                                      className="min-h-[80px] text-sm font-mono"
+                                      placeholder="Wardrobe notes..."
+                                    />
+                                  ) : (
+                                    <div className="text-sm text-foreground bg-muted/30 rounded p-3">
+                                      {analysis.producing_logistics.wardrobe?.principal?.length > 0 
+                                        ? analysis.producing_logistics.wardrobe.principal.join(', ')
+                                        : Array.isArray(analysis.producing_logistics.wardrobe)
+                                          ? analysis.producing_logistics.wardrobe.join(', ')
+                                          : <span className="text-muted-foreground italic">No wardrobe notes</span>}
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Makeup */}
+                                <div className="space-y-2">
+                                  <h3 className="text-sm font-semibold text-primary flex items-center gap-2">💄 Makeup</h3>
+                                  {isEditMode ? (
+                                    <Textarea
+                                      value={editedScenes[scene.id]?.producing_logistics?.makeup_text || 
+                                        (typeof analysis.producing_logistics.makeup === 'object'
+                                          ? JSON.stringify(analysis.producing_logistics.makeup, null, 2)
+                                          : '')}
+                                      onChange={(e) => {
+                                        const updated = editedScenes[scene.id] || JSON.parse(JSON.stringify(analysis));
+                                        if (!updated.producing_logistics) updated.producing_logistics = {};
+                                        updated.producing_logistics.makeup_text = e.target.value;
+                                        setEditedScenes(prev => ({ ...prev, [scene.id]: updated }));
+                                      }}
+                                      className="min-h-[60px] text-sm font-mono"
+                                      placeholder="Makeup notes..."
+                                    />
+                                  ) : (
+                                    <div className="text-sm text-foreground bg-muted/30 rounded p-3 space-y-1">
+                                      {analysis.producing_logistics.makeup?.special?.length > 0 && <p><span className="text-muted-foreground">Special:</span> {analysis.producing_logistics.makeup.special.join(', ')}</p>}
+                                      {analysis.producing_logistics.makeup?.continuity && <p><span className="text-muted-foreground">Continuity:</span> {analysis.producing_logistics.makeup.continuity}</p>}
+                                      {!analysis.producing_logistics.makeup?.special?.length && !analysis.producing_logistics.makeup?.continuity &&
+                                        <p className="text-muted-foreground italic">Standard makeup</p>}
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Scheduling Concerns */}
+                                <div className="space-y-2">
+                                  <h3 className="text-sm font-semibold text-primary flex items-center gap-2">📅 Scheduling</h3>
+                                  {isEditMode ? (
+                                    <Textarea
+                                      value={editedScenes[scene.id]?.producing_logistics?.scheduling_text || 
+                                        (typeof analysis.producing_logistics.scheduling_concerns === 'object'
+                                          ? JSON.stringify(analysis.producing_logistics.scheduling_concerns, null, 2)
+                                          : '')}
+                                      onChange={(e) => {
+                                        const updated = editedScenes[scene.id] || JSON.parse(JSON.stringify(analysis));
+                                        if (!updated.producing_logistics) updated.producing_logistics = {};
+                                        updated.producing_logistics.scheduling_text = e.target.value;
+                                        setEditedScenes(prev => ({ ...prev, [scene.id]: updated }));
+                                      }}
+                                      className="min-h-[80px] text-sm font-mono"
+                                      placeholder="Scheduling concerns..."
+                                    />
+                                  ) : (
+                                    <div className="text-sm text-foreground bg-muted/30 rounded p-3 space-y-1">
+                                      {analysis.producing_logistics.scheduling_concerns?.timeConstraints && <p><span className="text-muted-foreground">Time:</span> {analysis.producing_logistics.scheduling_concerns.timeConstraints}</p>}
+                                      {analysis.producing_logistics.scheduling_concerns?.locationAccess && <p><span className="text-muted-foreground">Location:</span> {analysis.producing_logistics.scheduling_concerns.locationAccess}</p>}
+                                      {analysis.producing_logistics.scheduling_concerns?.specialEquipment && <p><span className="text-muted-foreground">Equipment:</span> {analysis.producing_logistics.scheduling_concerns.specialEquipment}</p>}
+                                      {!analysis.producing_logistics.scheduling_concerns?.timeConstraints && !analysis.producing_logistics.scheduling_concerns?.locationAccess &&
+                                        <p className="text-muted-foreground italic">No special scheduling concerns</p>}
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Budget Flags - Full Width */}
+                                <div className="space-y-2 md:col-span-2">
+                                  <h3 className="text-sm font-semibold text-primary flex items-center gap-2">💰 Budget Flags</h3>
+                                  {isEditMode ? (
+                                    <Textarea
+                                      value={editedScenes[scene.id]?.producing_logistics?.budget_flags_text || 
+                                        (Array.isArray(analysis.producing_logistics.budget_flags || analysis.producing_logistics.red_flags)
+                                          ? (analysis.producing_logistics.budget_flags || analysis.producing_logistics.red_flags).join('\n')
+                                          : '')}
+                                      onChange={(e) => {
+                                        const updated = editedScenes[scene.id] || JSON.parse(JSON.stringify(analysis));
+                                        if (!updated.producing_logistics) updated.producing_logistics = {};
+                                        updated.producing_logistics.budget_flags_text = e.target.value;
+                                        setEditedScenes(prev => ({ ...prev, [scene.id]: updated }));
+                                      }}
+                                      className="min-h-[80px] text-sm font-mono"
+                                      placeholder="One budget concern per line..."
+                                    />
+                                  ) : (
+                                    <div className="space-y-1">
+                                      {(analysis.producing_logistics.budget_flags || analysis.producing_logistics.red_flags || []).map((flag, idx) => (
+                                        <div key={idx} className="flex items-start gap-2 text-sm">
+                                          <span className="text-red-400">⚠️</span>
+                                          <span className="text-foreground">{flag}</span>
+                                        </div>
+                                      ))}
+                                      {(!analysis.producing_logistics.budget_flags?.length && !analysis.producing_logistics.red_flags?.length) &&
+                                        <p className="text-sm text-muted-foreground italic">No budget concerns flagged</p>}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
                             ) : (
                               <div className="flex flex-col items-center justify-center py-12 gap-4">
                                 <p className="text-center text-muted-foreground">
