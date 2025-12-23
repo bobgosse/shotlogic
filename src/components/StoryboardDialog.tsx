@@ -122,7 +122,7 @@ export const StoryboardDialog = ({ open, onOpenChange, scene, analysis }: Storyb
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 gap-0">
+      <DialogContent className="max-w-[95vw] max-h-[90vh] p-0 gap-0">
         <DialogHeader className="p-6 pb-4 border-b border-border">
           <DialogTitle className="font-mono">
             SCENE {scene.scene_number} - {scene.header.replace(/\n/g, ' ')}
@@ -133,7 +133,7 @@ export const StoryboardDialog = ({ open, onOpenChange, scene, analysis }: Storyb
         </DialogHeader>
 
         {/* Split View Container */}
-        <div className="flex h-[70vh]">
+        <div className="flex h-[60vh]">
           {/* Left Pane - Shot List Editor */}
           <div className="w-1/2 border-r border-border overflow-y-auto">
             <ShotListEditor shots={shots} onShotsChange={setShots} />
