@@ -1553,34 +1553,227 @@ const ProjectDetails = () => {
                                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-netflix-red"></div>
                                 <p className="text-sm text-muted-foreground">Generating Directing Vision...</p>
                               </div>
-                            ) : analysis?.directing_vision && 
-                               !analysis.directing_vision.visual_metaphor?.includes('Unable to parse') &&
-                               analysis.directing_vision.visual_metaphor !== 'N/A' ? (
-                              <>
-                                {/* Visual Metaphor */}
+                            ) : analysis?.directing_vision ? (
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {/* Character Motivations */}
                                 <div className="space-y-2">
-                                  <h3 className="text-sm font-semibold text-primary">Visual Metaphor</h3>
-                                  <p className="text-sm text-foreground leading-relaxed">
-                                    {analysis.directing_vision.visual_metaphor || 'No analysis available'}
-                                  </p>
+                                  <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🎭 Character Motivations</h3>
+                                  {isEditMode ? (
+                                    <Textarea
+                                      value={editedScenes[scene.id]?.directing_vision?.character_motivations_text || ''}
+                                      onChange={(e) => {
+                                        const updated = editedScenes[scene.id] || JSON.parse(JSON.stringify(analysis));
+                                        if (!updated.directing_vision) updated.directing_vision = {};
+                                        updated.directing_vision.character_motivations_text = e.target.value;
+                                        setEditedScenes(prev => ({ ...prev, [scene.id]: updated }));
+                                      }}
+                                      className="min-h-[100px] text-sm font-mono"
+                                      placeholder="Character motivations..."
+                                    />
+                                  ) : (
+                                    <div className="space-y-2 bg-muted/30 rounded p-3 text-sm">
+                                      {(analysis.directing_vision.character_motivations || []).map((char, idx) => (
+                                        <div key={idx} className="border-b border-border/50 pb-2 last:border-0">
+                                          <p className="font-medium text-primary">{char.character}</p>
+                                          <p><span className="text-muted-foreground">Wants:</span> {char.wants}</p>
+                                          <p><span className="text-muted-foreground">Obstacle:</span> {char.obstacle}</p>
+                                          <p><span className="text-muted-foreground">Tactic:</span> {char.tactic}</p>
+                                        </div>
+                                      ))}
+                                      {(!analysis.directing_vision.character_motivations || analysis.directing_vision.character_motivations.length === 0) &&
+                                        <p className="text-muted-foreground italic">No character motivations analyzed</p>}
+                                    </div>
+                                  )}
                                 </div>
 
-                                {/* Editorial Intent */}
+                                {/* Conflict */}
                                 <div className="space-y-2">
-                                  <h3 className="text-sm font-semibold text-primary">Editorial Intent</h3>
-                                  <p className="text-sm text-foreground leading-relaxed">
-                                    {analysis.directing_vision.editorial_intent || 'No analysis available'}
-                                  </p>
+                                  <h3 className="text-sm font-semibold text-primary flex items-center gap-2">⚔️ Conflict</h3>
+                                  {isEditMode ? (
+                                    <Textarea
+                                      value={editedScenes[scene.id]?.directing_vision?.conflict_text || ''}
+                                      onChange={(e) => {
+                                        const updated = editedScenes[scene.id] || JSON.parse(JSON.stringify(analysis));
+                                        if (!updated.directing_vision) updated.directing_vision = {};
+                                        updated.directing_vision.conflict_text = e.target.value;
+                                        setEditedScenes(prev => ({ ...prev, [scene.id]: updated }));
+                                      }}
+                                      className="min-h-[80px] text-sm font-mono"
+                                      placeholder="Conflict details..."
+                                    />
+                                  ) : (
+                                    <div className="bg-muted/30 rounded p-3 text-sm space-y-1">
+                                      {analysis.directing_vision.conflict?.type && <Badge variant="outline">{analysis.directing_vision.conflict.type}</Badge>}
+                                      <p>{analysis.directing_vision.conflict?.description || analysis.directing_vision.shot_motivation || 'No conflict analysis'}</p>
+                                      {analysis.directing_vision.conflict?.resolution && <p><span className="text-muted-foreground">Resolution:</span> {analysis.directing_vision.conflict.resolution}</p>}
+                                    </div>
+                                  )}
                                 </div>
 
-                                {/* Shot Motivation */}
+                                {/* Subtext */}
                                 <div className="space-y-2">
-                                  <h3 className="text-sm font-semibold text-primary">Shot Motivation</h3>
-                                  <p className="text-sm text-foreground leading-relaxed">
-                                    {analysis.directing_vision.shot_motivation || 'No analysis available'}
-                                  </p>
+                                  <h3 className="text-sm font-semibold text-primary flex items-center gap-2">💭 Subtext</h3>
+                                  {isEditMode ? (
+                                    <Textarea
+                                      value={editedScenes[scene.id]?.directing_vision?.subtext || analysis.directing_vision.subtext || ''}
+                                      onChange={(e) => {
+                                        const updated = editedScenes[scene.id] || JSON.parse(JSON.stringify(analysis));
+                                        if (!updated.directing_vision) updated.directing_vision = {};
+                                        updated.directing_vision.subtext = e.target.value;
+                                        setEditedScenes(prev => ({ ...prev, [scene.id]: updated }));
+                                      }}
+                                      className="min-h-[80px] text-sm"
+                                      placeholder="Subtext..."
+                                    />
+                                  ) : (
+                                    <p className="text-sm text-foreground bg-muted/30 rounded p-3 italic">
+                                      {analysis.directing_vision.subtext || 'No subtext analysis'}
+                                    </p>
+                                  )}
                                 </div>
-                              </>
+
+                                {/* Tone & Mood */}
+                                <div className="space-y-2">
+                                  <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🎨 Tone & Mood</h3>
+                                  {isEditMode ? (
+                                    <Textarea
+                                      value={editedScenes[scene.id]?.directing_vision?.tone_text || ''}
+                                      onChange={(e) => {
+                                        const updated = editedScenes[scene.id] || JSON.parse(JSON.stringify(analysis));
+                                        if (!updated.directing_vision) updated.directing_vision = {};
+                                        updated.directing_vision.tone_text = e.target.value;
+                                        setEditedScenes(prev => ({ ...prev, [scene.id]: updated }));
+                                      }}
+                                      className="min-h-[80px] text-sm font-mono"
+                                      placeholder="Tone details..."
+                                    />
+                                  ) : (
+                                    <div className="bg-muted/30 rounded p-3 text-sm space-y-1">
+                                      {analysis.directing_vision.tone_and_mood?.opening && <p><span className="text-muted-foreground">Opens:</span> {analysis.directing_vision.tone_and_mood.opening}</p>}
+                                      {analysis.directing_vision.tone_and_mood?.shift && <p><span className="text-muted-foreground">Shifts:</span> {analysis.directing_vision.tone_and_mood.shift}</p>}
+                                      {analysis.directing_vision.tone_and_mood?.closing && <p><span className="text-muted-foreground">Closes:</span> {analysis.directing_vision.tone_and_mood.closing}</p>}
+                                      {analysis.directing_vision.tone_and_mood?.energy && <Badge variant="outline" className="mt-1">{analysis.directing_vision.tone_and_mood.energy}</Badge>}
+                                      {!analysis.directing_vision.tone_and_mood?.opening && analysis.directing_vision.visual_metaphor && 
+                                        <p>{analysis.directing_vision.visual_metaphor}</p>}
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Visual Strategy */}
+                                <div className="space-y-2">
+                                  <h3 className="text-sm font-semibold text-primary flex items-center gap-2">📷 Visual Strategy</h3>
+                                  {isEditMode ? (
+                                    <Textarea
+                                      value={editedScenes[scene.id]?.directing_vision?.visual_strategy_text || ''}
+                                      onChange={(e) => {
+                                        const updated = editedScenes[scene.id] || JSON.parse(JSON.stringify(analysis));
+                                        if (!updated.directing_vision) updated.directing_vision = {};
+                                        updated.directing_vision.visual_strategy_text = e.target.value;
+                                        setEditedScenes(prev => ({ ...prev, [scene.id]: updated }));
+                                      }}
+                                      className="min-h-[80px] text-sm font-mono"
+                                      placeholder="Visual strategy..."
+                                    />
+                                  ) : (
+                                    <div className="bg-muted/30 rounded p-3 text-sm space-y-1">
+                                      <p><span className="text-muted-foreground">Approach:</span> {analysis.directing_vision.visual_strategy?.approach || analysis.directing_vision.visual_approach || 'Not specified'}</p>
+                                      {analysis.directing_vision.visual_strategy?.cameraPersonality && <p><span className="text-muted-foreground">Camera:</span> {analysis.directing_vision.visual_strategy.cameraPersonality}</p>}
+                                      {analysis.directing_vision.visual_strategy?.lightingMood && <p><span className="text-muted-foreground">Lighting:</span> {analysis.directing_vision.visual_strategy.lightingMood}</p>}
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Key Moments */}
+                                <div className="space-y-2">
+                                  <h3 className="text-sm font-semibold text-primary flex items-center gap-2">⭐ Key Moments</h3>
+                                  {isEditMode ? (
+                                    <Textarea
+                                      value={editedScenes[scene.id]?.directing_vision?.key_moments_text || ''}
+                                      onChange={(e) => {
+                                        const updated = editedScenes[scene.id] || JSON.parse(JSON.stringify(analysis));
+                                        if (!updated.directing_vision) updated.directing_vision = {};
+                                        updated.directing_vision.key_moments_text = e.target.value;
+                                        setEditedScenes(prev => ({ ...prev, [scene.id]: updated }));
+                                      }}
+                                      className="min-h-[100px] text-sm font-mono"
+                                      placeholder="Key moments..."
+                                    />
+                                  ) : (
+                                    <div className="space-y-2">
+                                      {(analysis.directing_vision.key_moments || []).map((moment, idx) => (
+                                        <div key={idx} className="bg-accent/20 border border-accent/30 rounded p-3 text-sm">
+                                          <p className="font-medium text-accent">"{moment.beat}"</p>
+                                          <p className="text-foreground mt-1">{moment.emphasis}</p>
+                                          {moment.why && <p className="text-muted-foreground text-xs mt-1">Why: {moment.why}</p>}
+                                        </div>
+                                      ))}
+                                      {(!analysis.directing_vision.key_moments || analysis.directing_vision.key_moments.length === 0) &&
+                                        <p className="text-sm text-muted-foreground italic">No key moments identified</p>}
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Performance Notes - Full Width */}
+                                <div className="space-y-2 md:col-span-2">
+                                  <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🎬 Performance Notes</h3>
+                                  {isEditMode ? (
+                                    <Textarea
+                                      value={editedScenes[scene.id]?.directing_vision?.performance_notes_text || ''}
+                                      onChange={(e) => {
+                                        const updated = editedScenes[scene.id] || JSON.parse(JSON.stringify(analysis));
+                                        if (!updated.directing_vision) updated.directing_vision = {};
+                                        updated.directing_vision.performance_notes_text = e.target.value;
+                                        setEditedScenes(prev => ({ ...prev, [scene.id]: updated }));
+                                      }}
+                                      className="min-h-[80px] text-sm"
+                                      placeholder="Performance notes..."
+                                    />
+                                  ) : (
+                                    <div className="bg-muted/30 rounded p-3 text-sm">
+                                      {typeof analysis.directing_vision.performance_notes === 'object' ? (
+                                        <>
+                                          {analysis.directing_vision.performance_notes.general && <p>{analysis.directing_vision.performance_notes.general}</p>}
+                                          {analysis.directing_vision.performance_notes.specific?.map((note, idx) => (
+                                            <p key={idx} className="mt-1">• {note}</p>
+                                          ))}
+                                        </>
+                                      ) : (
+                                        <p>{analysis.directing_vision.performance_notes || 'No performance notes'}</p>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Blocking - Full Width */}
+                                <div className="space-y-2 md:col-span-2">
+                                  <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🚶 Blocking</h3>
+                                  {isEditMode ? (
+                                    <Textarea
+                                      value={editedScenes[scene.id]?.directing_vision?.blocking_ideas_text || ''}
+                                      onChange={(e) => {
+                                        const updated = editedScenes[scene.id] || JSON.parse(JSON.stringify(analysis));
+                                        if (!updated.directing_vision) updated.directing_vision = {};
+                                        updated.directing_vision.blocking_ideas_text = e.target.value;
+                                        setEditedScenes(prev => ({ ...prev, [scene.id]: updated }));
+                                      }}
+                                      className="min-h-[80px] text-sm font-mono"
+                                      placeholder="Blocking ideas..."
+                                    />
+                                  ) : (
+                                    <div className="bg-muted/30 rounded p-3 text-sm space-y-1">
+                                      {typeof analysis.directing_vision.blocking_ideas === 'object' ? (
+                                        <>
+                                          {analysis.directing_vision.blocking_ideas.geography && <p><span className="text-muted-foreground">Geography:</span> {analysis.directing_vision.blocking_ideas.geography}</p>}
+                                          {analysis.directing_vision.blocking_ideas.movement && <p><span className="text-muted-foreground">Movement:</span> {analysis.directing_vision.blocking_ideas.movement}</p>}
+                                          {analysis.directing_vision.blocking_ideas.eyelines && <p><span className="text-muted-foreground">Eyelines:</span> {analysis.directing_vision.blocking_ideas.eyelines}</p>}
+                                        </>
+                                      ) : (
+                                        <p>{analysis.directing_vision.blocking_ideas || 'No blocking notes'}</p>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
                             ) : (
                               <div className="flex flex-col items-center justify-center py-12 gap-4">
                                 <p className="text-center text-muted-foreground">
