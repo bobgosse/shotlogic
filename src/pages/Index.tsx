@@ -331,64 +331,42 @@ export default function Index() {
 
   function renderAnalysis(analysis: any) {
     if (!analysis) return null;
-
     console.log('🎨 Rendering analysis:', analysis);
-
+    
+    const narrative = analysis.analysis?.narrativeAnalysis || analysis.data?.narrativeAnalysis || analysis.narrativeAnalysis;
+    const shotList = analysis.analysis?.shotList || analysis.data?.shotList || analysis.shotList;
+    
     return (
       <div className="mt-4 pt-4 border-t border-gray-700 space-y-4">
-        {/* Narrative Analysis */}
-        {(analysis.analysis?.narrativeAnalysis || analysis.data?.narrativeAnalysis) && (
+        {narrative && (
           <div className="bg-gray-900 p-4 rounded border border-gray-600">
-            <h4 className="font-semibold text-white mb-3">📖 Narrative Analysis</h4>
-            <div className="space-y-2 text-sm">
-              {Object.entries(analysis.data.narrativeAnalysis).map(([key, value]) => (
-                <div key={key}>
-                  <span className="text-gray-400 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
-                  <span className="ml-2 text-gray-200">{String(value)}</span>
-                </div>
-              ))}
+            <h4 className="font-semibold text-white mb-3">📖 Story Analysis</h4>
+            <div className="space-y-3 text-sm">
+              {narrative.synopsis && <div><span className="text-[#E50914] font-medium">Synopsis:</span><p className="text-gray-200 mt-1">{narrative.synopsis}</p></div>}
+              {narrative.centralConflict && <div><span className="text-[#E50914] font-medium">Conflict:</span><span className="ml-2 text-gray-200">{narrative.centralConflict}</span></div>}
+              {narrative.sceneTurn && <div><span className="text-[#E50914] font-medium">Scene Turn:</span><p className="text-gray-200 mt-1 italic">"{narrative.sceneTurn}"</p></div>}
+              {narrative.stakes && <div><span className="text-[#E50914] font-medium">Stakes:</span><p className="text-gray-200 mt-1">{narrative.stakes}</p></div>}
+              {narrative.emotionalTone && <div><span className="text-[#E50914] font-medium">Tone:</span><span className="ml-2 text-gray-200">{narrative.emotionalTone}</span></div>}
             </div>
           </div>
         )}
-
-        {/* Shot List */}
-        {(analysis.analysis?.shotList || analysis.data?.shotList) && Array.isArray(analysis.data.shotList) && analysis.data.shotList.length > 0 && (
+        {shotList && Array.isArray(shotList) && shotList.length > 0 && (
           <div className="bg-gray-900 p-4 rounded border border-gray-600">
-            <h4 className="font-semibold text-white mb-3">🎬 Shot List ({analysis.data.shotList.length} shots)</h4>
+            <h4 className="font-semibold text-white mb-3">🎬 Shot List ({shotList.length} shots)</h4>
             <div className="space-y-2">
-              {(analysis.data.shotList || []).map((shot: any, idx: number) => (
+              {shotList.map((shot: any, idx: number) => (
                 <div key={idx} className="bg-gray-800 p-3 rounded border border-gray-700">
                   <div className="flex items-start justify-between gap-2 mb-2">
-                    <span className="font-mono text-xs text-[#E50914]">
-                      Shot {shot.shotNumber || idx + 1}
-                    </span>
-                    <span className="text-xs text-gray-400">{shot.shotType || 'N/A'}</span>
+                    <span className="font-mono text-xs text-[#E50914]">Shot {shot.shotNumber || idx + 1}</span>
+                    <span className="text-xs text-gray-400">{shot.shotType || shot.shot_type || 'N/A'}</span>
                   </div>
-                  <p className="text-sm text-gray-300">{shot.visualDescription || 'No description'}</p>
-                  {shot.rationale && (
-                    <p className="text-xs text-gray-400 mt-1 italic">💡 {shot.rationale}</p>
-                  )}
-                  {shot.editorialIntent && (
-                    <p className="text-xs text-gray-400 mt-1">🎯 {shot.editorialIntent}</p>
-                  )}
-                  {shot.cameraMovement && (
-                    <div className="text-xs text-gray-400 mt-2">
-                      📹 {shot.cameraMovement}
-                    </div>
-                  )}
+                  <p className="text-sm text-gray-300">{shot.visualDescription || shot.visual || 'No description'}</p>
+                  {shot.rationale && <p className="text-xs text-gray-400 mt-1 italic">💡 {shot.rationale}</p>}
                 </div>
               ))}
             </div>
           </div>
         )}
-
-        {/* Raw JSON (for debugging) */}
-        <details className="text-xs">
-          <summary className="text-gray-500 cursor-pointer">Show Raw JSON</summary>
-          <pre className="mt-2 p-2 bg-black text-green-400 rounded overflow-auto max-h-64">
-            {JSON.stringify(analysis, null, 2)}
-          </pre>
-        </details>
       </div>
     );
   }
