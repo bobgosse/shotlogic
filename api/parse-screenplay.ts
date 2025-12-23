@@ -46,6 +46,8 @@ async function parsePDF(buffer: Buffer): Promise<string> {
   }
 }
 
+// Replacement parseFDX function - copy this to parse-screenplay.ts
+
 async function parseFDX(buffer: Buffer): Promise<string> {
   const xmlText = buffer.toString('utf-8')
   
@@ -67,6 +69,8 @@ async function parseFDX(buffer: Buffer): Promise<string> {
       ? xmlDoc.FinalDraft.Content.Paragraph 
       : [xmlDoc.FinalDraft.Content.Paragraph]
   }
+  
+  console.log('[FDX] Found paragraphs:', paragraphs.length);
   
   const lines: string[] = []
   
@@ -91,13 +95,18 @@ async function parseFDX(buffer: Buffer): Promise<string> {
     
     switch (type) {
       case 'Scene Heading':
-        lines.push(`\n${text.toUpperCase()}\n`)
+        console.log('[FDX] Scene:', text);
+        lines.push('')
+        lines.push(text.toUpperCase())
+        lines.push('')
         break
       case 'Action':
-        lines.push(text, '')
+        lines.push(text)
+        lines.push('')
         break
       case 'Character':
-        lines.push(`\n${text.toUpperCase()}`)
+        lines.push('')
+        lines.push(text.toUpperCase())
         break
       case 'Dialogue':
         lines.push(text)
@@ -107,7 +116,10 @@ async function parseFDX(buffer: Buffer): Promise<string> {
     }
   }
   
-  return lines.join('\n').replace(/\n{4,}/g, '\n\n\n').trim()
+  const result = lines.join('\n').replace(/\n{4,}/g, '\n\n\n').trim()
+  console.log('[FDX] Output length:', result.length);
+  return result
+}
 }
 
 function parseTXT(buffer: Buffer): string {
