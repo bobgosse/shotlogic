@@ -96,6 +96,8 @@ export const StoryboardDialog = ({ open, onOpenChange, scene, analysis }: Storyb
   }, [shots]);
 
   const handleExportPDF = async () => {
+    console.log('Export clicked! Shots:', shots.length, shots);
+    console.log('Options:', { exportPlaceholders, includePrompts });
     if (hasEmptyFrames && !exportPlaceholders) {
       toast({
         title: "Cannot export",
