@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import Index from './pages/Index'
+import Landing from './pages/Landing'
 import Dashboard from './pages/Dashboard'
 import ProjectDetails from './pages/ProjectDetails'
 
@@ -21,7 +22,9 @@ function App() {
       <BrowserRouter>
         <Routes>
           {/* Dashboard (Project List) is the landing page */}
-          <Route path="/" element={<Dashboard />} />
+          <Route path="/" element={<Landing />} />
+          <Route path="/projects" element={<Dashboard />} />
+          <Route path="/upload" element={<Index />} />
           
           {/* Analysis/Upload page */}
           <Route path="/analyze" element={<Index />} />
