@@ -22,7 +22,7 @@ function App() {
       <BrowserRouter>
         <Routes>
           {/* Dashboard (Project List) is the landing page */}
-          <Route path="/" element={<Landing />} />
+          <Route path="/" element={<Dashboard />} />
           <Route path="/projects" element={<Dashboard />} />
           <Route path="/upload" element={<Index />} />
           
