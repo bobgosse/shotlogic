@@ -161,19 +161,7 @@ export const exportShotListPDF = async (scenes: Scene[], projectTitle: string) =
       checkPageBreak(20);
     }
 
-    // Tone
-    if (analysis.directing_vision?.visual_metaphor) {
-      pdf.setFont("helvetica", "bold");
-      pdf.text("Tone:", margin, yPosition);
-      pdf.setFont("helvetica", "normal");
-      const toneLines = pdf.splitTextToSize(analysis.directing_vision.visual_metaphor, maxWidth - 5);
-      yPosition += 4;
-      pdf.text(toneLines, margin + 2, yPosition);
-      yPosition += toneLines.length * 3.5 + 4;
-      checkPageBreak(20);
-    }
-
-    // Conflict Type
+    // Conflict
     if (analysis.story_analysis?.ownership) {
       pdf.setFont("helvetica", "bold");
       pdf.text("Conflict:", margin, yPosition);
@@ -181,6 +169,18 @@ export const exportShotListPDF = async (scenes: Scene[], projectTitle: string) =
       yPosition += 4;
       pdf.text(analysis.story_analysis.ownership, margin + 2, yPosition);
       yPosition += 6;
+      checkPageBreak(20);
+    }
+
+    // Scene Turn
+    if (analysis.story_analysis?.breaking_point) {
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Scene Turn:", margin, yPosition);
+      pdf.setFont("helvetica", "normal");
+      const turnLines = pdf.splitTextToSize(analysis.story_analysis.breaking_point, maxWidth - 5);
+      yPosition += 4;
+      pdf.text(turnLines, margin + 2, yPosition);
+      yPosition += turnLines.length * 3.5 + 4;
       checkPageBreak(20);
     }
 
@@ -196,15 +196,15 @@ export const exportShotListPDF = async (scenes: Scene[], projectTitle: string) =
       checkPageBreak(20);
     }
 
-    // Breaking Point / Scene Turn
-    if (analysis.story_analysis?.breaking_point) {
+    // Tone
+    if (analysis.directing_vision?.visual_metaphor) {
       pdf.setFont("helvetica", "bold");
-      pdf.text("Scene Turn:", margin, yPosition);
+      pdf.text("Tone:", margin, yPosition);
       pdf.setFont("helvetica", "normal");
-      const turnLines = pdf.splitTextToSize(analysis.story_analysis.breaking_point, maxWidth - 5);
+      const toneLines = pdf.splitTextToSize(analysis.directing_vision.visual_metaphor, maxWidth - 5);
       yPosition += 4;
-      pdf.text(turnLines, margin + 2, yPosition);
-      yPosition += turnLines.length * 3.5 + 4;
+      pdf.text(toneLines, margin + 2, yPosition);
+      yPosition += toneLines.length * 3.5 + 4;
       checkPageBreak(20);
     }
 

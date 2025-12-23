@@ -1305,6 +1305,63 @@ const ProjectDetails = () => {
                                !analysis.story_analysis.stakes?.includes('Analysis failed') &&
                                analysis.story_analysis.stakes !== 'N/A' ? (
                               <>
+                                {/* Synopsis */}
+                                <div className="space-y-2">
+                                  <h3 className="text-sm font-semibold text-primary">Synopsis</h3>
+                                  {isEditMode ? (
+                                    <Textarea
+                                      value={editedScenes[scene.id]?.story_analysis?.synopsis || analysis?.story_analysis?.synopsis || ''}
+                                      onChange={(e) => {
+                                        const updated = editedScenes[scene.id] || JSON.parse(JSON.stringify(analysis));
+                                        if (!updated.story_analysis) updated.story_analysis = {};
+                                        updated.story_analysis.synopsis = e.target.value;
+                                        setEditedScenes(prev => ({ ...prev, [scene.id]: updated }));
+                                      }}
+                                      className="min-h-[80px] text-sm font-mono"
+                                    />
+                                  ) : (
+                                    <p className="text-sm text-foreground leading-relaxed">{analysis.story_analysis.synopsis || 'No analysis available'}</p>
+                                  )}
+                                </div>
+
+                                {/* Conflict */}
+                                <div className="space-y-2">
+                                  <h3 className="text-sm font-semibold text-primary">Conflict</h3>
+                                  {isEditMode ? (
+                                    <Textarea
+                                      value={editedScenes[scene.id]?.story_analysis?.ownership || analysis?.story_analysis?.ownership || ''}
+                                      onChange={(e) => {
+                                        const updated = editedScenes[scene.id] || JSON.parse(JSON.stringify(analysis));
+                                        if (!updated.story_analysis) updated.story_analysis = {};
+                                        updated.story_analysis.ownership = e.target.value;
+                                        setEditedScenes(prev => ({ ...prev, [scene.id]: updated }));
+                                      }}
+                                      className="min-h-[60px] text-sm font-mono"
+                                    />
+                                  ) : (
+                                    <p className="text-sm text-foreground">{analysis.story_analysis.ownership || 'No analysis available'}</p>
+                                  )}
+                                </div>
+
+                                {/* Scene Turn */}
+                                <div className="bg-accent/20 border border-accent/30 rounded-lg p-4">
+                                  <h3 className="text-base font-bold text-accent mb-2">Scene Turn</h3>
+                                  {isEditMode ? (
+                                    <Textarea
+                                      value={editedScenes[scene.id]?.story_analysis?.breaking_point || analysis?.story_analysis?.breaking_point || ''}
+                                      onChange={(e) => {
+                                        const updated = editedScenes[scene.id] || JSON.parse(JSON.stringify(analysis));
+                                        if (!updated.story_analysis) updated.story_analysis = {};
+                                        updated.story_analysis.breaking_point = e.target.value;
+                                        setEditedScenes(prev => ({ ...prev, [scene.id]: updated }));
+                                      }}
+                                      className="min-h-[80px] text-sm font-mono"
+                                    />
+                                  ) : (
+                                    <p className="text-sm text-foreground leading-relaxed">{analysis.story_analysis.breaking_point || 'No analysis available'}</p>
+                                  )}
+                                </div>
+
                                 {/* Stakes */}
                                 <div className="space-y-2">
                                   <h3 className="text-sm font-semibold text-primary">Stakes</h3>
@@ -1324,60 +1381,22 @@ const ProjectDetails = () => {
                                   )}
                                 </div>
 
-                                {/* Ownership */}
+                                {/* Tone */}
                                 <div className="space-y-2">
-                                  <h3 className="text-sm font-semibold text-primary">Ownership</h3>
+                                  <h3 className="text-sm font-semibold text-primary">Tone</h3>
                                   {isEditMode ? (
                                     <Textarea
-                                      value={editedScenes[scene.id]?.story_analysis?.ownership || analysis?.story_analysis?.ownership || ''}
+                                      value={editedScenes[scene.id]?.directing_vision?.visual_metaphor || analysis?.directing_vision?.visual_metaphor || ''}
                                       onChange={(e) => {
                                         const updated = editedScenes[scene.id] || JSON.parse(JSON.stringify(analysis));
-                                        if (!updated.story_analysis) updated.story_analysis = {};
-                                        updated.story_analysis.ownership = e.target.value;
+                                        if (!updated.directing_vision) updated.directing_vision = {};
+                                        updated.directing_vision.visual_metaphor = e.target.value;
                                         setEditedScenes(prev => ({ ...prev, [scene.id]: updated }));
                                       }}
                                       className="min-h-[60px] text-sm font-mono"
                                     />
                                   ) : (
-                                    <p className="text-sm text-foreground">{analysis.story_analysis.ownership || 'No analysis available'}</p>
-                                  )}
-                                </div>
-
-                                {/* Breaking Point */}
-                                <div className="bg-accent/20 border border-accent/30 rounded-lg p-4">
-                                  <h3 className="text-base font-bold text-accent mb-2">Breaking Point</h3>
-                                  {isEditMode ? (
-                                    <Textarea
-                                      value={editedScenes[scene.id]?.story_analysis?.breaking_point || analysis?.story_analysis?.breaking_point || ''}
-                                      onChange={(e) => {
-                                        const updated = editedScenes[scene.id] || JSON.parse(JSON.stringify(analysis));
-                                        if (!updated.story_analysis) updated.story_analysis = {};
-                                        updated.story_analysis.breaking_point = e.target.value;
-                                        setEditedScenes(prev => ({ ...prev, [scene.id]: updated }));
-                                      }}
-                                      className="min-h-[80px] text-sm font-mono"
-                                    />
-                                  ) : (
-                                    <p className="text-sm text-foreground leading-relaxed">{analysis.story_analysis.breaking_point || 'No analysis available'}</p>
-                                  )}
-                                </div>
-
-                                {/* Key Props */}
-                                <div className="space-y-2">
-                                  <h3 className="text-sm font-semibold text-primary">Key Props</h3>
-                                  {isEditMode ? (
-                                    <Textarea
-                                      value={editedScenes[scene.id]?.story_analysis?.key_props || analysis?.story_analysis?.key_props || ''}
-                                      onChange={(e) => {
-                                        const updated = editedScenes[scene.id] || JSON.parse(JSON.stringify(analysis));
-                                        if (!updated.story_analysis) updated.story_analysis = {};
-                                        updated.story_analysis.key_props = e.target.value;
-                                        setEditedScenes(prev => ({ ...prev, [scene.id]: updated }));
-                                      }}
-                                      className="min-h-[60px] text-sm font-mono"
-                                    />
-                                  ) : (
-                                    <p className="text-sm text-foreground">{analysis.story_analysis.key_props || 'No analysis available'}</p>
+                                    <p className="text-sm text-foreground">{analysis.directing_vision?.visual_metaphor || 'No analysis available'}</p>
                                   )}
                                 </div>
                               </>
