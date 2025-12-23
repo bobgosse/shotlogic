@@ -120,7 +120,6 @@ async function parseFDX(buffer: Buffer): Promise<string> {
   console.log('[FDX] Output length:', result.length);
   return result
 }
-}
 
 function parseTXT(buffer: Buffer): string {
   let text = ''
