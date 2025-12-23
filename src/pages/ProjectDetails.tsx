@@ -837,11 +837,11 @@ const ProjectDetails = () => {
         currentSceneId={currentSceneId}
         onSceneSelect={handleSceneSelect}
         onClose={() => setShowNavigator(false)}
-        isOpen={showNavigator}
+        isOpen={showNavigator && !isEditMode}
       />
 
       {/* Main Content */}
-      <div className={`flex-1 transition-all duration-300 ${showNavigator && !isTablet ? "ml-[280px]" : "ml-0"}`}>
+      <div className={`flex-1 transition-all duration-300 ${showNavigator && !isTablet && !isEditMode ? "ml-[280px]" : "ml-0"}`}>
         <div className="bg-card border-b border-border p-6 print:border-0">
           <div className="max-w-7xl mx-auto">
             <div className="flex justify-between items-start mb-4 print:hidden">
@@ -1146,10 +1146,10 @@ const ProjectDetails = () => {
                                !analysis.story_analysis.stakes?.includes('Unable to parse') && 
                                !analysis.story_analysis.stakes?.includes('Analysis failed') &&
                                analysis.story_analysis.stakes !== 'N/A' ? (
-                              <>
-                                {/* Synopsis */}
-                                <div className="space-y-2">
-                                  <h3 className="text-sm font-semibold text-primary">Synopsis</h3>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {/* Synopsis - Full Width */}
+                                <div className="space-y-2 md:col-span-2">
+                                  <h3 className="text-sm font-semibold text-primary flex items-center gap-2">📝 Synopsis</h3>
                                   {isEditMode ? (
                                     <Textarea
                                       value={editedScenes[scene.id]?.story_analysis?.synopsis || analysis?.story_analysis?.synopsis || ''}
@@ -1168,7 +1168,7 @@ const ProjectDetails = () => {
 
                                 {/* Conflict */}
                                 <div className="space-y-2">
-                                  <h3 className="text-sm font-semibold text-primary">Conflict</h3>
+                                  <h3 className="text-sm font-semibold text-primary flex items-center gap-2">⚔️ Conflict</h3>
                                   {isEditMode ? (
                                     <Textarea
                                       value={editedScenes[scene.id]?.story_analysis?.ownership || analysis?.story_analysis?.ownership || ''}
@@ -1187,7 +1187,7 @@ const ProjectDetails = () => {
 
                                 {/* Scene Turn */}
                                 <div className="bg-accent/20 border border-accent/30 rounded-lg p-4">
-                                  <h3 className="text-base font-bold text-accent mb-2">Scene Turn</h3>
+                                  <h3 className="text-sm font-semibold text-accent flex items-center gap-2 mb-2">⚡ Scene Turn</h3>
                                   {isEditMode ? (
                                     <Textarea
                                       value={editedScenes[scene.id]?.story_analysis?.breaking_point || analysis?.story_analysis?.breaking_point || ''}
@@ -1206,7 +1206,7 @@ const ProjectDetails = () => {
 
                                 {/* Stakes */}
                                 <div className="space-y-2">
-                                  <h3 className="text-sm font-semibold text-primary">Stakes</h3>
+                                  <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🎯 Stakes</h3>
                                   {isEditMode ? (
                                     <Textarea
                                       value={editedScenes[scene.id]?.story_analysis?.stakes || analysis?.story_analysis?.stakes || ''}
@@ -1225,7 +1225,7 @@ const ProjectDetails = () => {
 
                                 {/* Tone */}
                                 <div className="space-y-2">
-                                  <h3 className="text-sm font-semibold text-primary">Tone</h3>
+                                  <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🎭 Tone</h3>
                                   {isEditMode ? (
                                     <Textarea
                                       value={editedScenes[scene.id]?.directing_vision?.visual_metaphor || analysis?.directing_vision?.visual_metaphor || ''}
@@ -1241,7 +1241,7 @@ const ProjectDetails = () => {
                                     <p className="text-sm text-foreground">{analysis.directing_vision?.visual_metaphor || 'No analysis available'}</p>
                                   )}
                                 </div>
-                              </>
+                              </div>
                             ) : (
                               <div className="flex flex-col items-center justify-center py-12 gap-4">
                                 <p className="text-center text-muted-foreground">
