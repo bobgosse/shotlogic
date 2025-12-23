@@ -75,9 +75,21 @@ const isShotListItem = (shot: string | ShotListItem): shot is ShotListItem => {
 export const StoryboardDialog = ({ open, onOpenChange, scene, analysis }: StoryboardDialogProps) => {
   const { toast } = useToast();
   const [exportPlaceholders, setExportPlaceholders] = useState(true);
+  const [includePrompts, setIncludePrompts] = useState(false);
 
-  // Initialize with empty shots array since shot_list is no longer in the schema
-  const [shots, setShots] = useState<ShotData[]>([]);
+  // Initialize shots from analysis shot_list
+  const [shots, setShots] = useState<ShotData[]>(() => {
+    const shotList = (analysis as any)?.shot_list || [];
+    return shotList.map((shot: any, index: number) => ({
+      id: `shot-${index}`,
+      shotType: shot.shot_type || 'WIDE',
+      visual: shot.visual || shot.action || '',
+      rationale: shot.rationale || '',
+      imageUrl: null,
+      annotation: '',
+      imagePrompt: shot.image_prompt || ''
+    }));
+  });
 
   const hasEmptyFrames = useMemo(() => {
     return shots.some(shot => !shot.imageUrl);
@@ -93,17 +105,12 @@ export const StoryboardDialog = ({ open, onOpenChange, scene, analysis }: Storyb
       return;
     }
 
-    // Convert shots back to the format expected by PDF generator
-    const shotImages: Record<number, string | null> = {};
-    shots.forEach((shot, index) => {
-      shotImages[index] = shot.imageUrl;
-    });
-
-    // Create modified analysis - storyboard feature temporarily disabled
-    // as the new analysis schema doesn't include shot_list
-    const modifiedAnalysis = analysis;
-
-    await generateStoryboardPDF(scene, modifiedAnalysis, shotImages);
+    await generateStoryboardPDF(
+      scene.scene_number,
+      scene.header.replace(/\n/g, ' '),
+      shots,
+      { includePlaceholders: exportPlaceholders, includePrompts }
+    );
 
     toast({
       title: "Storyboard exported",
@@ -142,15 +149,27 @@ export const StoryboardDialog = ({ open, onOpenChange, scene, analysis }: Storyb
 
         <DialogFooter className="p-6 pt-4 border-t border-border flex-col sm:flex-row gap-4">
           {/* Export Options */}
-          <div className="flex items-center space-x-2 mr-auto">
-            <Switch
-              id="export-placeholders"
-              checked={exportPlaceholders}
-              onCheckedChange={setExportPlaceholders}
-            />
-            <Label htmlFor="export-placeholders" className="text-sm cursor-pointer">
-              Export with placeholders
-            </Label>
+          <div className="flex items-center gap-6 mr-auto">
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="export-placeholders"
+                checked={exportPlaceholders}
+                onCheckedChange={setExportPlaceholders}
+              />
+              <Label htmlFor="export-placeholders" className="text-sm cursor-pointer">
+                Include placeholders
+              </Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="include-prompts"
+                checked={includePrompts}
+                onCheckedChange={setIncludePrompts}
+              />
+              <Label htmlFor="include-prompts" className="text-sm cursor-pointer">
+                Include AI prompts
+              </Label>
+            </div>
           </div>
 
           {/* Warning for empty frames */}
