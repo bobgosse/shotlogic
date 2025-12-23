@@ -1115,6 +1115,19 @@ const ProjectDetails = () => {
 
                     {analysis && hasNewAnalysisStructure(analysis) ? (
                       <>
+                        {/* Re-analyze button for existing analysis */}
+                        <div className="flex justify-end mb-4">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleReanalyzeScene(scene.id, scene.scene_number, scene.content)}
+                            disabled={reanalyzing}
+                            className="text-xs"
+                          >
+                            <RefreshCw className={reanalyzing ? "w-3 h-3 mr-1 animate-spin" : "w-3 h-3 mr-1"} />
+                            {reanalyzing ? 'Re-analyzing...' : 'Re-analyze Scene'}
+                          </Button>
+                        </div>
                         <Tabs defaultValue="story" className="w-full">
                           <TabsList className="w-full grid grid-cols-3 mb-4">
                             <TabsTrigger value="story">Story</TabsTrigger>
