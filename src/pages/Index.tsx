@@ -38,7 +38,15 @@ export default function Index() {
 
     try {
       const buffer = await file.arrayBuffer();
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
+      // Convert to base64 in chunks to avoid stack overflow
+      const bytes = new Uint8Array(buffer);
+      let binary = '';
+      const chunkSize = 8192;
+      for (let i = 0; i < bytes.length; i += chunkSize) {
+        const chunk = bytes.subarray(i, i + chunkSize);
+        binary += String.fromCharCode.apply(null, chunk as any);
+      }
+      const base64 = btoa(binary);
       
       setParsingMessage('Parsing screenplay...');
       
