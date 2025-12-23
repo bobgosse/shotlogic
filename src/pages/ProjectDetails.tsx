@@ -1,7 +1,6 @@
 import React from 'react';
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -162,52 +161,6 @@ const ProjectDetails = () => {
     }
   }, [project?.status, project?.title, project?.id]);
 
-  // Auto-resume logic: detect stalls
-  useEffect(() => {
-    if (!project || project.status === 'COMPLETED') {
-      if (stallCheckRef.current) {
-        clearInterval(stallCheckRef.current);
-        stallCheckRef.current = null;
-      }
-      return;
-    }
-
-    // Track when data changes
-    lastUpdateRef.current = Date.now();
-
-    // Check for stalls every 5 seconds
-    stallCheckRef.current = setInterval(async () => {
-      const timeSinceUpdate = Date.now() - lastUpdateRef.current;
-      
-      if (timeSinceUpdate > 15000 && project.status !== 'COMPLETED') {
-        console.log('Analysis stalled, auto-resuming...');
-        
-        try {
-          const { error } = await supabase.functions.invoke('analyze-next-scene', {
-            body: { projectId: id }
-          });
-
-          if (error) {
-            console.error('Auto-resume failed:', error);
-          } else {
-            toast({
-              title: "Analysis resumed",
-              description: "Automatically continuing analysis",
-            });
-            lastUpdateRef.current = Date.now();
-          }
-        } catch (err) {
-          console.error('Auto-resume error:', err);
-        }
-      }
-    }, 5000);
-
-    return () => {
-      if (stallCheckRef.current) {
-        clearInterval(stallCheckRef.current);
-      }
-    };
-  }, [project, id, toast]);
 
 
   const parseAnalysis = (analysisString: string | null): AnalysisData | null => {
@@ -621,122 +574,6 @@ const ProjectDetails = () => {
     });
   };
 
-  const handleReanalyze = async () => {
-    if (!project || !id) return;
-    
-    setReanalyzing(true);
-    try {
-      // Fetch the original screenplay text
-      const { data: projectData, error: fetchError } = await supabase
-        .from('projects')
-        .select('screenplay_text')
-        .eq('id', id)
-        .single();
-
-      if (fetchError) throw fetchError;
-      if (!projectData.screenplay_text) {
-        throw new Error('No screenplay text found for this project');
-      }
-
-      toast({
-        title: "Re-parsing screenplay...",
-        description: "Using the updated parser to fix scene headers",
-      });
-
-      // Re-parse with the fixed parser
-      const parsedScenes = parseScreenplay(projectData.screenplay_text);
-
-      if (parsedScenes.length === 0) {
-        throw new Error('No scenes found during re-parsing');
-      }
-
-      // Delete existing scenes
-      await supabase
-        .from('scenes')
-        .delete()
-        .eq('project_id', id);
-
-      // Deduplicate scenes by scene_number
-      const sceneMap = new Map(parsedScenes.map(scene => [scene.number, scene]));
-      const uniqueScenes = Array.from(sceneMap.values());
-
-      // Insert new scenes with corrected headers
-      const { error: insertError } = await supabase
-        .from('scenes')
-        .upsert(
-          uniqueScenes.map(scene => ({
-            project_id: id,
-            scene_number: scene.number,
-            header: scene.header,
-            content: scene.content,
-            status: 'pending',
-          })),
-          { onConflict: 'project_id,scene_number' }
-        );
-
-      if (insertError) throw insertError;
-
-      // Update project total_scenes
-      await supabase
-        .from('projects')
-        .update({
-          total_scenes: uniqueScenes.length,
-          current_scene: 0,
-          status: 'pending',
-        })
-        .eq('id', id);
-
-      toast({
-        title: "Re-parsing complete!",
-        description: `Updated ${uniqueScenes.length} scenes with fixed headers. Starting AI analysis...`,
-      });
-
-      // Trigger AI analysis for all scenes
-      for (const scene of uniqueScenes) {
-        try {
-          const { data, error: fnError } = await supabase.functions.invoke('analyze-scene', {
-            body: {
-              sceneContent: scene.content,
-              sceneNumber: scene.number,
-              projectId: id,
-              visualStyle: project?.visual_style || null
-            }
-          });
-
-          if (fnError) {
-            console.error(`Error analyzing scene ${scene.number}:`, fnError);
-            continue;
-          }
-
-          await supabase
-            .from('scenes')
-            .update({
-              analysis: data.analysis,
-              status: data.status,
-            })
-            .eq('project_id', id)
-            .eq('scene_number', scene.number);
-
-        } catch (error) {
-          console.error(`Failed to analyze scene ${scene.number}:`, error);
-        }
-      }
-
-      toast({
-        title: "Re-analysis complete!",
-        description: "All scenes have been updated with corrected data",
-      });
-
-    } catch (error: any) {
-      toast({
-        title: "Re-analysis failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setReanalyzing(false);
-    }
-  };
 
   const handleSaveEdits = async () => {
     if (!id) return;
@@ -1065,14 +902,6 @@ const ProjectDetails = () => {
                 >
                   <Sparkles className={`w-4 h-4 mr-2 ${reanalyzing ? 'animate-pulse' : ''}`} />
                   {reanalyzing ? 'Regenerating...' : 'Regenerate All'}
-                </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={handleReanalyze}
-                  disabled={reanalyzing}
-                >
-                  <RefreshCw className={`w-4 h-4 mr-2 ${reanalyzing ? 'animate-spin' : ''}`} />
-                  {reanalyzing ? 'Re-analyzing...' : 'Re-analyze'}
                 </Button>
             <Button 
                   variant="outline" 
