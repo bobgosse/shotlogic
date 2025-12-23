@@ -15,7 +15,7 @@ import { MobileSceneView } from "@/components/MobileSceneView";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, ArrowLeft, Film, Camera, Printer, Download, RefreshCw, FileText, Edit, Save, Grid, ChevronDown, ChevronsDownUp, ChevronsUpDown, Menu, Sparkles, ImageIcon, Palette, X, Check } from "lucide-react";
+import { Trash2, ArrowLeft, Film, Camera, Printer, Download, RefreshCw, FileText, Edit, Save, Grid, ChevronDown, ChevronsDownUp, ChevronsUpDown, Menu, Sparkles, ImageIcon, Palette, X, Check, Plus } from "lucide-react";
 import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { exportShotListPDF, exportShotListCSV } from "@/utils/shotListExporter";
@@ -1820,44 +1820,115 @@ const ProjectDetails = () => {
                                   </div>
                                   <div className="flex-1 space-y-2">
                                     <div className="flex items-center justify-between gap-2">
-                                      <span className="text-sm font-bold text-primary uppercase tracking-wide">
-                                        {shot.shot_type}
-                                      </span>
+                                      {isEditMode ? (
+                                        <select
+                                          value={editedScenes[scene.id]?.shot_list?.[idx]?.shot_type || shot.shot_type}
+                                          onChange={(e) => {
+                                            const updated = editedScenes[scene.id] || JSON.parse(JSON.stringify(analysis));
+                                            if (!updated.shot_list) updated.shot_list = [...analysis.shot_list];
+                                            updated.shot_list[idx] = { ...updated.shot_list[idx], shot_type: e.target.value };
+                                            setEditedScenes(prev => ({ ...prev, [scene.id]: updated }));
+                                          }}
+                                          className="text-sm font-bold text-primary uppercase tracking-wide bg-background border border-border rounded px-2 py-1"
+                                        >
+                                          <option value="WIDE">WIDE</option>
+                                          <option value="MEDIUM">MEDIUM</option>
+                                          <option value="MEDIUM_CLOSE">MEDIUM CLOSE</option>
+                                          <option value="CLOSE_UP">CLOSE UP</option>
+                                          <option value="EXTREME_CLOSE">EXTREME CLOSE</option>
+                                          <option value="INSERT">INSERT</option>
+                                          <option value="POV">POV</option>
+                                          <option value="OVER_SHOULDER">OVER SHOULDER</option>
+                                          <option value="TWO_SHOT">TWO SHOT</option>
+                                          <option value="GROUP">GROUP</option>
+                                        </select>
+                                      ) : (
+                                        <span className="text-sm font-bold text-primary uppercase tracking-wide">
+                                          {shot.shot_type}
+                                        </span>
+                                      )}
                                       <div className="flex gap-1">
-                                        <Button
-                                          size="sm"
-                                          variant="ghost"
-                                          className="h-7 px-2 text-xs"
-                                          onClick={() => {
-                                            const prompts = generatePromptPair(shot, scene, analysis);
-                                            navigator.clipboard.writeText(prompts.previs);
-                                            toast({ title: "Previs Prompt Copied!", description: "Cinematic Midjourney prompt ready to paste" });
-                                          }}
-                                        >
-                                          <ImageIcon className="h-3 w-3 mr-1" />
-                                          Previs
-                                        </Button>
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          className="h-7 px-2 text-xs"
-                                          onClick={() => {
-                                            const prompts = generatePromptPair(shot, scene, analysis);
-                                            navigator.clipboard.writeText(prompts.storyboard);
-                                            toast({ title: "Storyboard Prompt Copied!", description: "Clean storyboard prompt ready to paste" });
-                                          }}
-                                        >
-                                          Board
-                                        </Button>
+                                        {isEditMode && (
+                                          <Button
+                                            size="sm"
+                                            variant="destructive"
+                                            className="h-7 px-2 text-xs"
+                                            onClick={() => {
+                                              const updated = editedScenes[scene.id] || JSON.parse(JSON.stringify(analysis));
+                                              if (!updated.shot_list) updated.shot_list = [...analysis.shot_list];
+                                              updated.shot_list = updated.shot_list.filter((_, i) => i !== idx);
+                                              setEditedScenes(prev => ({ ...prev, [scene.id]: updated }));
+                                            }}
+                                          >
+                                            <Trash2 className="h-3 w-3" />
+                                          </Button>
+                                        )}
+                                        {!isEditMode && (
+                                          <>
+                                            <Button
+                                              size="sm"
+                                              variant="ghost"
+                                              className="h-7 px-2 text-xs"
+                                              onClick={() => {
+                                                const prompts = generatePromptPair(shot, scene, analysis);
+                                                navigator.clipboard.writeText(prompts.previs);
+                                                toast({ title: "Previs Prompt Copied!", description: "Cinematic Midjourney prompt ready to paste" });
+                                              }}
+                                            >
+                                              <ImageIcon className="h-3 w-3 mr-1" />
+                                              Previs
+                                            </Button>
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              className="h-7 px-2 text-xs"
+                                              onClick={() => {
+                                                const prompts = generatePromptPair(shot, scene, analysis);
+                                                navigator.clipboard.writeText(prompts.storyboard);
+                                                toast({ title: "Storyboard Prompt Copied!", description: "Clean storyboard prompt ready to paste" });
+                                              }}
+                                            >
+                                              Board
+                                            </Button>
+                                          </>
+                                        )}
                                       </div>
                                     </div>
-                                    <p className="text-sm text-foreground leading-relaxed">
-                                      {shot.visual}
-                                    </p>
-                                    {shot.rationale && (
-                                      <p className="text-xs text-muted-foreground italic">
-                                        {shot.rationale}
+                                    {isEditMode ? (
+                                      <Textarea
+                                        value={editedScenes[scene.id]?.shot_list?.[idx]?.visual || shot.visual}
+                                        onChange={(e) => {
+                                          const updated = editedScenes[scene.id] || JSON.parse(JSON.stringify(analysis));
+                                          if (!updated.shot_list) updated.shot_list = [...analysis.shot_list];
+                                          updated.shot_list[idx] = { ...updated.shot_list[idx], visual: e.target.value };
+                                          setEditedScenes(prev => ({ ...prev, [scene.id]: updated }));
+                                        }}
+                                        className="text-sm min-h-[60px]"
+                                        placeholder="Visual description..."
+                                      />
+                                    ) : (
+                                      <p className="text-sm text-foreground leading-relaxed">
+                                        {shot.visual}
                                       </p>
+                                    )}
+                                    {isEditMode ? (
+                                      <Textarea
+                                        value={editedScenes[scene.id]?.shot_list?.[idx]?.rationale || shot.rationale || ''}
+                                        onChange={(e) => {
+                                          const updated = editedScenes[scene.id] || JSON.parse(JSON.stringify(analysis));
+                                          if (!updated.shot_list) updated.shot_list = [...analysis.shot_list];
+                                          updated.shot_list[idx] = { ...updated.shot_list[idx], rationale: e.target.value };
+                                          setEditedScenes(prev => ({ ...prev, [scene.id]: updated }));
+                                        }}
+                                        className="text-xs min-h-[40px] italic"
+                                        placeholder="Rationale for this shot..."
+                                      />
+                                    ) : (
+                                      shot.rationale && (
+                                        <p className="text-xs text-muted-foreground italic">
+                                          {shot.rationale}
+                                        </p>
+                                      )
                                     )}
                                   </div>
                                 </div>
