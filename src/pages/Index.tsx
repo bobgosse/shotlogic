@@ -1,6 +1,6 @@
 import React from 'react';
 import { useState, useCallback, useEffect } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import { Upload, CheckCircle2, AlertCircle, Loader2, FolderOpen, Save, Edit2 } from 'lucide-react'
 
 // ═══════════════════════════════════════════════════════════════
@@ -22,6 +22,7 @@ interface Scene {
 export default function Index() {
   const [searchParams] = useSearchParams();
   const projectId = searchParams.get('projectId');
+  const navigate = useNavigate();
 
   const [fileInfo, setFileInfo] = useState<{ name: string, type: string } | null>(null);
   const [scenes, setScenes] = useState<Scene[]>([]);
@@ -111,6 +112,9 @@ export default function Index() {
       
       // If this was a new project, store the ID
       if (!loadedProjectId && result.id) {
+        // Redirect to full project view
+        navigate(`/project/${result.id}`);
+        return;
         setLoadedProjectId(result.id);
       }
 
