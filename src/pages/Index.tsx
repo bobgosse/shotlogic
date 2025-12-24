@@ -76,17 +76,32 @@ export default function Index() {
     await saveProject(analyzedScenes, name);
   };
 
-  // FIXED: Accept projectName as parameter
+  // FIXED: Accept projectName as parameter AND stringify analysis
   const saveProject = async (analyzedScenes: AnalyzedScene[], name: string) => {
     setIsSaving(true);
     console.log('[DEBUG] Saving project with name:', name);
+    console.log('[DEBUG] Scenes to save:', analyzedScenes.length);
+    
     try {
+      // CRITICAL FIX: Convert analysis objects to JSON strings for database storage
+      // ProjectDetails.tsx expects analysis as a string that it JSON.parse's
+      const scenesForDb = analyzedScenes.map(s => ({
+        number: s.number,
+        text: s.text,
+        // Stringify the analysis object so ProjectDetails can parse it
+        analysis: s.analysis ? JSON.stringify(s.analysis) : null,
+        status: s.status === 'complete' ? 'COMPLETED' : s.status.toUpperCase(),
+        error: s.error
+      }));
+      
+      console.log('[DEBUG] First scene analysis type:', typeof scenesForDb[0]?.analysis);
+      
       const response = await fetch('/api/projects/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: name, // Use passed parameter, not state
-          scenes: analyzedScenes,
+          name: name,
+          scenes: scenesForDb,
           userId: user?.id,
           createdAt: new Date().toISOString()
         })
@@ -95,6 +110,7 @@ export default function Index() {
       const result = await response.json();
       if (result.id) navigate('/project/' + result.id);
     } catch (err) {
+      console.error('[DEBUG] Save error:', err);
       setError('Failed to save project');
       setIsSaving(false);
     }
