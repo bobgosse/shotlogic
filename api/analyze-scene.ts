@@ -3,7 +3,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
-const DEPLOY_TIMESTAMP = "2024-12-24T23:00:00Z_FIELD_STRUCTURE_FIX"
+const DEPLOY_TIMESTAMP = "2024-12-24T23:30:00Z_SYNOPSIS_FIX"
 
 function getEnvironmentVariable(name: string): string | undefined {
   try {
@@ -100,19 +100,20 @@ ${sceneText}
 
 ${visualStyle ? `VISUAL STYLE: "${visualStyle}" - incorporate this into all image prompts.` : ''}
 
-Return a JSON object with this EXACT structure (these field names are required):
+Return a JSON object with this EXACT structure (these field names are REQUIRED):
 
 {
   "story_analysis": {
-    "stakes": "What's at risk in this scene? What could be lost or gained? Be specific.",
+    "synopsis": "A 2-3 sentence summary of what happens in this scene. Describe the action, who's involved, and the outcome.",
+    "stakes": "What's at risk in this scene? What could be lost or gained? Be specific about consequences.",
     "ownership": "Who owns this scene? Which character drives the action and why?",
     "breaking_point": "What's the turning point or key moment? Quote a specific line or describe the pivotal action.",
-    "key_props": "List all important props mentioned or implied (phones, documents, weapons, etc.)"
+    "key_props": "List all important props mentioned or implied (phones, documents, weapons, food, vehicles, etc.)"
   },
   
   "producing_logistics": {
     "red_flags": ["List each budget concern as a separate string", "Stunts, VFX, crowds, vehicles, special equipment", "Be specific about cost impact"],
-    "resource_impact": "Low | Medium | High",
+    "resource_impact": "Low or Medium or High",
     "departments_affected": ["Camera", "Sound", "Art", "Wardrobe", "Makeup", "Stunts", "VFX", "Locations", "Extras"]
   },
   
@@ -125,8 +126,8 @@ Return a JSON object with this EXACT structure (these field names are required):
   "shot_list": [
     {
       "shotNumber": 1,
-      "shotType": "WIDE | MEDIUM | CLOSE_UP | INSERT | POV | OVER_SHOULDER | TWO_SHOT",
-      "movement": "STATIC | PAN | TILT | PUSH_IN | PULL_BACK | DOLLY | TRACK | HANDHELD | STEADICAM",
+      "shotType": "WIDE or MEDIUM or CLOSE_UP or INSERT or POV or OVER_SHOULDER or TWO_SHOT",
+      "movement": "STATIC or PAN or TILT or PUSH_IN or PULL_BACK or DOLLY or TRACK or HANDHELD or STEADICAM",
       "subject": "Who/what is featured",
       "action": "What happens during this shot",
       "visualDescription": "Detailed description of what we see",
@@ -144,7 +145,7 @@ SHOT LIST: Generate ${shotCount} shots with full coverage:
 - Insert shots for props characters touch
 - Vary shot sizes for editorial rhythm
 
-Return ONLY valid JSON. No markdown, no explanation.`
+CRITICAL: Return ONLY valid JSON. No markdown, no explanation, no backticks.`
 
     console.log(`🤖 [${invocationId}] Calling OpenAI API...`)
     const openaiStartTime = Date.now()
@@ -204,6 +205,7 @@ Return ONLY valid JSON. No markdown, no explanation.`
 
     console.log(`✅ [${invocationId}] Analysis complete`)
     console.log(`   - Shots: ${analysis.shot_list?.length || 0}`)
+    console.log(`   - Synopsis: ${analysis.story_analysis?.synopsis?.substring(0, 50) || 'N/A'}...`)
     console.log(`   - Stakes: ${analysis.story_analysis?.stakes?.substring(0, 50) || 'N/A'}...`)
 
     return res.status(200).json({
