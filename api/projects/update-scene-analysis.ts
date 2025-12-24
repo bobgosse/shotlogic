@@ -1,6 +1,5 @@
 // api/projects/update-scene-analysis.ts
 // Updates a single scene's analysis in MongoDB
-
 import { VercelRequest, VercelResponse } from '@vercel/node'
 import { getDb } from '../lib/mongodb.js'
 import { ObjectId } from 'mongodb'
@@ -27,15 +26,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const db = await getDb()
     const collection = db.collection('projects')
-
     const objectId = new ObjectId(projectId)
-    const project = await collection.findOne({ _id: objectId })
 
+    const project = await collection.findOne({ _id: objectId })
     if (!project) {
       return res.status(404).json({ error: 'Project not found' })
     }
 
-    // Extract the actual analysis data (handle nested structure)
+    // Extract the actual analysis data (handle nested structure from API)
     let analysisData = analysis
     if (analysis.data) {
       analysisData = analysis.data
@@ -54,14 +52,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         console.log(`   ✅ Updating scene ${sceneNum}`)
         return {
           ...scene,
-          analysis: {
-            data: analysisData,
-            meta: {
-              sceneNumber: targetNum,
-              updatedAt: new Date().toISOString()
-            }
-          },
-          status: 'complete'
+          // CRITICAL FIX: Stringify analysis so parseAnalysis() can JSON.parse() it
+          // This matches how Index.tsx saves initial analysis
+          analysis: JSON.stringify(analysisData),
+          status: 'COMPLETED'
         }
       }
       return scene
@@ -79,7 +73,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       { $set: { scenes: updatedScenes, updatedAt: new Date() } }
     )
 
-    console.log(`✅ Scene ${sceneNumber} analysis saved`)
+    console.log(`✅ Scene ${sceneNumber} analysis saved as string`)
 
     return res.status(200).json({
       success: true,
