@@ -63,6 +63,8 @@ export default function Index() {
 
       const { screenplayText } = await response.json();
       setParsingMessage('Extracting scenes...');
+      console.log('[DEBUG] Screenplay text received, length:', screenplayText.length);
+      console.log('[DEBUG] First 500 chars:', screenplayText.substring(0, 500));
       processExtractedText(screenplayText);
       
     } catch (err) {
@@ -82,6 +84,8 @@ export default function Index() {
     text = text.replace(/\n{3,}/g, '\n\n');
 
     // Find first scene header
+    console.log('[DEBUG] Looking for scene headers in text of length:', text.length);
+    console.log('[DEBUG] First 500 chars after processing:', text.substring(0, 500));
     const firstSceneMatch = text.match(/(?:^|\n)\s*\d*\s*(?:INT\.|EXT\.|I\/E|I\.E\.)\s+/i);
     
     if (!firstSceneMatch) {
