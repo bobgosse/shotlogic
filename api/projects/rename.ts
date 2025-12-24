@@ -1,102 +1,140 @@
-// API Route: /api/projects/rename
-// Renames a project by updating its name in MongoDB
+// api/projects/rename.ts
+// Renames a project in MongoDB
+import { VercelRequest, VercelResponse } from '@vercel/node'
+import { getDb } from '../lib/mongodb.js'
+import { ObjectId } from 'mongodb'
 
-import { MongoClient, ObjectId } from 'mongodb';
+const DEPLOY_TIMESTAMP = '2025-12-24T20:00:00Z_RENAME_ENDPOINT'
 
-const MONGODB_URI = process.env.MONGODB_URI || process.env.MONGO_URI || '';
-
-export async function PATCH(request: Request) {
-  console.log('📝 Rename project request received');
+export default async function handler(
+  req: VercelRequest,
+  res: VercelResponse
+) {
+  const invocationId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  const startTime = Date.now()
   
+  console.log(`\n✏️  [${invocationId}] ═══════════════════════════════`)
+  console.log(`📅 Timestamp: ${new Date().toISOString()}`)
+  console.log(`🏷️  Deploy: ${DEPLOY_TIMESTAMP}`)
+  console.log(`📍 Method: ${req.method}`)
+
+  // Set CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'PATCH, POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end()
+  }
+
+  if (req.method !== 'PATCH' && req.method !== 'POST') {
+    return res.status(405).json({
+      error: 'Method Not Allowed',
+      message: 'This endpoint only accepts PATCH or POST requests',
+      deployMarker: DEPLOY_TIMESTAMP
+    })
+  }
+
   try {
-    const body = await request.json();
-    const { projectId, newName } = body;
+    const { projectId, newName } = req.body || {}
 
-    if (!projectId) {
-      return new Response(
-        JSON.stringify({ error: 'Project ID is required' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
+    console.log(`📝 [${invocationId}] Rename request:`, { projectId, newName })
+
+    // Validate projectId
+    if (!projectId || typeof projectId !== 'string') {
+      console.error(`❌ [${invocationId}] Project ID is missing or invalid`)
+      return res.status(400).json({
+        error: 'Missing Project ID',
+        message: 'The projectId field is required.',
+        deployMarker: DEPLOY_TIMESTAMP
+      })
     }
 
+    // Validate newName
     if (!newName || typeof newName !== 'string') {
-      return new Response(
-        JSON.stringify({ error: 'New name is required' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
+      console.error(`❌ [${invocationId}] New name is missing or invalid`)
+      return res.status(400).json({
+        error: 'Missing New Name',
+        message: 'The newName field is required.',
+        deployMarker: DEPLOY_TIMESTAMP
+      })
     }
 
-    const trimmedName = newName.trim();
-    
+    const trimmedName = newName.trim()
+
     if (trimmedName.length === 0) {
-      return new Response(
-        JSON.stringify({ error: 'Project name cannot be empty' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
+      return res.status(400).json({
+        error: 'Invalid Name',
+        message: 'Project name cannot be empty.',
+        deployMarker: DEPLOY_TIMESTAMP
+      })
     }
 
     if (trimmedName.length > 100) {
-      return new Response(
-        JSON.stringify({ error: 'Project name must be under 100 characters' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
+      return res.status(400).json({
+        error: 'Invalid Name',
+        message: 'Project name must be under 100 characters.',
+        deployMarker: DEPLOY_TIMESTAMP
+      })
     }
 
+    // Validate ObjectId format
     if (!ObjectId.isValid(projectId)) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid project ID format' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
+      console.error(`❌ [${invocationId}] Invalid ObjectId format: ${projectId}`)
+      return res.status(400).json({
+        error: 'Invalid project ID format',
+        message: `"${projectId}" is not a valid MongoDB ObjectId.`,
+        deployMarker: DEPLOY_TIMESTAMP
+      })
     }
 
-    const client = new MongoClient(MONGODB_URI);
-    await client.connect();
-    
-    const db = client.db('shotlogic');
-    const collection = db.collection('projects');
+    const objectId = new ObjectId(projectId)
+    console.log(`✅ [${invocationId}] Valid ObjectId: ${objectId.toHexString()}`)
 
+    // Connect to database
+    const db = await getDb()
+    const collection = db.collection('projects')
+
+    // Update the project name
     const result = await collection.updateOne(
-      { _id: new ObjectId(projectId) },
+      { _id: objectId },
       { 
         $set: { 
           name: trimmedName,
           updatedAt: new Date().toISOString()
         } 
       }
-    );
-
-    await client.close();
+    )
 
     if (result.matchedCount === 0) {
-      return new Response(
-        JSON.stringify({ error: 'Project not found' }),
-        { status: 404, headers: { 'Content-Type': 'application/json' } }
-      );
+      return res.status(404).json({
+        error: 'Project not found',
+        message: `No project exists with ID: ${projectId}`,
+        deployMarker: DEPLOY_TIMESTAMP
+      })
     }
 
-    console.log(`✅ Project ${projectId} renamed to "${trimmedName}"`);
+    const duration = Date.now() - startTime
+    console.log(`✅ [${invocationId}] SUCCESS - Project renamed to "${trimmedName}" in ${duration}ms`)
 
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: 'Project renamed successfully',
-        newName: trimmedName
-      }),
-      { status: 200, headers: { 'Content-Type': 'application/json' } }
-    );
+    return res.status(200).json({
+      success: true,
+      message: 'Project renamed successfully',
+      newName: trimmedName,
+      projectId: projectId,
+      processingTime: duration,
+      deployMarker: DEPLOY_TIMESTAMP
+    })
 
   } catch (error) {
-    console.error('❌ Rename error:', error);
-    return new Response(
-      JSON.stringify({ 
-        error: 'Failed to rename project',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    );
+    const duration = Date.now() - startTime
+    console.error(`❌ FATAL ERROR: ${error instanceof Error ? error.message : String(error)}`)
+    
+    return res.status(500).json({
+      error: 'Failed to rename project',
+      details: error instanceof Error ? error.message : 'Unknown server error',
+      deployMarker: DEPLOY_TIMESTAMP,
+      processingTime: duration
+    })
   }
-}
-
-export async function POST(request: Request) {
-  return PATCH(request);
 }
