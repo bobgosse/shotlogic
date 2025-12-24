@@ -1,29 +1,166 @@
 import React from 'react';
 import { useState, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Upload, Loader2, Film, ArrowRight, FileText } from 'lucide-react'
+import { Upload, Loader2, Film, CheckCircle, XCircle } from 'lucide-react'
 import { useUser } from '@clerk/clerk-react'
+
+interface ParsedScene {
+  number: number;
+  text: string;
+}
+
+interface AnalyzedScene {
+  number: number;
+  text: string;
+  analysis: any;
+  status: 'pending' | 'analyzing' | 'complete' | 'error';
+  error: string | null;
+}
 
 export default function Index() {
   const navigate = useNavigate();
   const { user } = useUser();
+  
   const [fileInfo, setFileInfo] = useState<{ name: string, type: string } | null>(null);
-  const [scenes, setScenes] = useState<{ number: number; text: string }[]>([]);
+  const [projectName, setProjectName] = useState('Untitled Project');
+  const [error, setError] = useState<string | null>(null);
   const [isParsing, setIsParsing] = useState(false);
   const [parsingMessage, setParsingMessage] = useState('');
-  const [projectName, setProjectName] = useState('Untitled Project');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [scenes, setScenes] = useState<AnalyzedScene[]>([]);
+  const [currentSceneIndex, setCurrentSceneIndex] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  // ═══════════════════════════════════════════════════════════════
-  // FILE HANDLING
-  // ═══════════════════════════════════════════════════════════════
+  const analyzeScene = async (scene: AnalyzedScene, totalScenes: number): Promise<AnalyzedScene> => {
+    try {
+      const response = await fetch('/api/analyze-scene', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sceneText: scene.text,
+          sceneNumber: scene.number,
+          totalScenes: totalScenes
+        })
+      });
+      if (!response.ok) throw new Error('Analysis failed');
+      const result = await response.json();
+      return { ...scene, analysis: result.analysis, status: 'complete', error: null };
+    } catch (err) {
+      return { ...scene, analysis: null, status: 'error', error: 'Analysis failed' };
+    }
+  };
+
+  const analyzeAllScenes = async (parsedScenes: ParsedScene[]) => {
+    setIsAnalyzing(true);
+    setCurrentSceneIndex(0);
+    
+    const initialScenes: AnalyzedScene[] = parsedScenes.map(s => ({
+      number: s.number, text: s.text, analysis: null, status: 'pending', error: null
+    }));
+    setScenes(initialScenes);
+    
+    const analyzedScenes: AnalyzedScene[] = [...initialScenes];
+    
+    for (let i = 0; i < parsedScenes.length; i++) {
+      setCurrentSceneIndex(i);
+      analyzedScenes[i] = { ...analyzedScenes[i], status: 'analyzing' };
+      setScenes([...analyzedScenes]);
+      
+      const result = await analyzeScene(analyzedScenes[i], parsedScenes.length);
+      analyzedScenes[i] = result;
+      setScenes([...analyzedScenes]);
+    }
+    
+    setIsAnalyzing(false);
+    await saveProject(analyzedScenes);
+  };
+
+  const saveProject = async (analyzedScenes: AnalyzedScene[]) => {
+    setIsSaving(true);
+    try {
+      const response = await fetch('/api/projects/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: projectName,
+          scenes: analyzedScenes,
+          userId: user?.id,
+          createdAt: new Date().toISOString()
+        })
+      });
+      if (!response.ok) throw new Error('Failed to save project');
+      const result = await response.json();
+      if (result.id) navigate('/project/' + result.id);
+    } catch (err) {
+      setError('Failed to save project');
+      setIsSaving(false);
+    }
+  };
+
+  function processExtractedText(text: string): ParsedScene[] {
+    console.log("[DEBUG] Text length:", text?.length);
+    console.log("[DEBUG] First 1000 chars:", text?.substring(0, 1000));
+    
+    // Fix spaced-out PDF text (P H O N E -> PHONE)
+    // Pattern: single space between chars, double+ space between words
+    if (text && text.match(/[A-Z] [A-Z] [A-Z]/)) {
+      console.log("[DEBUG] Detected spaced-out text, fixing...");
+      
+      // Split by double+ spaces (word boundaries), fix each segment, rejoin
+      text = text.split(/  +/).map(segment => {
+        // Remove all single spaces within each segment
+        return segment.replace(/ /g, '');
+      }).join(' ');
+      
+      console.log("[DEBUG] After spacing fix, first 500 chars:", text.substring(0, 500));
+    }
+    
+    // Normalize multiple spaces to single space
+    text = text.replace(/  +/g, ' ');
+    
+    // CRITICAL: Insert newlines before scene headers so regex can find them
+    // This handles PDFs where newlines were lost
+    text = text.replace(/\s+(INT\.|EXT\.|I\/E\.|I\.E\.)\s+/gi, '\n$1 ');
+    
+    console.log("[DEBUG] After newline injection, first 500 chars:", text.substring(0, 500));
+    
+    // Find first scene header
+    const firstSceneMatch = text.match(/(?:^|\n)\s*\d*\s*(INT\.|EXT\.|I\/E|I\.E\.)\s+/i);
+    console.log("[DEBUG] First scene match:", firstSceneMatch ? firstSceneMatch[0] : "NOT FOUND");
+    
+    if (!firstSceneMatch) {
+      console.log("[DEBUG] No scene headers found!");
+      return [];
+    }
+    
+    const scriptText = text.substring(firstSceneMatch.index!);
+    console.log("[DEBUG] Script text starts with:", scriptText.substring(0, 200));
+    
+    // Split by scene headers
+    const scenePattern = /(?=(?:^|\n)[ \t]*\d*[ \t]*(?:INT\.|EXT\.|I\/E|I\.E\.)[ \t]+)/gim;
+    const sceneBlocks = scriptText.split(scenePattern);
+    
+    console.log("[DEBUG] Found", sceneBlocks.length, "potential scene blocks");
+    
+    const scenes = sceneBlocks
+      .map(block => block.trim())
+      .filter(block => /^[ \t]*\d*[ \t]*(?:INT\.|EXT\.|I\/E|I\.E\.)[ \t]+/i.test(block.trim()))
+      .map((block, index) => ({ number: index + 1, text: block.trim() }));
+    
+    console.log("[DEBUG] Extracted", scenes.length, "valid scenes");
+    if (scenes.length > 0) {
+      console.log("[DEBUG] First scene header:", scenes[0].text.substring(0, 100));
+    }
+    
+    return scenes;
+  }
 
   const handleFile = useCallback(async (file: File) => {
     setError(null);
+    setScenes([]);
+    
     const fileName = file.name.toLowerCase();
     let fileType: 'txt' | 'pdf' | 'fdx' | null = null;
-    
     if (fileName.endsWith('.txt')) fileType = 'txt';
     else if (fileName.endsWith('.pdf')) fileType = 'pdf';
     else if (fileName.endsWith('.fdx')) fileType = 'fdx';
@@ -32,15 +169,14 @@ export default function Index() {
       setError('Please upload a .txt, .pdf, or .fdx file');
       return;
     }
-
+    
     setFileInfo({ name: file.name, type: fileType });
     setProjectName(file.name.replace(/\.(txt|pdf|fdx)$/i, ''));
     setIsParsing(true);
     setParsingMessage('Reading file...');
-
+    
     try {
       const buffer = await file.arrayBuffer();
-      // Convert to base64 in chunks to avoid stack overflow
       const bytes = new Uint8Array(buffer);
       let binary = '';
       const chunkSize = 8192;
@@ -51,130 +187,35 @@ export default function Index() {
       const base64 = btoa(binary);
       
       setParsingMessage('Parsing screenplay...');
-      
       const response = await fetch('/api/parse-screenplay', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fileData: base64, fileName: file.name, fileType })
       });
-
+      
       if (!response.ok) {
         const err = await response.json();
-        throw new Error(err.error || 'Failed to parse file');
+        throw new Error(err.error || 'Failed to parse screenplay');
       }
-
+      
       const { screenplayText } = await response.json();
       setParsingMessage('Extracting scenes...');
-      console.log('[DEBUG] Screenplay text received, length:', screenplayText.length);
-      console.log('[DEBUG] First 500 chars:', screenplayText.substring(0, 500));
-      processExtractedText(screenplayText);
+      const parsedScenes = processExtractedText(screenplayText);
+      
+      if (parsedScenes.length === 0) {
+        setError('No scene headers found. Make sure your screenplay has INT. or EXT. headers.');
+        setIsParsing(false);
+        return;
+      }
+      
+      setIsParsing(false);
+      await analyzeAllScenes(parsedScenes);
       
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to process file');
       setIsParsing(false);
     }
-  }, []);
-
-  function processExtractedText(text: string) {
-    // Only fix double-spacing issues (preserve single spaces)
-    text = text.replace(/  +/g, ' ');
-
-    // Force newlines before scene headers (case-sensitive)
-    text = text.replace(/(INT\.|EXT\.)/g, '\n$1');
-    text = text.replace(/\n{3,}/g, '\n\n');
-
-    // Find first scene header
-    console.log('[DEBUG] Looking for scene headers in text of length:', text.length);
-    console.log('[DEBUG] First 500 chars after processing:', text.substring(0, 500));
-    const firstSceneMatch = text.match(/(?:^|\n)\s*\d*\s*(?:INT\.|EXT\.|I\/E|I\.E\.)\s+/i);
-    
-    if (!firstSceneMatch) {
-      setError("No scene headers found. Make sure your screenplay has INT. or EXT. headers.");
-      setIsParsing(false);
-      return;
-    }
-
-    const firstSceneIndex = firstSceneMatch.index!;
-    const scriptText = text.substring(firstSceneIndex);
-
-    // Split on scene headers (case-sensitive)
-    const scenePattern = /(?=(?:^|\n)[ \t]*\d*[ \t]*(?:INT\.|EXT\.|I\/E|I\.E\.)[ \t]+)/gim;
-    const sceneBlocks = scriptText.split(scenePattern);
-
-    const validScenes = sceneBlocks
-      .filter(block => {
-        const trimmed = block.trim();
-        if (trimmed.length < 20) return false;
-        return /^[ \t]*\d*[ \t]*(?:INT\.|EXT\.|I\/E|I\.E\.)[ \t]+/i.test(trimmed);
-      })
-      .map((block, index) => ({
-        number: index + 1,
-        text: block.trim()
-      }));
-
-    if (validScenes.length === 0) {
-      setError("Found scene headers but couldn't parse them. The format may be non-standard.");
-      setIsParsing(false);
-      return;
-    }
-
-    setScenes(validScenes);
-    setIsParsing(false);
-    setParsingMessage('');
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  // SAVE & CONTINUE
-  // ═══════════════════════════════════════════════════════════════
-
-  async function saveAndContinue() {
-    setIsSaving(true);
-    setError(null);
-
-    try {
-      // Format scenes for saving
-      const scenesToSave = scenes.map(s => ({
-        number: s.number,
-        text: s.text,
-        analysis: null,
-        status: 'pending',
-        error: null
-      }));
-
-      const response = await fetch('/api/projects/save', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: projectName,
-          scenes: scenesToSave,
-          userId: user?.id,
-          createdAt: new Date().toISOString()
-        })
-      });
-
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || 'Failed to save project');
-      }
-
-      const result = await response.json();
-      
-      if (result.id) {
-        // Redirect to project details where analysis happens
-        navigate(`/project/${result.id}`);
-      } else {
-        throw new Error('No project ID returned');
-      }
-
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save project');
-      setIsSaving(false);
-    }
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  // DRAG & DROP
-  // ═══════════════════════════════════════════════════════════════
+  }, [user, projectName]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -186,158 +227,131 @@ export default function Index() {
     e.preventDefault();
   }, []);
 
-  // ═══════════════════════════════════════════════════════════════
-  // RENDER
-  // ═══════════════════════════════════════════════════════════════
+  const completedScenes = scenes.filter(s => s.status === 'complete' || s.status === 'error').length;
+  const totalScenes = scenes.length;
+  const progressPercent = totalScenes > 0 ? Math.round((completedScenes / totalScenes) * 100) : 0;
+  const currentScene = scenes[currentSceneIndex];
+
+  const getSceneHeader = (text: string) => {
+    const match = text.match(/^.*?(INT\.|EXT\.|I\/E|I\.E\.).*?(?:\n|$)/i);
+    return match ? match[0].trim().substring(0, 50) : 'Scene';
+  };
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">
-      {/* Header */}
       <header className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2">
           <div className="w-8 h-8 bg-[#E50914] rounded flex items-center justify-center">
             <Film className="w-4 h-4 text-white" />
           </div>
-          <span className="font-semibold">ShotLogic</span>
-        </Link>
-        <Link to="/" className="text-sm text-white/60 hover:text-white">
-          ← Back to Projects
+          <span className="font-semibold text-lg">ShotLogic</span>
         </Link>
       </header>
 
       <main className="max-w-3xl mx-auto px-6 py-12">
-        {/* Step indicator */}
-        <div className="flex items-center gap-4 mb-8 text-sm">
-          <div className={`flex items-center gap-2 ${!fileInfo ? 'text-[#E50914]' : 'text-white/40'}`}>
-            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${!fileInfo ? 'bg-[#E50914]' : 'bg-white/20'}`}>1</div>
-            Upload
-          </div>
-          <div className="flex-1 h-px bg-white/20" />
-          <div className={`flex items-center gap-2 ${fileInfo && scenes.length === 0 ? 'text-[#E50914]' : scenes.length > 0 ? 'text-white/40' : 'text-white/40'}`}>
-            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${fileInfo && scenes.length === 0 ? 'bg-[#E50914]' : scenes.length > 0 ? 'bg-white/20' : 'bg-white/10'}`}>2</div>
-            Parse
-          </div>
-          <div className="flex-1 h-px bg-white/20" />
-          <div className={`flex items-center gap-2 ${scenes.length > 0 ? 'text-[#E50914]' : 'text-white/40'}`}>
-            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${scenes.length > 0 ? 'bg-[#E50914]' : 'bg-white/10'}`}>3</div>
-            Analyze
-          </div>
-        </div>
-
-        {/* Error display */}
         {error && (
           <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400">
             {error}
           </div>
         )}
 
-        {/* STEP 1: Upload */}
-        {scenes.length === 0 && !isParsing && (
-          <div
-            onDrop={handleDrop}
-            onDragOver={handleDragOver}
-            className="border-2 border-dashed border-white/20 rounded-xl p-12 text-center hover:border-[#E50914]/50 transition-colors cursor-pointer"
-            onClick={() => document.getElementById('file-input')?.click()}
-          >
-            <Upload className="w-12 h-12 text-white/40 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Upload Your Screenplay</h2>
-            <p className="text-white/50 mb-4">Drag & drop or click to browse</p>
-            <p className="text-white/30 text-sm">Supports .pdf, .fdx, .txt</p>
-            <input
-              id="file-input"
-              type="file"
-              accept=".txt,.pdf,.fdx"
-              className="hidden"
-              onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
-            />
-          </div>
-        )}
-
-        {/* STEP 2: Parsing */}
-        {isParsing && (
-          <div className="text-center py-16">
-            <Loader2 className="w-12 h-12 text-[#E50914] mx-auto mb-4 animate-spin" />
-            <p className="text-lg">{parsingMessage}</p>
-            {fileInfo && (
-              <p className="text-white/50 mt-2">{fileInfo.name}</p>
-            )}
-          </div>
-        )}
-
-        {/* STEP 3: Review & Save */}
-        {scenes.length > 0 && !isParsing && (
-          <div className="space-y-6">
-            {/* Project name */}
-            <div>
-              <label className="block text-sm text-white/60 mb-2">Project Name</label>
+        {!isParsing && !isAnalyzing && !isSaving && scenes.length === 0 && (
+          <>
+            <div className="text-center mb-8">
+              <h1 className="text-3xl font-bold mb-2">Upload Your Screenplay</h1>
+              <p className="text-white/60">We'll analyze every scene automatically</p>
+            </div>
+            <div
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              onClick={() => document.getElementById('file-input')?.click()}
+              className="border-2 border-dashed border-white/20 rounded-xl p-16 text-center cursor-pointer hover:border-[#E50914]/50 hover:bg-white/5 transition-all"
+            >
+              <Upload className="w-12 h-12 text-white/40 mx-auto mb-4" />
+              <p className="text-lg font-medium mb-2">Drag & drop or click to browse</p>
+              <p className="text-white/50 text-sm">Supports .pdf, .fdx, .txt</p>
               <input
-                type="text"
-                value={projectName}
-                onChange={(e) => setProjectName(e.target.value)}
-                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:border-[#E50914] focus:outline-none"
+                id="file-input"
+                type="file"
+                accept=".pdf,.fdx,.txt"
+                onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+                className="hidden"
               />
             </div>
+          </>
+        )}
 
-            {/* Scene summary */}
-            <div className="bg-white/5 border border-white/10 rounded-lg p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <FileText className="w-5 h-5 text-[#E50914]" />
-                <h3 className="font-semibold">Detected {scenes.length} Scenes</h3>
+        {isParsing && (
+          <div className="text-center py-20">
+            <Loader2 className="w-12 h-12 text-[#E50914] animate-spin mx-auto mb-4" />
+            <h2 className="text-xl font-medium mb-2">{parsingMessage}</h2>
+            <p className="text-white/50">Processing {fileInfo?.name}</p>
+          </div>
+        )}
+
+        {isAnalyzing && (
+          <div className="py-8">
+            <div className="text-center mb-8">
+              <h2 className="text-2xl font-bold mb-2">Analyzing Screenplay</h2>
+              <p className="text-white/60">{fileInfo?.name}</p>
+            </div>
+            
+            <div className="mb-6">
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-white/60">Progress</span>
+                <span className="font-medium">{completedScenes} of {totalScenes} scenes</span>
               </div>
-              
-              <div className="max-h-64 overflow-y-auto space-y-2">
-                {scenes.slice(0, 10).map((scene) => (
-                  <div key={scene.number} className="text-sm text-white/60 truncate">
-                    <span className="text-[#E50914] font-mono mr-2">Scene {scene.number}</span>
-                    {scene.text.split('\n')[0].substring(0, 80)}...
-                  </div>
-                ))}
-                {scenes.length > 10 && (
-                  <p className="text-white/40 text-sm pt-2">
-                    ...and {scenes.length - 10} more scenes
-                  </p>
-                )}
+              <div className="h-3 bg-white/10 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-[#E50914] transition-all duration-300"
+                  style={{ width: progressPercent + '%' }}
+                />
               </div>
+              <div className="text-right text-sm text-white/50 mt-1">{progressPercent}%</div>
             </div>
 
-            {/* CTA */}
-            <button
-              onClick={saveAndContinue}
-              disabled={isSaving}
-              className="w-full py-4 bg-[#E50914] hover:bg-[#B20710] disabled:opacity-50 rounded-lg font-semibold text-lg flex items-center justify-center gap-2 transition-colors"
-            >
-              {isSaving ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  Save & Start Analyzing
-                  <ArrowRight className="w-5 h-5" />
-                </>
-              )}
-            </button>
+            {currentScene && (
+              <div className="bg-white/5 rounded-lg p-4 mb-6">
+                <div className="flex items-center gap-3">
+                  <Loader2 className="w-5 h-5 text-[#E50914] animate-spin flex-shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-sm text-white/50">Now analyzing:</p>
+                    <p className="font-medium truncate">Scene {currentScene.number}: {getSceneHeader(currentScene.text)}</p>
+                  </div>
+                </div>
+              </div>
+            )}
 
-            <p className="text-center text-white/40 text-sm">
-              You'll be taken to your project workspace where AI analysis happens
-            </p>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {scenes.map((scene) => (
+                <div 
+                  key={scene.number}
+                  className={'flex items-center gap-3 p-3 rounded-lg ' + (
+                    scene.status === 'analyzing' ? 'bg-[#E50914]/10 border border-[#E50914]/30' :
+                    scene.status === 'complete' ? 'bg-green-500/10' :
+                    scene.status === 'error' ? 'bg-red-500/10' : 'bg-white/5'
+                  )}
+                >
+                  {scene.status === 'complete' && <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />}
+                  {scene.status === 'error' && <XCircle className="w-4 h-4 text-red-500 flex-shrink-0" />}
+                  {scene.status === 'analyzing' && <Loader2 className="w-4 h-4 text-[#E50914] animate-spin flex-shrink-0" />}
+                  {scene.status === 'pending' && <div className="w-4 h-4 rounded-full bg-white/20 flex-shrink-0" />}
+                  <span className="text-sm text-white/70 truncate">Scene {scene.number}: {getSceneHeader(scene.text)}</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-center text-white/40 text-sm mt-6">This may take a few minutes...</p>
+          </div>
+        )}
 
-            {/* Start over */}
-            <button
-              onClick={() => {
-                setScenes([]);
-                setFileInfo(null);
-                setProjectName('Untitled Project');
-              }}
-              className="w-full py-2 text-white/40 hover:text-white text-sm"
-            >
-              ← Upload a different file
-            </button>
+        {isSaving && (
+          <div className="text-center py-20">
+            <Loader2 className="w-12 h-12 text-[#E50914] animate-spin mx-auto mb-4" />
+            <h2 className="text-xl font-medium mb-2">Saving Project</h2>
+            <p className="text-white/50">Almost there...</p>
           </div>
         )}
       </main>
     </div>
   );
 }
-// v2 - case insensitive scene detection
