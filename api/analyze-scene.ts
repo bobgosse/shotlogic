@@ -4,7 +4,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
-const DEPLOY_TIMESTAMP = "2024-12-22T14:00:00Z_ENHANCED_SKILLS"
+const DEPLOY_TIMESTAMP = "2024-12-24T21:00:00Z_FIELD_NAME_FIX"
 
 function getEnvironmentVariable(name: string): string | undefined {
   try {
@@ -398,9 +398,19 @@ Return ONLY valid JSON. No markdown, no explanation outside JSON.`
     console.log(`   - Shots generated: ${analysis.shotList?.length || 0}`)
     console.log(`   - Props found: ${analysis.producingAnalysis?.keyProps?.length || 0}`)
 
+    // ═══════════════════════════════════════════════════════════════
+    // MAP FIELD NAMES TO MATCH ProjectDetails.tsx EXPECTATIONS
+    // ═══════════════════════════════════════════════════════════════
+    const mappedAnalysis = {
+      story_analysis: analysis.narrativeAnalysis,
+      producing_logistics: analysis.producingAnalysis,
+      directing_vision: analysis.directingAnalysis,
+      shotList: analysis.shotList
+    }
+
     return res.status(200).json({
       success: true,
-      analysis,
+      analysis: mappedAnalysis,
       meta: {
         sceneNumber,
         complexity,
