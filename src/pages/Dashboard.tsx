@@ -16,6 +16,8 @@ function Dashboard() {
   const [projects, setProjects] = useState<ProjectItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showClaimOption, setShowClaimOption] = useState(false)
+  const [isClaiming, setIsClaiming] = useState(false)
 
   const showToast = useCallback((
     title: string, 
@@ -88,6 +90,47 @@ function Dashboard() {
       showToast('Delete Failed', 'Could not delete project', 'destructive')
     }
   }
+
+  
+  const claimOrphanProjects = async () => {
+    if (!user) return
+    setIsClaiming(true)
+    try {
+      const response = await fetch('/api/projects/claim-orphans', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id })
+      })
+      const result = await response.json()
+      if (result.success && result.claimedCount > 0) {
+        alert(`Claimed ${result.claimedCount} project(s)! Refreshing...`)
+        window.location.reload()
+      } else {
+        alert('No unclaimed projects found.')
+      }
+    } catch (err) {
+      alert('Failed to claim projects')
+    } finally {
+      setIsClaiming(false)
+    }
+  }
+
+  // Check for orphan projects on load
+  useEffect(() => {
+    async function checkOrphans() {
+      try {
+        const response = await fetch('/api/projects/get-all')
+        const result = await response.json()
+        if (result.projects && result.projects.length > 0 && projects.length === 0) {
+          setShowClaimOption(true)
+        }
+      } catch (e) {}
+    }
+    if (isLoaded && user && !isLoading && projects.length === 0) {
+      checkOrphans()
+    }
+  }, [isLoaded, user, isLoading, projects.length])
+
 
   if (!isLoaded) {
     return (
@@ -164,6 +207,15 @@ function Dashboard() {
               <Plus className="w-4 h-4" />
               Upload Screenplay
             </Link>
+            {showClaimOption && (
+              <button
+                onClick={claimOrphanProjects}
+                disabled={isClaiming}
+                className="mt-4 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm text-white/70 transition-colors"
+              >
+                {isClaiming ? 'Claiming...' : '🔄 Claim existing test projects'}
+              </button>
+            )}
           </div>
         ) : (
           <ProjectList 
