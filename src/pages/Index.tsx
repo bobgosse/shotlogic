@@ -2,9 +2,11 @@ import React from 'react';
 import { useState, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Upload, Loader2, Film, ArrowRight, FileText } from 'lucide-react'
+import { useUser } from '@clerk/clerk-react'
 
 export default function Index() {
   const navigate = useNavigate();
+  const { user } = useUser();
   const [fileInfo, setFileInfo] = useState<{ name: string, type: string } | null>(null);
   const [scenes, setScenes] = useState<{ number: number; text: string }[]>([]);
   const [isParsing, setIsParsing] = useState(false);
@@ -145,6 +147,7 @@ export default function Index() {
         body: JSON.stringify({
           name: projectName,
           scenes: scenesToSave,
+          userId: user?.id,
           createdAt: new Date().toISOString()
         })
       });

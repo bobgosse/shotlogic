@@ -1,15 +1,9 @@
 import React from 'react';
-// src/pages/Dashboard.tsx
-// Complete dashboard with ShotLogic logo and branding - CLEAN CODE
-
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Loader2, Plus, Home } from 'lucide-react'
+import { Loader2, Plus, Film } from 'lucide-react'
+import { UserButton, useUser } from '@clerk/clerk-react'
 import ProjectList from '../components/ProjectList'
-
-// ═══════════════════════════════════════════════════════════════
-// TYPE DEFINITIONS
-// ═══════════════════════════════════════════════════════════════
 
 interface ProjectItem {
   _id: string
@@ -17,18 +11,12 @@ interface ProjectItem {
   updatedAt: string
 }
 
-// ═══════════════════════════════════════════════════════════════
-// MAIN COMPONENT
-// ═══════════════════════════════════════════════════════════════
-
 function Dashboard() {
+  const { user, isLoaded } = useUser()
   const [projects, setProjects] = useState<ProjectItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // ---------------------------------------------------------------
-  // TOAST UTILITY
-  // ---------------------------------------------------------------
   const showToast = useCallback((
     title: string, 
     description?: string, 
@@ -40,29 +28,24 @@ function Dashboard() {
       alert(`❌ ${message}`)
     } else {
       console.log(message)
-      alert(`✅ ${message}`)
     }
   }, [])
 
-  // ---------------------------------------------------------------
-  // FETCH PROJECTS ON MOUNT
-  // ---------------------------------------------------------------
   useEffect(() => {
+    if (!isLoaded || !user) return
+
     const fetchProjects = async () => {
-      console.log('📂 Fetching projects from cloud...')
+      console.log('📂 Fetching projects for user:', user.id)
       setIsLoading(true)
       setError(null)
-
       try {
-        const response = await fetch('/api/projects/get-all', {
+        const response = await fetch(`/api/projects/get-all?userId=${user.id}`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json'
           }
         })
-
         console.log(`📥 Response status: ${response.status}`)
-
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}))
           console.error('❌ Fetch failed:', errorData)
@@ -72,149 +55,123 @@ function Dashboard() {
             'Failed to load projects from cloud database'
           )
         }
-
         const result = await response.json()
         console.log('✅ Projects loaded:', result)
-
         if (!result.success || !result.projects) {
           throw new Error('Invalid response format from server')
         }
-
         setProjects(result.projects)
         console.log(`📊 Total projects: ${result.projects.length}`)
-
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred'
         console.error('❌ Load error:', errorMessage)
         setError(errorMessage)
-        showToast(
-          'Failed to Load Projects',
-          errorMessage,
-          'destructive'
-        )
+        showToast('Failed to Load Projects', errorMessage, 'destructive')
       } finally {
         setIsLoading(false)
       }
     }
-
     fetchProjects()
-  }, [showToast])
+  }, [isLoaded, user, showToast])
 
-  // ---------------------------------------------------------------
-  // RENDER
-  // ---------------------------------------------------------------
+  const handleDeleteProject = async (projectId: string, projectName: string) => {
+    if (!confirm(`Are you sure you want to delete "${projectName}"?`)) return
+    
+    try {
+      const response = await fetch(`/api/projects/delete?id=${projectId}`, {
+        method: 'DELETE'
+      })
+      if (!response.ok) throw new Error('Failed to delete project')
+      setProjects(prev => prev.filter(p => p._id !== projectId))
+      showToast('Project Deleted', `"${projectName}" has been removed`)
+    } catch (err) {
+      showToast('Delete Failed', 'Could not delete project', 'destructive')
+    }
+  }
+
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-[#E50914] animate-spin" />
+      </div>
+    )
+  }
 
   return (
-    <div className="min-h-screen bg-[#141414] text-white p-8">
-      <div className="max-w-6xl mx-auto space-y-8">
-        
-        {/* FIXED: Main Header with Logo, Branding and Action Buttons */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4 flex-1">
-            {/* Logo */}
-            <Link to="/" className='inline-block'>
-              <img 
-                src="/images/shotlogic-logo.jpg" 
-                alt="ShotLogic Logo"
-                className="h-20 w-20 object-contain hover:opacity-80 transition-opacity cursor-pointer rounded-lg"
-              />
-            </Link>
-            
-            {/* Text Branding */}
-            <div>
-              <Link to="/" className='inline-block'>
-                <h1 className="text-5xl font-bold text-[#E50914] hover:text-red-700 transition-colors cursor-pointer">
-                  ShotLogic
-                </h1>
-              </Link>
-              <p className="text-xl text-gray-400 mt-1">
-                AI-Powered Screenplay Analysis for Production Planning
-              </p>
-            </div>
+    <div className="min-h-screen bg-[#0a0a0a] text-white">
+      {/* Header */}
+      <header className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
+        <Link to="/" className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-[#E50914] rounded flex items-center justify-center">
+            <Film className="w-4 h-4 text-white" />
           </div>
+          <span className="font-semibold text-lg">ShotLogic</span>
+        </Link>
+        
+        <div className="flex items-center gap-4">
+          <span className="text-white/60 text-sm">
+            {user?.firstName || user?.emailAddresses?.[0]?.emailAddress || 'User'}
+          </span>
+          <UserButton afterSignOutUrl="/" />
+        </div>
+      </header>
 
-          {/* Action Buttons */}
-          <div className="flex items-center gap-3">
-            <Link 
-              to="/analyze"
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gray-800 border border-gray-700 rounded-md hover:bg-gray-700 transition-colors"
+      {/* Main Content */}
+      <main className="max-w-5xl mx-auto px-6 py-8">
+        {/* Title Row */}
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-2xl font-bold">My Projects</h1>
+            <p className="text-white/50 text-sm mt-1">
+              {projects.length} project{projects.length !== 1 ? 's' : ''}
+            </p>
+          </div>
+          <Link
+            to="/upload"
+            className="flex items-center gap-2 px-4 py-2 bg-[#E50914] hover:bg-[#B20710] rounded-lg font-medium transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            New Project
+          </Link>
+        </div>
+
+        {/* Content */}
+        {isLoading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-8 h-8 text-[#E50914] animate-spin" />
+          </div>
+        ) : error ? (
+          <div className="text-center py-20">
+            <p className="text-red-400 mb-4">{error}</p>
+            <button 
+              onClick={() => window.location.reload()}
+              className="text-[#E50914] hover:underline"
             >
-              <Home className="w-4 h-4" />
-              Analyze Screenplay
-            </Link>
-            
+              Try again
+            </button>
+          </div>
+        ) : projects.length === 0 ? (
+          <div className="text-center py-20">
+            <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Film className="w-8 h-8 text-white/30" />
+            </div>
+            <h2 className="text-xl font-medium mb-2">No projects yet</h2>
+            <p className="text-white/50 mb-6">Upload a screenplay to get started</p>
             <Link
-              to="/analyze"
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[#E50914] rounded-md hover:bg-red-700 transition-colors"
+              to="/upload"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-[#E50914] hover:bg-[#B20710] rounded-lg font-medium transition-colors"
             >
               <Plus className="w-4 h-4" />
-              New Project
+              Upload Screenplay
             </Link>
           </div>
-        </div>
-
-        {/* Projects Section */}
-        <div className="bg-gray-900 rounded-lg border border-gray-700 shadow-xl p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-semibold text-white">
-              My Projects
-            </h2>
-            {!isLoading && !error && (
-              <span className="text-sm text-gray-400">
-                {projects.length} project{projects.length !== 1 ? 's' : ''}
-              </span>
-            )}
-          </div>
-
-          {/* Loading State */}
-          {isLoading && (
-            <div className="flex flex-col items-center justify-center py-12">
-              <Loader2 className="w-12 h-12 animate-spin text-[#E50914] mb-4" />
-              <p className="text-gray-400">Loading your projects...</p>
-            </div>
-          )}
-
-          {/* Error State */}
-          {error && !isLoading && (
-            <div className="bg-red-900/30 border border-[#E50914] rounded-lg p-6">
-              <h3 className="text-white font-semibold mb-2">
-                Failed to Load Projects
-              </h3>
-              <p className="text-red-300 text-sm">
-                {error}
-              </p>
-              <button
-                onClick={() => window.location.reload()}
-                className="mt-4 px-4 py-2 text-sm font-medium text-white bg-[#E50914] rounded-md hover:bg-red-700 transition-colors"
-              >
-                Retry
-              </button>
-            </div>
-          )}
-
-          {/* ProjectList Component */}
-          {!isLoading && !error && (
-            <ProjectList 
-              projects={projects}
-              setProjects={setProjects}
-              showToast={showToast}
-            />
-          )}
-        </div>
-
-        {/* Info Section */}
-        <div className="bg-gray-900 rounded-lg border border-gray-700 p-6">
-          <h3 className="text-lg font-semibold text-white mb-3">
-            💡 Project Management Tips
-          </h3>
-          <ul className="space-y-2 text-sm text-gray-400">
-            <li>• Click on a project to open and view the full analysis</li>
-            <li>• Projects are automatically saved to the cloud after analysis</li>
-            <li>• Use the delete button to permanently remove unwanted projects</li>
-            <li>• Project names are taken from your screenplay filename</li>
-          </ul>
-        </div>
-      </div>
+        ) : (
+          <ProjectList 
+            projects={projects} 
+            onDelete={handleDeleteProject}
+          />
+        )}
+      </main>
     </div>
   )
 }

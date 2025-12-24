@@ -1,12 +1,11 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { SignedIn, SignedOut, RedirectToSignIn } from '@clerk/clerk-react'
 import Index from './pages/Index'
-import Landing from './pages/Landing'
 import Dashboard from './pages/Dashboard'
 import ProjectDetails from './pages/ProjectDetails'
 
-// Create a query client
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -16,21 +15,27 @@ const queryClient = new QueryClient({
   },
 })
 
+// Protected route wrapper
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  return (
+    <>
+      <SignedIn>{children}</SignedIn>
+      <SignedOut><RedirectToSignIn /></SignedOut>
+    </>
+  )
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <Routes>
-          {/* Dashboard (Project List) is the landing page */}
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/projects" element={<Dashboard />} />
-          <Route path="/upload" element={<Index />} />
-          
-          {/* Analysis/Upload page */}
-          <Route path="/analyze" element={<Index />} />
-          
-          {/* Project Details page */}
-          <Route path="/project/:id" element={<ProjectDetails />} />
+          {/* All routes are protected */}
+          <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/projects" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/upload" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+          <Route path="/analyze" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+          <Route path="/project/:id" element={<ProtectedRoute><ProjectDetails /></ProtectedRoute>} />
         </Routes>
       </BrowserRouter>
     </QueryClientProvider>
