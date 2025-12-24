@@ -36,7 +36,7 @@ export default async function handler(
       { $set: { userId: userId } }
     )
 
-    console.log(`✅ Claimed ${result.modifiedCount} orphan projects for user ${userId}`)
+    console.log("Claimed " + result.modifiedCount + " orphan projects for user " + userId);
 
     return res.status(200).json({
       success: true,
