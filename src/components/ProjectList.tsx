@@ -1,9 +1,9 @@
 // src/components/ProjectList.tsx
-// Project List component - FIXED NAVIGATION
+// Project List component - WITH EDIT FUNCTIONALITY
 
 import { useCallback, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Trash2, Loader2, Calendar, AlertCircle } from 'lucide-react'
+import { Trash2, Loader2, Calendar, AlertCircle, Pencil, Check, X } from 'lucide-react'
 
 // ═══════════════════════════════════════════════════════════════
 // TYPE DEFINITIONS
@@ -38,6 +38,94 @@ function isValidObjectId(id: any): boolean {
 
 function ProjectList({ projects, setProjects, showToast }: ProjectListProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editName, setEditName] = useState('')
+  const [savingId, setSavingId] = useState<string | null>(null)
+
+  // ---------------------------------------------------------------
+  // EDIT HANDLERS
+  // ---------------------------------------------------------------
+  
+  const startEditing = (projectId: string, currentName: string) => {
+    setEditingId(projectId)
+    setEditName(currentName)
+  }
+
+  const cancelEditing = () => {
+    setEditingId(null)
+    setEditName('')
+  }
+
+  const saveEdit = useCallback(async (projectId: string) => {
+    const trimmedName = editName.trim()
+    
+    if (!trimmedName) {
+      showToast('Invalid Name', 'Project name cannot be empty.', 'destructive')
+      return
+    }
+
+    if (trimmedName.length > 100) {
+      showToast('Invalid Name', 'Project name must be under 100 characters.', 'destructive')
+      return
+    }
+
+    console.log(`✏️  Saving new name for project ${projectId}: "${trimmedName}"`)
+    setSavingId(projectId)
+
+    try {
+      const response = await fetch('/api/projects/rename', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          projectId,
+          newName: trimmedName
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to rename project')
+      }
+
+      const result = await response.json()
+      console.log('✅ Rename successful:', result)
+
+      // Update local state
+      setProjects(prevProjects => 
+        prevProjects.map(p => 
+          p._id === projectId 
+            ? { ...p, name: trimmedName, updatedAt: new Date().toISOString() }
+            : p
+        )
+      )
+
+      showToast('Project Renamed', `Project renamed to "${trimmedName}"`)
+      setEditingId(null)
+      setEditName('')
+
+    } catch (error) {
+      console.error('❌ Rename error:', error)
+      showToast(
+        'Rename Failed',
+        error instanceof Error ? error.message : 'Failed to rename project.',
+        'destructive'
+      )
+    } finally {
+      setSavingId(null)
+    }
+  }, [editName, setProjects, showToast])
+
+  // Handle Enter key to save, Escape to cancel
+  const handleKeyDown = (e: React.KeyboardEvent, projectId: string) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      saveEdit(projectId)
+    } else if (e.key === 'Escape') {
+      cancelEditing()
+    }
+  }
 
   // ---------------------------------------------------------------
   // DELETE HANDLER
@@ -226,6 +314,9 @@ function ProjectList({ projects, setProjects, showToast }: ProjectListProps) {
           const projectId = project._id
           const projectName = project.name || 'Untitled Project'
           const hasValidId = isValidObjectId(projectId)
+          const isEditing = editingId === projectId
+          const isSaving = savingId === projectId
+          const isDeleting = deletingId === projectId
 
           if (!hasValidId) {
             console.warn(`⚠️  Invalid project at index ${index}:`, {
@@ -247,16 +338,59 @@ function ProjectList({ projects, setProjects, showToast }: ProjectListProps) {
             >
               {/* Project Info */}
               <div className="flex-1 min-w-0">
-                {hasValidId ? (
-                  // Valid project - clickable link - FIXED LINK
-                  <Link 
-to={`/project/${projectId}`} 
-                    className="block hover:text-[#E50914] transition-colors"
-                  >
-                    <h3 className="text-lg font-semibold text-white truncate">
-                      {projectName}
-                    </h3>
-                  </Link>
+                {isEditing ? (
+                  // Edit mode - inline input
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      onKeyDown={(e) => handleKeyDown(e, projectId)}
+                      className="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-white text-lg font-semibold focus:outline-none focus:border-[#E50914] focus:ring-1 focus:ring-[#E50914]"
+                      placeholder="Enter project name"
+                      autoFocus
+                      disabled={isSaving}
+                    />
+                    <button
+                      onClick={() => saveEdit(projectId)}
+                      disabled={isSaving}
+                      className="p-2 text-green-500 hover:bg-green-500/20 rounded transition-colors disabled:opacity-50"
+                      title="Save"
+                    >
+                      {isSaving ? (
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                      ) : (
+                        <Check className="w-5 h-5" />
+                      )}
+                    </button>
+                    <button
+                      onClick={cancelEditing}
+                      disabled={isSaving}
+                      className="p-2 text-gray-400 hover:bg-gray-600/50 rounded transition-colors disabled:opacity-50"
+                      title="Cancel"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                ) : hasValidId ? (
+                  // Valid project - clickable link with edit button
+                  <div className="flex items-center gap-2">
+                    <Link 
+                      to={`/project/${projectId}`} 
+                      className="block hover:text-[#E50914] transition-colors flex-1 min-w-0"
+                    >
+                      <h3 className="text-lg font-semibold text-white truncate">
+                        {projectName}
+                      </h3>
+                    </Link>
+                    <button
+                      onClick={() => startEditing(projectId, projectName)}
+                      className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-600/50 rounded transition-colors"
+                      title="Rename project"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                  </div>
                 ) : (
                   // Invalid project - no link
                   <div className="flex items-center gap-2">
@@ -282,32 +416,34 @@ to={`/project/${projectId}`}
               </div>
 
               {/* Delete Button */}
-              <button
-                onClick={() => handleDelete(projectId, projectName)}
-                disabled={!hasValidId || deletingId === projectId}
-                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors ml-4 ${
-                  hasValidId
-                    ? 'text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed'
-                    : 'text-gray-500 bg-gray-700 cursor-not-allowed opacity-50'
-                }`}
-                title={
-                  hasValidId
-                    ? `Delete ${projectName}`
-                    : 'Cannot delete - Invalid project ID'
-                }
-              >
-                {deletingId === projectId ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Deleting...
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="w-4 h-4" />
-                    {hasValidId ? 'Delete' : 'Invalid'}
-                  </>
-                )}
-              </button>
+              {!isEditing && (
+                <button
+                  onClick={() => handleDelete(projectId, projectName)}
+                  disabled={!hasValidId || isDeleting}
+                  className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors ml-4 ${
+                    hasValidId
+                      ? 'text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed'
+                      : 'text-gray-500 bg-gray-700 cursor-not-allowed opacity-50'
+                  }`}
+                  title={
+                    hasValidId
+                      ? `Delete ${projectName}`
+                      : 'Cannot delete - Invalid project ID'
+                  }
+                >
+                  {isDeleting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4" />
+                      {hasValidId ? 'Delete' : 'Invalid'}
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           )
         })}

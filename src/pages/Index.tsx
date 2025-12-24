@@ -50,7 +50,8 @@ export default function Index() {
     }
   };
 
-  const analyzeAllScenes = async (parsedScenes: ParsedScene[]) => {
+  // FIXED: Pass projectName as parameter to avoid stale closure
+  const analyzeAllScenes = async (parsedScenes: ParsedScene[], name: string) => {
     setIsAnalyzing(true);
     setCurrentSceneIndex(0);
     
@@ -72,17 +73,19 @@ export default function Index() {
     }
     
     setIsAnalyzing(false);
-    await saveProject(analyzedScenes);
+    await saveProject(analyzedScenes, name);
   };
 
-  const saveProject = async (analyzedScenes: AnalyzedScene[]) => {
+  // FIXED: Accept projectName as parameter
+  const saveProject = async (analyzedScenes: AnalyzedScene[], name: string) => {
     setIsSaving(true);
+    console.log('[DEBUG] Saving project with name:', name);
     try {
       const response = await fetch('/api/projects/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: projectName,
+          name: name, // Use passed parameter, not state
           scenes: analyzedScenes,
           userId: user?.id,
           createdAt: new Date().toISOString()
@@ -171,7 +174,12 @@ export default function Index() {
     }
     
     setFileInfo({ name: file.name, type: fileType });
-    setProjectName(file.name.replace(/\.(txt|pdf|fdx)$/i, ''));
+    
+    // FIXED: Extract name and use it directly (avoid stale closure)
+    const extractedName = file.name.replace(/\.(txt|pdf|fdx)$/i, '');
+    setProjectName(extractedName);
+    console.log('[DEBUG] Project name extracted:', extractedName);
+    
     setIsParsing(true);
     setParsingMessage('Reading file...');
     
@@ -209,13 +217,14 @@ export default function Index() {
       }
       
       setIsParsing(false);
-      await analyzeAllScenes(parsedScenes);
+      // FIXED: Pass extractedName directly to avoid closure issue
+      await analyzeAllScenes(parsedScenes, extractedName);
       
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to process file');
       setIsParsing(false);
     }
-  }, [user, projectName]);
+  }, [user, navigate]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
