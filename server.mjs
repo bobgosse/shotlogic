@@ -82,7 +82,10 @@ app.post('/api/projects/save', async (req, res) => {
 app.delete('/api/projects/delete', async (req, res) => {
   await apiHandler(req, res, join(__dirname, 'api/projects/delete.ts'));
 });
-
+// Rename project
+app.patch('/api/projects/rename', async (req, res) => {
+  await apiHandler(req, res, join(__dirname, 'api/projects/rename.ts'));
+});
 // Claim orphan projects
 app.post('/api/projects/claim-orphans', async (req, res) => {
   await apiHandler(req, res, join(__dirname, 'api/projects/claim-orphans.ts'));
