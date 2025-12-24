@@ -74,10 +74,8 @@ export default function Index() {
   }, []);
 
   function processExtractedText(text: string) {
-    // Fix spacing issues
-    text = text.split('\n').map(line => {
-      return line.split(/\s{2,}/).map(word => word.replace(/\s/g, '')).join(' ');
-    }).join('\n');
+    // Only fix double-spacing issues (preserve single spaces)
+    text = text.replace(/  +/g, ' ');
 
     // Force newlines before scene headers (case-sensitive)
     text = text.replace(/(INT\.|EXT\.)/g, '\n$1');
