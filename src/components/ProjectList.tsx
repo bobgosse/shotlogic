@@ -1,5 +1,5 @@
 // src/components/ProjectList.tsx
-// Project List component - WITH EDIT FUNCTIONALITY
+// Project List component - WITH EDIT FUNCTIONALITY (FIXED TOAST)
 
 import { useCallback, useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -18,7 +18,7 @@ interface ProjectItem {
 interface ProjectListProps {
   projects: ProjectItem[]
   setProjects: React.Dispatch<React.SetStateAction<ProjectItem[]>>
-  showToast: (title: string, description?: string, variant?: 'default' | 'destructive') => void
+  showToast?: (title: string, description?: string, variant?: 'default' | 'destructive') => void
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -42,6 +42,19 @@ function ProjectList({ projects, setProjects, showToast }: ProjectListProps) {
   const [editName, setEditName] = useState('')
   const [savingId, setSavingId] = useState<string | null>(null)
 
+  // Safe toast wrapper - won't crash if showToast is undefined
+  const safeToast = (title: string, description?: string, variant?: 'default' | 'destructive') => {
+    try {
+      if (showToast && typeof showToast === 'function') {
+        showToast(title, description, variant)
+      } else {
+        console.log(`Toast: ${title} - ${description || ''}`)
+      }
+    } catch (e) {
+      console.log(`Toast (fallback): ${title} - ${description || ''}`)
+    }
+  }
+
   // ---------------------------------------------------------------
   // EDIT HANDLERS
   // ---------------------------------------------------------------
@@ -60,12 +73,12 @@ function ProjectList({ projects, setProjects, showToast }: ProjectListProps) {
     const trimmedName = editName.trim()
     
     if (!trimmedName) {
-      showToast('Invalid Name', 'Project name cannot be empty.', 'destructive')
+      safeToast('Invalid Name', 'Project name cannot be empty.', 'destructive')
       return
     }
 
     if (trimmedName.length > 100) {
-      showToast('Invalid Name', 'Project name must be under 100 characters.', 'destructive')
+      safeToast('Invalid Name', 'Project name must be under 100 characters.', 'destructive')
       return
     }
 
@@ -92,7 +105,7 @@ function ProjectList({ projects, setProjects, showToast }: ProjectListProps) {
       const result = await response.json()
       console.log('✅ Rename successful:', result)
 
-      // Update local state
+      // Update local state FIRST (most important)
       setProjects(prevProjects => 
         prevProjects.map(p => 
           p._id === projectId 
@@ -101,21 +114,24 @@ function ProjectList({ projects, setProjects, showToast }: ProjectListProps) {
         )
       )
 
-      showToast('Project Renamed', `Project renamed to "${trimmedName}"`)
+      // Clear edit mode
       setEditingId(null)
       setEditName('')
+      setSavingId(null)
+
+      // Toast last (if it fails, UI is already updated)
+      safeToast('Project Renamed', `Project renamed to "${trimmedName}"`)
 
     } catch (error) {
       console.error('❌ Rename error:', error)
-      showToast(
+      setSavingId(null)
+      safeToast(
         'Rename Failed',
         error instanceof Error ? error.message : 'Failed to rename project.',
         'destructive'
       )
-    } finally {
-      setSavingId(null)
     }
-  }, [editName, setProjects, showToast])
+  }, [editName, setProjects])
 
   // Handle Enter key to save, Escape to cancel
   const handleKeyDown = (e: React.KeyboardEvent, projectId: string) => {
@@ -137,7 +153,7 @@ function ProjectList({ projects, setProjects, showToast }: ProjectListProps) {
     // Validate ID
     if (!projectId || typeof projectId !== 'string') {
       console.error('❌ Invalid ID: ID is missing or not a string')
-      showToast(
+      safeToast(
         'Delete Failed',
         'Project ID is missing or invalid.',
         'destructive'
@@ -147,7 +163,7 @@ function ProjectList({ projects, setProjects, showToast }: ProjectListProps) {
     
     if (projectId.length !== 24) {
       console.error(`❌ Invalid ID length: Expected 24, got ${projectId.length}`)
-      showToast(
+      safeToast(
         'Delete Failed',
         'Project ID has invalid format.',
         'destructive'
@@ -157,7 +173,7 @@ function ProjectList({ projects, setProjects, showToast }: ProjectListProps) {
     
     if (!isValidObjectId(projectId)) {
       console.error('❌ Invalid ID format')
-      showToast(
+      safeToast(
         'Delete Failed',
         'Project ID format is invalid.',
         'destructive'
@@ -197,24 +213,24 @@ function ProjectList({ projects, setProjects, showToast }: ProjectListProps) {
       console.log('✅ Delete successful:', result)
 
       setProjects(prevProjects => prevProjects.filter(p => p._id !== projectId))
+      setDeletingId(null)
 
-      showToast(
+      safeToast(
         'Project Deleted',
         `"${projectName}" has been permanently deleted.`
       )
 
     } catch (error) {
       console.error('❌ Delete error:', error)
+      setDeletingId(null)
       
-      showToast(
+      safeToast(
         'Delete Failed',
         error instanceof Error ? error.message : 'Failed to delete project.',
         'destructive'
       )
-    } finally {
-      setDeletingId(null)
     }
-  }, [setProjects, showToast])
+  }, [setProjects])
 
   // ---------------------------------------------------------------
   // FORMAT DATE
@@ -241,23 +257,16 @@ function ProjectList({ projects, setProjects, showToast }: ProjectListProps) {
   }
 
   // ---------------------------------------------------------------
-  // DATA VALIDATION
+  // DATA VALIDATION (silent in production)
   // ---------------------------------------------------------------
-  
-  console.log(`\n📊 ProjectList Render:`)
-  console.log(`   Total projects: ${projects.length}`)
   
   const validProjects: ProjectItem[] = []
   const invalidProjects: any[] = []
   
-  projects.forEach((project, index) => {
+  projects.forEach((project) => {
     const hasId = project && typeof project === 'object' && '_id' in project
     const idValue = hasId ? project._id : null
     const isValid = isValidObjectId(idValue)
-    
-    console.log(`   [${index}] Name: "${project?.name || 'UNKNOWN'}"`)
-    console.log(`       _id: ${idValue}`)
-    console.log(`       Valid: ${isValid}`)
     
     if (isValid) {
       validProjects.push(project)
@@ -265,8 +274,6 @@ function ProjectList({ projects, setProjects, showToast }: ProjectListProps) {
       invalidProjects.push(project)
     }
   })
-  
-  console.log(`   Valid: ${validProjects.length}, Invalid: ${invalidProjects.length}\n`)
 
   // ---------------------------------------------------------------
   // RENDER
@@ -307,7 +314,6 @@ function ProjectList({ projects, setProjects, showToast }: ProjectListProps) {
       <div className="space-y-3">
         {projects.map((project, index) => {
           if (!project || typeof project !== 'object') {
-            console.error(`⚠️  Project at index ${index} is not an object:`, project)
             return null
           }
 
@@ -317,15 +323,6 @@ function ProjectList({ projects, setProjects, showToast }: ProjectListProps) {
           const isEditing = editingId === projectId
           const isSaving = savingId === projectId
           const isDeleting = deletingId === projectId
-
-          if (!hasValidId) {
-            console.warn(`⚠️  Invalid project at index ${index}:`, {
-              name: projectName,
-              _id: projectId,
-              idType: typeof projectId,
-              idLength: projectId?.length
-            })
-          }
 
           return (
             <div
@@ -407,12 +404,6 @@ function ProjectList({ projects, setProjects, showToast }: ProjectListProps) {
                     Updated {formatDate(project.updatedAt)}
                   </p>
                 </div>
-
-                {!hasValidId && (
-                  <p className="text-xs text-yellow-500 mt-1 font-mono">
-                    ID: {projectId || 'MISSING'} (Length: {projectId?.length || 0})
-                  </p>
-                )}
               </div>
 
               {/* Delete Button */}
