@@ -82,7 +82,7 @@ export default function Index() {
     text = text.replace(/\n{3,}/g, '\n\n');
 
     // Find first scene header
-    const firstSceneMatch = text.match(/(?:^|\n)\s*\d*\s*(?:INT\.|EXT\.|I\/E|I\.E\.)\s+/);
+    const firstSceneMatch = text.match(/(?:^|\n)\s*\d*\s*(?:INT\.|EXT\.|I\/E|I\.E\.)\s+/i);
     
     if (!firstSceneMatch) {
       setError("No scene headers found. Make sure your screenplay has INT. or EXT. headers.");
@@ -94,14 +94,14 @@ export default function Index() {
     const scriptText = text.substring(firstSceneIndex);
 
     // Split on scene headers (case-sensitive)
-    const scenePattern = /(?=(?:^|\n)[ \t]*\d*[ \t]*(?:INT\.|EXT\.|I\/E|I\.E\.)[ \t]+)/gm;
+    const scenePattern = /(?=(?:^|\n)[ \t]*\d*[ \t]*(?:INT\.|EXT\.|I\/E|I\.E\.)[ \t]+)/gim;
     const sceneBlocks = scriptText.split(scenePattern);
 
     const validScenes = sceneBlocks
       .filter(block => {
         const trimmed = block.trim();
         if (trimmed.length < 20) return false;
-        return /^[ \t]*\d*[ \t]*(?:INT\.|EXT\.|I\/E|I\.E\.)[ \t]+/.test(trimmed);
+        return /^[ \t]*\d*[ \t]*(?:INT\.|EXT\.|I\/E|I\.E\.)[ \t]+/i.test(trimmed);
       })
       .map((block, index) => ({
         number: index + 1,
