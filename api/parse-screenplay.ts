@@ -46,7 +46,6 @@ async function parsePDF(buffer: Buffer): Promise<string> {
   }
 }
 
-// Replacement parseFDX function - copy this to parse-screenplay.ts
 
 async function parseFDX(buffer: Buffer): Promise<string> {
   const xmlText = buffer.toString('utf-8')
