@@ -1,10 +1,9 @@
 // api/analyze-scene.ts
-// PRODUCTION: Enhanced screenplay scene analysis with skills-based prompting
-// Combines Story Analyst, Line Producer, Director, and Cinematographer expertise
+// PRODUCTION: Scene analysis matching ProjectDetails.tsx field structure
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
-const DEPLOY_TIMESTAMP = "2024-12-24T21:00:00Z_FIELD_NAME_FIX"
+const DEPLOY_TIMESTAMP = "2024-12-24T23:00:00Z_FIELD_STRUCTURE_FIX"
 
 function getEnvironmentVariable(name: string): string | undefined {
   try {
@@ -34,7 +33,7 @@ export default async function handler(
 ) {
   const invocationId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
   
-  console.log(`\n🎬 [${invocationId}] ═══ ENHANCED SCENE ANALYSIS ═══`)
+  console.log(`\n🎬 [${invocationId}] ═══ SCENE ANALYSIS ═══`)
   console.log(`📅 Timestamp: ${new Date().toISOString()}`)
   console.log(`🏷️  Deploy: ${DEPLOY_TIMESTAMP}`)
   
@@ -55,7 +54,6 @@ export default async function handler(
   }
 
   try {
-    // Get API key
     const openaiKey = getEnvironmentVariable('OPENAI_API_KEY')
     
     if (!openaiKey) {
@@ -67,13 +65,11 @@ export default async function handler(
       })
     }
 
-    // Parse request
     const requestBody = req.body as AnalyzeSceneRequest
     const { sceneText, sceneNumber, totalScenes, visualStyle } = requestBody
     
     console.log(`📊 [${invocationId}] Scene: ${sceneNumber}/${totalScenes}`)
     console.log(`📊 [${invocationId}] Text length: ${sceneText?.length || 0} chars`)
-    console.log(`📊 [${invocationId}] Visual style: ${visualStyle || 'None'}`)
 
     if (!sceneText || sceneNumber == null || totalScenes == null) {
       return res.status(400).json({ 
@@ -82,262 +78,75 @@ export default async function handler(
       })
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // ENHANCED SKILLS-BASED PROMPTS
-    // ═══════════════════════════════════════════════════════════════
-    
-    const systemPrompt = `You are an elite film production team combined into one expert analyst:
-
-**THE STORY ANALYST** (Former development executive, 20 years experience)
-- Identifies narrative stakes, character objectives, and dramatic tension
-- Recognizes scene types: exposition, confrontation, revelation, transition
-- Understands subtext and what's NOT being said
-- Tracks character arcs and power dynamics
-
-**THE LINE PRODUCER** (Award-winning producer, budgets from $500K to $50M)
-- Instantly spots budget red flags and production challenges
-- Identifies all physical requirements: props, wardrobe, vehicles, locations
-- Flags stunts, VFX, special equipment, crowd scenes
-- Thinks about scheduling and day/night shoots
-
-**THE DIRECTOR** (Sundance winner, known for visual storytelling)
-- Designs coverage that serves emotional truth
-- Understands shot motivation - why THIS shot at THIS moment
-- Creates visual metaphors that enhance theme
-- Plans transitions and editorial rhythm
-
-**THE CINEMATOGRAPHER** (Oscar-nominated DP)
-- Knows lighting for mood and practical execution
-- Understands camera movement motivation
-- Creates depth and visual interest in every frame
-- Designs shots that cut together seamlessly
-
-Your combined expertise produces analysis that is PRACTICAL, SPECIFIC, and PRODUCTION-READY.`
-
-    // Determine scene complexity for shot count scaling
+    // Determine complexity for shot count
     const sceneLength = sceneText.length
     const hasAction = /\b(runs?|fights?|chases?|crashes?|explodes?|falls?|grabs?|throws?|hits?|punches?|shoots?|drives?|jumps?|climbs?|escapes?)\b/i.test(sceneText)
-    const hasVehicle = /\b(car|truck|van|suv|vehicle|motorcycle|bike|bus|taxi|uber)\b/i.test(sceneText)
-    const hasWeapon = /\b(gun|knife|weapon|pistol|rifle|sword)\b/i.test(sceneText)
-    const hasEmotionalBeat = /\b(cries?|crying|tears|screams?|yells?|whispers?|kisses?|hugs?|slaps?|laughs?)\b/i.test(sceneText)
-    
-    // Count unique character names (all caps words that appear before dialogue)
     const dialogueMatches = sceneText.match(/^[A-Z][A-Z\s]+(?=\n)/gm) || []
     const characterCount = new Set(dialogueMatches.map(m => m.trim())).size
     
-    // Count dialogue exchanges
-    const dialogueExchanges = dialogueMatches.length
-    
-    let shotCountGuidance = "6-8 shots"
-    let complexity = "MEDIUM"
-    let sceneType = "DIALOGUE"
-    
-    // Determine scene type
-    if (hasAction || hasVehicle || hasWeapon) {
-      sceneType = "ACTION"
-    } else if (dialogueExchanges > 6) {
-      sceneType = "DIALOGUE_HEAVY"
-    } else if (sceneLength < 200) {
-      sceneType = "TRANSITION"
+    let shotCount = "6-8"
+    if (sceneLength > 1500 || hasAction || characterCount > 3) {
+      shotCount = "10-15"
+    } else if (sceneLength < 400) {
+      shotCount = "4-6"
     }
-    
-    // Scale shots based on complexity factors
-    let complexityScore = 0
-    if (sceneLength > 1500) complexityScore += 2
-    else if (sceneLength > 800) complexityScore += 1
-    if (hasAction) complexityScore += 3
-    if (hasVehicle) complexityScore += 2
-    if (hasWeapon) complexityScore += 1
-    if (hasEmotionalBeat) complexityScore += 1
-    if (characterCount > 3) complexityScore += 2
-    else if (characterCount > 1) complexityScore += 1
-    if (dialogueExchanges > 8) complexityScore += 2
-    else if (dialogueExchanges > 4) complexityScore += 1
-    
-    if (complexityScore >= 6) {
-      shotCountGuidance = "10-15 shots"
-      complexity = "HIGH"
-    } else if (complexityScore >= 4) {
-      shotCountGuidance = "8-10 shots"
-      complexity = "MEDIUM-HIGH"
-    } else if (complexityScore >= 2) {
-      shotCountGuidance = "6-8 shots"
-      complexity = "MEDIUM"
-    } else {
-      shotCountGuidance = "4-6 shots"
-      complexity = "LOW"
-    }
-    
-    console.log(`📊 [${invocationId}] Complexity: ${complexity}, Shots: ${shotCountGuidance}`)
 
-    const userPrompt = `Analyze Scene ${sceneNumber} of ${totalScenes} with the depth of a professional film production team.
+    const systemPrompt = `You are an expert film production analyst combining the skills of a story analyst, line producer, and director. Analyze scenes with practical, production-ready insights.`
 
-═══════════════════════════════════════════════════════
+    const userPrompt = `Analyze Scene ${sceneNumber} of ${totalScenes}.
+
 SCENE TEXT:
-═══════════════════════════════════════════════════════
 ${sceneText}
 
-${visualStyle ? `═══════════════════════════════════════════════════════
-VISUAL STYLE MANDATE: "${visualStyle}"
-ALL image prompts MUST reflect this aesthetic.
-═══════════════════════════════════════════════════════` : ''}
+${visualStyle ? `VISUAL STYLE: "${visualStyle}" - incorporate this into all image prompts.` : ''}
 
-Return a JSON object with this EXACT structure:
+Return a JSON object with this EXACT structure (these field names are required):
 
 {
-  "narrativeAnalysis": {
-    "synopsis": "3-4 sentence summary capturing the DRAMATIC ACTION, not just plot. What changes? What's at stake?",
-    "centralConflict": "Choose: Argument | Seduction | Negotiation | Confrontation | Revelation | Discovery | Escape | Pursuit | Transformation | Moment_of_Decision | Other",
-    "sceneTurn": "Quote the SPECIFIC line or describe the exact action where power shifts or new information changes everything",
-    "emotionalTone": "Primary mood with any SHIFT noted (e.g., 'Tense anticipation → explosive frustration')",
-    "stakes": "Be SPECIFIC: What exactly does the protagonist risk losing? What could they gain?",
-    "subtext": "What's really being communicated beneath the surface dialogue/action?"
+  "story_analysis": {
+    "stakes": "What's at risk in this scene? What could be lost or gained? Be specific.",
+    "ownership": "Who owns this scene? Which character drives the action and why?",
+    "breaking_point": "What's the turning point or key moment? Quote a specific line or describe the pivotal action.",
+    "key_props": "List all important props mentioned or implied (phones, documents, weapons, etc.)"
   },
   
-  "producingAnalysis": {
-    "locations": {
-      "primary": "Main location with SPECIFIC requirements (size, features, practical considerations)",
-      "secondary": ["Any additional locations within this scene"],
-      "timeOfDay": "DAY | NIGHT | DAWN | DUSK | MAGIC_HOUR",
-      "intExt": "INT | EXT | INT/EXT",
-      "weatherConditions": "Any weather elements needed (rain, snow, fog, wind)",
-      "practicalConsiderations": "Parking, power, permits, noise restrictions"
-    },
-    "cast": {
-      "principal": ["Characters with dialogue - list NAME and brief description"],
-      "silent": ["Characters present without dialogue"],
-      "extras": {
-        "count": "Estimated number needed",
-        "description": "Types of extras (pedestrians, diners, office workers, etc.)",
-        "specialSkills": "Any special requirements (dancing, sports, period-appropriate)"
-      }
-    },
-    "keyProps": ["EXHAUSTIVE list of EVERY prop - phones, keys, wallets, bags, drinks, food, papers, weapons, tools, anything TOUCHED, HELD, or REFERENCED"],
-    "vehicles": ["Any vehicles in scene - make/model if specified, condition, action required (parked, driving, crash)"],
-    "sfx": {
-      "practical": ["Practical effects: rain, fog, fire, breakaway items, squibs, etc."],
-      "vfx": ["Visual effects: green screen, wire removal, CGI elements"],
-      "stunts": ["Stunt work: falls, fights, driving, wire work"]
-    },
-    "wardrobe": {
-      "principal": ["Detailed costume descriptions for each main character"],
-      "changes": "Any costume changes within the scene",
-      "special": "Period, damaged, wet, multiples needed"
-    },
-    "makeup": {
-      "standard": ["Basic makeup/grooming notes"],
-      "special": ["Special effects makeup: wounds, aging, prosthetics, tattoos"],
-      "continuity": "Any continuity concerns (sweat, dirt, blood progression)"
-    },
-    "schedulingConcerns": {
-      "timeConstraints": "Day/night shoots, golden hour, child labor restrictions",
-      "locationAccess": "Limited hours, permits, weather windows",
-      "actorAvailability": "Multiple characters, stunt doubles needed",
-      "specialEquipment": "Crane, Steadicam, underwater housing, etc."
-    },
-    "budgetFlags": ["Items that will SIGNIFICANTLY impact budget - be SPECIFIC about cost driver and estimated impact (LOW/MEDIUM/HIGH)"]
+  "producing_logistics": {
+    "red_flags": ["List each budget concern as a separate string", "Stunts, VFX, crowds, vehicles, special equipment", "Be specific about cost impact"],
+    "resource_impact": "Low | Medium | High",
+    "departments_affected": ["Camera", "Sound", "Art", "Wardrobe", "Makeup", "Stunts", "VFX", "Locations", "Extras"]
   },
   
-  "directingAnalysis": {
-    "characterMotivations": [
-      {
-        "character": "Character name",
-        "wants": "What they want in THIS scene",
-        "obstacle": "What's preventing them",
-        "tactic": "How they're trying to get it"
-      }
-    ],
-    "conflict": {
-      "type": "Internal | External | Both",
-      "description": "The core dramatic tension - who wants what from whom",
-      "resolution": "How the conflict shifts or resolves by scene end"
-    },
-    "subtext": "What's REALLY being communicated beneath the surface - the unspoken tension, hidden agendas, emotional undercurrents",
-    "toneAndMood": {
-      "opening": "How the scene BEGINS emotionally",
-      "shift": "Where and how the tone CHANGES (if it does)",
-      "closing": "How the scene ENDS emotionally",
-      "energy": "LOW | BUILDING | HIGH | DECLINING | VOLATILE"
-    },
-    "visualStrategy": {
-      "approach": "Overall visual philosophy (e.g., 'Observational distance', 'Claustrophobic intimacy', 'Kinetic chaos')",
-      "cameraPersonality": "Is the camera objective observer, subjective POV, omniscient, or character-aligned?",
-      "lightingMood": "Naturalistic, expressionistic, high-key, low-key, motivated sources"
-    },
-    "keyMoments": [
-      {
-        "beat": "Specific moment, line, or action",
-        "emphasis": "How to shoot it for maximum emotional/story impact",
-        "why": "Why this moment matters to the scene/story"
-      }
-    ],
-    "performanceNotes": {
-      "general": "Overall performance tone and energy",
-      "specific": ["Character-specific notes for actors"]
-    },
-    "blockingIdeas": {
-      "geography": "How characters use the space - who has power, who's trapped",
-      "movement": "Key character movements and what they communicate",
-      "eyelines": "Important looks, glances, avoided eye contact"
-    }
+  "directing_vision": {
+    "visual_metaphor": "What's the visual approach? How does camera work reflect the emotional content?",
+    "editorial_intent": "How should this scene be paced and cut? What's the rhythm?",
+    "shot_motivation": "Why these shots? What story purpose does the coverage serve?"
   },
   
-  "shotList": [
+  "shot_list": [
     {
       "shotNumber": 1,
-      "shotType": "WIDE | MEDIUM | MEDIUM_CLOSE | CLOSE_UP | EXTREME_CLOSE | INSERT | POV | OVER_SHOULDER | TWO_SHOT | GROUP",
-      "movement": "STATIC | PAN | TILT | PUSH_IN | PULL_BACK | DOLLY | TRACK | HANDHELD | STEADICAM | CRANE",
-      "subject": "Who/what is the subject",
-      "action": "What happens DURING this shot",
-      "visualDescription": "What the audience SEES - be cinematic and specific",
-      "rationale": "Why THIS shot serves the story",
-      "editorialIntent": "When would an editor cut TO this and WHY",
-      "duration": "BEAT | SHORT | MEDIUM | LONG",
-      "aiImagePrompt": "Format: [Shot size], [Subject doing specific action], [Detailed setting], [Specific lighting], [Mood/atmosphere]${visualStyle ? `, Style: ${visualStyle}` : ''}"
+      "shotType": "WIDE | MEDIUM | CLOSE_UP | INSERT | POV | OVER_SHOULDER | TWO_SHOT",
+      "movement": "STATIC | PAN | TILT | PUSH_IN | PULL_BACK | DOLLY | TRACK | HANDHELD | STEADICAM",
+      "subject": "Who/what is featured",
+      "action": "What happens during this shot",
+      "visualDescription": "Detailed description of what we see",
+      "rationale": "Why this shot matters to the story",
+      "aiImagePrompt": "[Shot size], [Subject with action], [Detailed setting], [Lighting], [Mood]${visualStyle ? `, Style: ${visualStyle}` : ''}"
     }
   ]
 }
 
-═══════════════════════════════════════════════════════
-SHOT LIST REQUIREMENTS (Generate ${shotCountGuidance}):
-═══════════════════════════════════════════════════════
+SHOT LIST: Generate ${shotCount} shots with full coverage:
+- Start with WIDE establishing shot
+- Include singles for each speaking character
+- Over-the-shoulder for dialogue exchanges
+- Reaction shots for emotional beats
+- Insert shots for props characters touch
+- Vary shot sizes for editorial rhythm
 
-SCENE TYPE DETECTED: ${sceneType} (Complexity: ${complexity})
+Return ONLY valid JSON. No markdown, no explanation.`
 
-COVERAGE RULES FOR THIS SCENE:
-- ALWAYS start with WIDE/ESTABLISHING shot for spatial context
-- For DIALOGUE: Include OTS (over-the-shoulder) for EACH speaker + clean SINGLES + REACTION shots
-- For ACTION: Break into clear beats - wide for geography, medium for action, close for impact
-- For EMOTION: Lead with the speaker, but CUT TO the listener's REACTION (this is often more powerful)
-- INSERT shots for: phones, documents, weapons, keys, money, food - anything a character TOUCHES
-- MATCH CUTS: Consider how each shot leads to the next
-
-MINIMUM SHOT REQUIREMENTS:
-- 2+ characters talking = minimum 4 shots (establishing, 2 singles, reaction)
-- Physical action = minimum 3 shots per action beat
-- Emotional revelation = build with at least 3 shots (context → delivery → reaction)
-- Character enters/exits = dedicated shot for the movement
-
-PACING:
-- Vary shot sizes for rhythm (avoid 3+ same sizes in a row)
-- Place most impactful shot at scene's turning point
-- End on a shot that transitions well to next scene
-
-IMAGE PROMPTS - Be SPECIFIC:
-- Setting: Not "a room" but "cramped fluorescent-lit office, beige cubicle walls"
-- Lighting: Direction and quality ("harsh overhead fluorescent" vs "warm golden hour through blinds")
-- Atmosphere: Smoke, rain, dust, steam if present
-- Character state: Specific expression/posture
-${visualStyle ? `- EVERY prompt MUST incorporate: "${visualStyle}"` : ''}
-
-Return ONLY valid JSON. No markdown, no explanation outside JSON.`
-
-    // ═══════════════════════════════════════════════════════════════
-    // CALL OPENAI API
-    // ═══════════════════════════════════════════════════════════════
-    
-    console.log(`🤖 [${invocationId}] Calling OpenAI API (gpt-4o)...`)
-    
+    console.log(`🤖 [${invocationId}] Calling OpenAI API...`)
     const openaiStartTime = Date.now()
     
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -353,7 +162,7 @@ Return ONLY valid JSON. No markdown, no explanation outside JSON.`
           { role: 'user', content: userPrompt }
         ],
         temperature: 0.7,
-        max_tokens: 5000,
+        max_tokens: 4000,
         response_format: { type: 'json_object' }
       }),
     })
@@ -381,7 +190,6 @@ Return ONLY valid JSON. No markdown, no explanation outside JSON.`
       })
     }
 
-    // Parse JSON response
     let analysis
     try {
       analysis = JSON.parse(content)
@@ -395,25 +203,19 @@ Return ONLY valid JSON. No markdown, no explanation outside JSON.`
     }
 
     console.log(`✅ [${invocationId}] Analysis complete`)
-    console.log(`   - Shots generated: ${analysis.shotList?.length || 0}`)
-    console.log(`   - Props found: ${analysis.producingAnalysis?.keyProps?.length || 0}`)
-
-    // ═══════════════════════════════════════════════════════════════
-    // MAP FIELD NAMES TO MATCH ProjectDetails.tsx EXPECTATIONS
-    // ═══════════════════════════════════════════════════════════════
-    const mappedAnalysis = {
-      story_analysis: analysis.narrativeAnalysis,
-      producing_logistics: analysis.producingAnalysis,
-      directing_vision: analysis.directingAnalysis,
-      shotList: analysis.shotList
-    }
+    console.log(`   - Shots: ${analysis.shot_list?.length || 0}`)
+    console.log(`   - Stakes: ${analysis.story_analysis?.stakes?.substring(0, 50) || 'N/A'}...`)
 
     return res.status(200).json({
       success: true,
-      analysis: mappedAnalysis,
+      analysis: {
+        story_analysis: analysis.story_analysis,
+        producing_logistics: analysis.producing_logistics,
+        directing_vision: analysis.directing_vision,
+        shot_list: analysis.shot_list
+      },
       meta: {
         sceneNumber,
-        complexity,
         processingTime: openaiDuration,
         deployMarker: DEPLOY_TIMESTAMP
       }
