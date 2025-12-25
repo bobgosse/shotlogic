@@ -77,7 +77,27 @@ export default async function handler(
         // Case 1: Analysis is already a string (new format from Index.tsx)
         if (typeof scene.analysis === 'string') {
           console.log(`   Scene ${scene.number}: Analysis is string (new format)`)
-          analysisString = scene.analysis;
+          // Parse, transform shot_list if needed, re-stringify
+          try {
+            const parsed = JSON.parse(scene.analysis);
+            // Transform camelCase shot_list to snake_case if needed
+            if (parsed.shot_list && Array.isArray(parsed.shot_list)) {
+              parsed.shot_list = parsed.shot_list.map((shot: any, idx: number) => ({
+                shot_number: shot.shot_number || shot.shotNumber || idx + 1,
+                shot_type: shot.shot_type || shot.shotType || 'WIDE',
+                movement: shot.movement || 'STATIC',
+                subject: shot.subject || '',
+                action: shot.action || '',
+                visual: shot.visual || shot.visualDescription || '',
+                rationale: shot.rationale || '',
+                image_prompt: shot.image_prompt || shot.aiImagePrompt || ''
+              }));
+            }
+            analysisString = JSON.stringify(parsed);
+          } catch {
+            // If parse fails, use as-is
+            analysisString = scene.analysis;
+          }
         }
         // Case 2: Analysis is object with data property (old format)
         else if (scene.analysis.data) {
