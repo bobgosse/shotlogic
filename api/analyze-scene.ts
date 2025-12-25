@@ -1,9 +1,9 @@
 // api/analyze-scene.ts
-// PRODUCTION: Scene analysis matching FULL ProjectDetails.tsx UI structure
+// PRODUCTION: Complete scene analysis matching ALL ProjectDetails.tsx UI fields
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
-const DEPLOY_TIMESTAMP = "2024-12-24T23:45:00Z_FULL_STRUCTURE"
+const DEPLOY_TIMESTAMP = "2024-12-25T00:30:00Z_COMPLETE_FIELDS"
 
 function getEnvironmentVariable(name: string): string | undefined {
   try {
@@ -84,7 +84,7 @@ export default async function handler(
       shotCount = "4-6"
     }
 
-    const systemPrompt = `You are an expert film production analyst. Return ONLY valid JSON matching the exact structure requested. No markdown, no explanation.`
+    const systemPrompt = `You are an expert film production analyst combining story analysis, producing, and directing expertise. Return ONLY valid JSON matching the exact structure requested.`
 
     const userPrompt = `Analyze Scene ${sceneNumber} of ${totalScenes}.
 
@@ -93,21 +93,22 @@ ${sceneText}
 
 ${visualStyle ? `VISUAL STYLE: "${visualStyle}" - use in all image prompts.` : ''}
 
-Return this EXACT JSON structure:
+Return this EXACT JSON structure with ALL fields filled in:
 
 {
   "story_analysis": {
-    "synopsis": "2-3 sentence summary of what happens in this scene",
+    "synopsis": "2-3 sentence summary of the scene's action and outcome",
     "stakes": "What's at risk? What could be lost or gained?",
-    "ownership": "Who drives this scene and why?",
-    "breaking_point": "The turning point - quote a line or describe the pivotal moment",
-    "key_props": "Comma-separated list of important props"
+    "ownership": "Who drives this scene? Which character has the most agency and why?",
+    "breaking_point": "The turning point - quote a specific line or describe the pivotal moment that changes everything",
+    "key_props": "Comma-separated list of important props (phones, documents, weapons, etc.)",
+    "tone": "The emotional quality of the scene (e.g., Tense, Hopeful, Melancholic, Frantic)"
   },
   
   "producing_logistics": {
-    "resource_impact": "Low",
+    "resource_impact": "Low or Medium or High",
     "red_flags": ["Budget concern 1", "Budget concern 2"],
-    "departments_affected": ["Camera", "Art", "Sound"],
+    "departments_affected": ["Camera", "Art", "Sound", "Wardrobe", "Makeup", "Stunts", "VFX"],
     "locations": {
       "primary": "Main location description",
       "setting": "General setting type",
@@ -115,16 +116,16 @@ Return this EXACT JSON structure:
       "intExt": "INT or EXT or INT/EXT"
     },
     "cast": {
-      "principal": ["Character 1", "Character 2"],
+      "principal": ["Main character 1", "Main character 2"],
       "speaking": ["Characters with dialogue"],
-      "silent": ["Background characters"],
+      "silent": ["Background characters with action"],
       "extras": {
         "count": "Number estimate",
         "description": "Type of extras needed"
       }
     },
     "key_props": ["prop1", "prop2", "prop3"],
-    "vehicles": ["Vehicle 1 if any"],
+    "vehicles": ["Vehicle descriptions if any"],
     "sfx": {
       "practical": ["Practical effects needed"],
       "vfx": ["VFX shots needed"],
@@ -132,58 +133,84 @@ Return this EXACT JSON structure:
     },
     "wardrobe": {
       "principal": ["Costume descriptions"],
-      "notes": "Special wardrobe needs"
+      "notes": "Special wardrobe requirements"
     },
     "makeup": {
       "standard": ["Basic makeup notes"],
       "special": ["SFX makeup if needed"]
     },
     "scheduling": {
-      "constraints": "Time/scheduling concerns",
+      "constraints": "Time or scheduling concerns",
       "notes": "Additional scheduling notes"
     }
   },
   
   "directing_vision": {
-    "visual_metaphor": "Visual approach and how camera reflects emotion",
-    "editorial_intent": "Pacing and rhythm notes",
+    "visual_metaphor": "Visual approach - how camera work reflects emotional content",
+    "editorial_intent": "Pacing and rhythm - how the scene should be cut",
     "shot_motivation": "Why these shots serve the story",
+    "subtext": "What's really being communicated beneath the surface",
     "conflict": {
       "type": "Internal or External or Both",
-      "description": "Core dramatic tension",
-      "resolution": "How it resolves or shifts"
+      "description": "Core dramatic tension - who wants what from whom",
+      "resolution": "How the conflict shifts or resolves by scene end"
     },
     "tone_and_mood": {
-      "opening": "How scene opens emotionally",
-      "shift": "Where/how tone changes",
-      "closing": "How scene ends emotionally",
-      "energy": "LOW or BUILDING or HIGH or DECLINING"
+      "opening": "How the scene opens emotionally",
+      "shift": "Where and how the tone changes (if it does)",
+      "closing": "How the scene ends emotionally",
+      "energy": "LOW or BUILDING or HIGH or DECLINING or VOLATILE"
     },
+    "visual_strategy": {
+      "approach": "Overall visual philosophy (e.g., Observational, Intimate, Kinetic)",
+      "camera_personality": "Objective observer, subjective POV, or character-aligned",
+      "lighting_mood": "Naturalistic, expressionistic, high-key, low-key"
+    },
+    "character_motivations": [
+      {
+        "character": "Character name",
+        "wants": "What they want in this scene",
+        "obstacle": "What's preventing them",
+        "tactic": "How they're trying to get it"
+      }
+    ],
+    "key_moments": [
+      {
+        "beat": "Specific moment or line",
+        "emphasis": "How to shoot it for maximum impact",
+        "why": "Why this moment matters"
+      }
+    ],
+    "performance_notes": ["Direction for actor 1", "Direction for actor 2"],
     "blocking": {
-      "geography": "How characters use space",
-      "movement": "Key movements",
-      "eyelines": "Important looks/glances"
-    },
-    "performance_notes": ["Note for actor 1", "Note for actor 2"]
+      "geography": "How characters use the space",
+      "movement": "Key character movements",
+      "eyelines": "Important looks or glances"
+    }
   },
   
   "shot_list": [
     {
-      "shotNumber": 1,
-      "shotType": "WIDE",
-      "movement": "STATIC",
-      "subject": "Full scene establishing",
-      "action": "What happens",
-      "visualDescription": "What we see in detail",
-      "rationale": "Why this shot",
-      "aiImagePrompt": "[Shot size], [Subject], [Setting], [Lighting], [Mood]${visualStyle ? `, ${visualStyle}` : ''}"
+      "shot_number": 1,
+      "shot_type": "WIDE or MEDIUM or CLOSE_UP or INSERT or POV or OVER_SHOULDER or TWO_SHOT",
+      "movement": "STATIC or PAN or TILT or PUSH_IN or PULL_BACK or DOLLY or TRACK or HANDHELD or STEADICAM",
+      "subject": "Who/what is featured",
+      "action": "What happens during this shot",
+      "visual": "Detailed description of what we see",
+      "rationale": "Why this shot matters",
+      "image_prompt": "[Shot size], [Subject], [Setting], [Lighting], [Mood]${visualStyle ? `, ${visualStyle}` : ''}"
     }
   ]
 }
 
-Generate ${shotCount} shots in shot_list. Use "Low", "Medium", or "High" for resource_impact.
+IMPORTANT REQUIREMENTS:
+1. Fill in EVERY field - do not leave any empty or with placeholder text
+2. For character_motivations, include an entry for EACH speaking character
+3. For key_moments, identify 2-3 crucial beats in the scene
+4. For performance_notes, give specific direction for each main actor
+5. Generate ${shotCount} shots in the shot_list
 
-Return ONLY the JSON object. No markdown code blocks.`
+Return ONLY the JSON object. No markdown, no explanation.`
 
     console.log(`🤖 [${invocationId}] Calling OpenAI API...`)
     const openaiStartTime = Date.now()
@@ -201,7 +228,7 @@ Return ONLY the JSON object. No markdown code blocks.`
           { role: 'user', content: userPrompt }
         ],
         temperature: 0.7,
-        max_tokens: 4000,
+        max_tokens: 4500,
         response_format: { type: 'json_object' }
       }),
     })
@@ -244,7 +271,8 @@ Return ONLY the JSON object. No markdown code blocks.`
     console.log(`✅ [${invocationId}] Analysis complete`)
     console.log(`   - Synopsis: ${analysis.story_analysis?.synopsis?.substring(0, 50) || 'N/A'}...`)
     console.log(`   - Shots: ${analysis.shot_list?.length || 0}`)
-    console.log(`   - Impact: ${analysis.producing_logistics?.resource_impact || 'N/A'}`)
+    console.log(`   - Character motivations: ${analysis.directing_vision?.character_motivations?.length || 0}`)
+    console.log(`   - Key moments: ${analysis.directing_vision?.key_moments?.length || 0}`)
 
     return res.status(200).json({
       success: true,
