@@ -6,11 +6,14 @@ interface ShotListItem {
   movement?: string;
   subject?: string;
   action?: string;
-  visual: string;
+  visual?: string;
+  visualDescription?: string;
   rationale: string;
   editorial_intent?: string;
   duration?: string;
   image_prompt?: string;
+  aiImagePrompt?: string;
+  coverage?: string;
 }
 
 interface Scene {
@@ -30,6 +33,7 @@ interface AnalysisData {
     key_props: string;
     synopsis?: string;
     subtext?: string;
+    tone?: string;
   };
   producing_logistics: {
     red_flags: string[];
@@ -38,13 +42,58 @@ interface AnalysisData {
     key_props?: string[];
     wardrobe?: string[];
     special_requirements?: string[];
+    locations?: {
+      primary?: string;
+      setting?: string;
+      timeOfDay?: string;
+      intExt?: string;
+    };
+    cast?: {
+      principal?: string[];
+      speaking?: string[];
+      silent?: string[];
+      extras?: { count?: string; description?: string };
+    };
   };
   directing_vision: {
-    visual_metaphor: string;
-    editorial_intent: string;
-    shot_motivation: string;
+    visual_metaphor?: string;
+    editorial_intent?: string;
+    shot_motivation?: string;
     visual_approach?: string;
-    performance_notes?: string;
+    performance_notes?: string[] | string;
+    subtext?: string;
+    conflict?: {
+      type?: string;
+      description?: string;
+      winner?: string;
+    };
+    tone_and_mood?: {
+      opening?: string;
+      shift?: string;
+      closing?: string;
+      energy?: string;
+    };
+    visual_strategy?: {
+      approach?: string;
+      camera_personality?: string;
+      lighting_mood?: string;
+    };
+    character_motivations?: Array<{
+      character?: string;
+      wants?: string;
+      obstacle?: string;
+      tactic?: string;
+    }>;
+    key_moments?: Array<{
+      beat?: string;
+      emphasis?: string;
+      why?: string;
+    }>;
+    blocking?: {
+      geography?: string;
+      movement?: string;
+      eyelines?: string;
+    };
   };
   shot_list?: ShotListItem[];
 }
@@ -60,6 +109,7 @@ const parseAnalysis = (analysisString: string | null): AnalysisData | null => {
 
 export const exportShotListPDF = async (scenes: Scene[], projectTitle: string) => {
   const pdf = new jsPDF();
+  console.log("EXPORT PDF CALLED - scenes:", scenes.length);
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
   const margin = 15;
@@ -85,7 +135,7 @@ export const exportShotListPDF = async (scenes: Scene[], projectTitle: string) =
   pdf.setFontSize(20);
   pdf.setFont("helvetica", "bold");
   pdf.setTextColor(229, 9, 20); // Netflix red
-  pdf.text("SCENE ANALYSIS & SHOT LIST", pageWidth / 2, yPosition, { align: 'center' });
+  pdf.text("FULL ANALYSIS REPORT", pageWidth / 2, yPosition, { align: 'center' });
   yPosition += 10;
 
   pdf.setFontSize(14);
@@ -161,14 +211,15 @@ export const exportShotListPDF = async (scenes: Scene[], projectTitle: string) =
       checkPageBreak(20);
     }
 
-    // Conflict
+    // Conflict/Ownership
     if (analysis.story_analysis?.ownership) {
       pdf.setFont("helvetica", "bold");
       pdf.text("Conflict:", margin, yPosition);
       pdf.setFont("helvetica", "normal");
+      const ownershipLines = pdf.splitTextToSize(analysis.story_analysis.ownership, maxWidth - 5);
       yPosition += 4;
-      pdf.text(analysis.story_analysis.ownership, margin + 2, yPosition);
-      yPosition += 6;
+      pdf.text(ownershipLines, margin + 2, yPosition);
+      yPosition += ownershipLines.length * 3.5 + 4;
       checkPageBreak(20);
     }
 
@@ -197,11 +248,12 @@ export const exportShotListPDF = async (scenes: Scene[], projectTitle: string) =
     }
 
     // Tone
-    if (analysis.directing_vision?.visual_metaphor) {
+    if (analysis.story_analysis?.tone || analysis.directing_vision?.visual_metaphor) {
       pdf.setFont("helvetica", "bold");
       pdf.text("Tone:", margin, yPosition);
       pdf.setFont("helvetica", "normal");
-      const toneLines = pdf.splitTextToSize(analysis.directing_vision.visual_metaphor, maxWidth - 5);
+      const toneText = analysis.story_analysis?.tone || analysis.directing_vision?.visual_metaphor || '';
+      const toneLines = pdf.splitTextToSize(toneText, maxWidth - 5);
       yPosition += 4;
       pdf.text(toneLines, margin + 2, yPosition);
       yPosition += toneLines.length * 3.5 + 4;
@@ -211,11 +263,216 @@ export const exportShotListPDF = async (scenes: Scene[], projectTitle: string) =
     yPosition += 4;
 
     // ═══════════════════════════════════════════════════════════════
-    // PRODUCING NOTES (if any red flags or key props)
+    // DIRECTING VISION SECTION
     // ═══════════════════════════════════════════════════════════════
-    const hasProducingNotes = (analysis.producing_logistics?.red_flags?.length > 0) || 
-                              (analysis.producing_logistics?.key_props?.length > 0) ||
-                              (analysis.producing_logistics?.special_requirements?.length > 0);
+    const dv = analysis.directing_vision;
+    console.log('Directing Vision data:', dv);
+    if (dv) {
+      checkPageBreak(40);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(10);
+      pdf.setTextColor(229, 9, 20);
+      pdf.text("DIRECTING VISION", margin, yPosition);
+      yPosition += 6;
+      pdf.setTextColor(0, 0, 0);
+      pdf.setFontSize(8);
+
+      // Tone & Mood
+      if (dv.tone_and_mood) {
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Tone & Mood:", margin, yPosition);
+        pdf.setFont("helvetica", "normal");
+        yPosition += 4;
+        if (dv.tone_and_mood.opening) {
+          pdf.text(`Opens: ${dv.tone_and_mood.opening}`, margin + 2, yPosition);
+          yPosition += 4;
+        }
+        if (dv.tone_and_mood.shift) {
+          const shiftLines = pdf.splitTextToSize(`Shifts: ${dv.tone_and_mood.shift}`, maxWidth - 5);
+          pdf.text(shiftLines, margin + 2, yPosition);
+          yPosition += shiftLines.length * 3.5;
+        }
+        if (dv.tone_and_mood.closing) {
+          pdf.text(`Closes: ${dv.tone_and_mood.closing}`, margin + 2, yPosition);
+          yPosition += 4;
+        }
+        if (dv.tone_and_mood.energy) {
+          pdf.text(`Energy: ${dv.tone_and_mood.energy}`, margin + 2, yPosition);
+          yPosition += 4;
+        }
+        yPosition += 2;
+        checkPageBreak(20);
+      }
+
+      // Visual Strategy
+      if (dv.visual_strategy) {
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Visual Strategy:", margin, yPosition);
+        pdf.setFont("helvetica", "normal");
+        yPosition += 4;
+        if (dv.visual_strategy.approach) {
+          pdf.text(`Approach: ${dv.visual_strategy.approach}`, margin + 2, yPosition);
+          yPosition += 4;
+        }
+        if (dv.visual_strategy.camera_personality) {
+          pdf.text(`Camera: ${dv.visual_strategy.camera_personality}`, margin + 2, yPosition);
+          yPosition += 4;
+        }
+        if (dv.visual_strategy.lighting_mood) {
+          pdf.text(`Lighting: ${dv.visual_strategy.lighting_mood}`, margin + 2, yPosition);
+          yPosition += 4;
+        }
+        yPosition += 2;
+        checkPageBreak(20);
+      }
+
+      // Subtext
+      if (dv.subtext) {
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Subtext:", margin, yPosition);
+        pdf.setFont("helvetica", "normal");
+        const subtextLines = pdf.splitTextToSize(dv.subtext, maxWidth - 5);
+        yPosition += 4;
+        pdf.text(subtextLines, margin + 2, yPosition);
+        yPosition += subtextLines.length * 3.5 + 4;
+        checkPageBreak(20);
+      }
+
+      // Conflict
+      if (dv.conflict) {
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Conflict:", margin, yPosition);
+        pdf.setFont("helvetica", "normal");
+        yPosition += 4;
+        if (dv.conflict.type) {
+          pdf.setFont("helvetica", "bold");
+          pdf.text(`Type: ${dv.conflict.type}`, margin + 2, yPosition);
+          pdf.setFont("helvetica", "normal");
+          yPosition += 4;
+        }
+        if (dv.conflict.description) {
+          const conflictLines = pdf.splitTextToSize(dv.conflict.description, maxWidth - 5);
+          pdf.text(conflictLines, margin + 2, yPosition);
+          yPosition += conflictLines.length * 3.5;
+        }
+        if (dv.conflict.winner) {
+          pdf.text(`Winner: ${dv.conflict.winner}`, margin + 2, yPosition);
+          yPosition += 4;
+        }
+        yPosition += 2;
+        checkPageBreak(20);
+      }
+
+      // Key Moments
+      if (dv.key_moments && dv.key_moments.length > 0) {
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Key Moments:", margin, yPosition);
+        pdf.setFont("helvetica", "normal");
+        yPosition += 4;
+        dv.key_moments.forEach((moment, idx) => {
+          checkPageBreak(15);
+          if (moment.beat) {
+            const beatLines = pdf.splitTextToSize(`${idx + 1}. ${moment.beat}`, maxWidth - 10);
+            pdf.text(beatLines, margin + 2, yPosition);
+            yPosition += beatLines.length * 3.5;
+          }
+          if (moment.why) {
+            pdf.setTextColor(80, 80, 80);
+            const whyLines = pdf.splitTextToSize(`   → ${moment.why}`, maxWidth - 15);
+            pdf.text(whyLines, margin + 2, yPosition);
+            yPosition += whyLines.length * 3.5;
+            pdf.setTextColor(0, 0, 0);
+          }
+          yPosition += 2;
+        });
+        yPosition += 2;
+        checkPageBreak(20);
+      }
+
+      // Character Motivations
+      if (dv.character_motivations && dv.character_motivations.length > 0) {
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Character Motivations:", margin, yPosition);
+        pdf.setFont("helvetica", "normal");
+        yPosition += 4;
+        dv.character_motivations.forEach((char) => {
+          checkPageBreak(15);
+          if (char.character) {
+            pdf.setFont("helvetica", "bold");
+            pdf.text(char.character, margin + 2, yPosition);
+            pdf.setFont("helvetica", "normal");
+            yPosition += 4;
+          }
+          if (char.wants) {
+            pdf.text(`  Wants: ${char.wants}`, margin + 2, yPosition);
+            yPosition += 4;
+          }
+          if (char.obstacle) {
+            pdf.text(`  Obstacle: ${char.obstacle}`, margin + 2, yPosition);
+            yPosition += 4;
+          }
+          if (char.tactic) {
+            pdf.text(`  Tactic: ${char.tactic}`, margin + 2, yPosition);
+            yPosition += 4;
+          }
+          yPosition += 2;
+        });
+        checkPageBreak(20);
+      }
+
+      // Blocking
+      if (dv.blocking) {
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Blocking:", margin, yPosition);
+        pdf.setFont("helvetica", "normal");
+        yPosition += 4;
+        if (dv.blocking.geography) {
+          const geoLines = pdf.splitTextToSize(`Geography: ${dv.blocking.geography}`, maxWidth - 5);
+          pdf.text(geoLines, margin + 2, yPosition);
+          yPosition += geoLines.length * 3.5;
+        }
+        if (dv.blocking.movement) {
+          const moveLines = pdf.splitTextToSize(`Movement: ${dv.blocking.movement}`, maxWidth - 5);
+          pdf.text(moveLines, margin + 2, yPosition);
+          yPosition += moveLines.length * 3.5;
+        }
+        if (dv.blocking.eyelines) {
+          const eyeLines = pdf.splitTextToSize(`Eyelines: ${dv.blocking.eyelines}`, maxWidth - 5);
+          pdf.text(eyeLines, margin + 2, yPosition);
+          yPosition += eyeLines.length * 3.5;
+        }
+        yPosition += 2;
+        checkPageBreak(20);
+      }
+
+      // Performance Notes
+      if (dv.performance_notes) {
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Performance Notes:", margin, yPosition);
+        pdf.setFont("helvetica", "normal");
+        yPosition += 4;
+        const notes = Array.isArray(dv.performance_notes) ? dv.performance_notes : [dv.performance_notes];
+        notes.forEach((note) => {
+          checkPageBreak(10);
+          const noteLines = pdf.splitTextToSize(`• ${note}`, maxWidth - 10);
+          pdf.text(noteLines, margin + 2, yPosition);
+          yPosition += noteLines.length * 3.5 + 2;
+        });
+        yPosition += 2;
+      }
+
+      yPosition += 4;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // PRODUCING NOTES
+    // ═══════════════════════════════════════════════════════════════
+    const pl = analysis.producing_logistics;
+    const hasProducingNotes = (pl?.red_flags?.length > 0) || 
+                              (pl?.key_props?.length > 0) ||
+                              (pl?.special_requirements?.length > 0) ||
+                              pl?.locations ||
+                              pl?.cast;
     
     if (hasProducingNotes) {
       checkPageBreak(30);
@@ -227,23 +484,64 @@ export const exportShotListPDF = async (scenes: Scene[], projectTitle: string) =
       pdf.setTextColor(0, 0, 0);
       pdf.setFontSize(8);
 
-      if (analysis.producing_logistics?.key_props?.length > 0) {
+      // Location
+      if (pl?.locations?.primary) {
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Location:", margin, yPosition);
+        pdf.setFont("helvetica", "normal");
+        yPosition += 4;
+        pdf.text(pl.locations.primary, margin + 2, yPosition);
+        yPosition += 6;
+      }
+
+      // Cast
+      if (pl?.cast?.principal?.length > 0) {
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Cast:", margin, yPosition);
+        pdf.setFont("helvetica", "normal");
+        yPosition += 4;
+        pdf.text(`Principal: ${pl.cast.principal.join(", ")}`, margin + 2, yPosition);
+        yPosition += 4;
+        if (pl.cast.speaking?.length > 0) {
+          pdf.text(`Speaking: ${pl.cast.speaking.join(", ")}`, margin + 2, yPosition);
+          yPosition += 4;
+        }
+        if (pl.cast.silent?.length > 0) {
+          pdf.text(`Silent: ${pl.cast.silent.join(", ")}`, margin + 2, yPosition);
+          yPosition += 4;
+        }
+        yPosition += 2;
+      }
+
+      // Key Props
+      if (pl?.key_props?.length > 0) {
         pdf.setFont("helvetica", "bold");
         pdf.text("Key Props:", margin, yPosition);
         pdf.setFont("helvetica", "normal");
         yPosition += 4;
-        pdf.text(analysis.producing_logistics.key_props.join(", "), margin + 2, yPosition);
+        pdf.text(pl.key_props.join(", "), margin + 2, yPosition);
         yPosition += 6;
       }
 
-      if (analysis.producing_logistics?.red_flags?.length > 0) {
+      // Resource Impact
+      if (pl?.resource_impact) {
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Resource Impact:", margin, yPosition);
+        pdf.setFont("helvetica", "normal");
+        yPosition += 4;
+        pdf.text(pl.resource_impact, margin + 2, yPosition);
+        yPosition += 6;
+      }
+
+      // Budget Flags
+      if (pl?.red_flags?.length > 0) {
         pdf.setFont("helvetica", "bold");
         pdf.setTextColor(200, 0, 0);
         pdf.text("Budget Flags:", margin, yPosition);
         pdf.setFont("helvetica", "normal");
         pdf.setTextColor(0, 0, 0);
         yPosition += 4;
-        analysis.producing_logistics.red_flags.forEach(flag => {
+        pl.red_flags.forEach(flag => {
           const flagLines = pdf.splitTextToSize(`• ${flag}`, maxWidth - 10);
           pdf.text(flagLines, margin + 2, yPosition);
           yPosition += flagLines.length * 3.5 + 2;
@@ -272,11 +570,11 @@ export const exportShotListPDF = async (scenes: Scene[], projectTitle: string) =
       pdf.setTextColor(255, 255, 255);
       pdf.text("SHOT", margin + 2, yPosition + 1);
       pdf.text("TYPE", margin + 18, yPosition + 1);
-      pdf.text("DESCRIPTION", margin + 45, yPosition + 1);
-      pdf.text("RATIONALE", margin + 125, yPosition + 1);
+      pdf.text("SUBJECT/DESCRIPTION", margin + 45, yPosition + 1);
+      pdf.text("RATIONALE", margin + 120, yPosition + 1);
       yPosition += 7;
 
-      // Shot rows - NUMBER RESETS TO 1 FOR EACH SCENE
+      // Shot rows
       analysis.shot_list.forEach((shot, shotIndex) => {
         checkPageBreak(12);
 
@@ -290,7 +588,7 @@ export const exportShotListPDF = async (scenes: Scene[], projectTitle: string) =
         pdf.setFontSize(7);
         pdf.setTextColor(0, 0, 0);
 
-        // Shot number (resets per scene)
+        // Shot number
         pdf.setFont("helvetica", "bold");
         pdf.text(`${scene.scene_number}.${shotIndex + 1}`, margin + 2, yPosition + 3);
 
@@ -300,14 +598,14 @@ export const exportShotListPDF = async (scenes: Scene[], projectTitle: string) =
         pdf.setFont("helvetica", "normal");
         pdf.text(`${shotType}${movement}`.substring(0, 12), margin + 18, yPosition + 3);
 
-        // Visual description
-        const visualText = (shot.visual || shot.subject || '').substring(0, 55);
-        pdf.text(visualText, margin + 45, yPosition + 3);
+        // Subject/Description
+        const subjectText = (shot.subject || shot.visual || shot.visualDescription || '').substring(0, 50);
+        pdf.text(subjectText, margin + 45, yPosition + 3);
 
         // Rationale
         pdf.setTextColor(80, 80, 80);
-        const rationaleText = (shot.rationale || '').substring(0, 35);
-        pdf.text(rationaleText, margin + 125, yPosition + 3);
+        const rationaleText = (shot.rationale || '').substring(0, 30);
+        pdf.text(rationaleText, margin + 120, yPosition + 3);
 
         yPosition += 9;
       });
@@ -330,12 +628,120 @@ export const exportShotListPDF = async (scenes: Scene[], projectTitle: string) =
     );
   }
 
-  pdf.save(`${projectTitle}-analysis-shotlist.pdf`);
+  pdf.save(`${projectTitle}-full-analysis.pdf`);
 };
 
+// ═══════════════════════════════════════════════════════════════
+// STORYBOARD PDF EXPORT
+// ═══════════════════════════════════════════════════════════════
+export const exportStoryboardPDF = async (scenes: Scene[], projectTitle: string) => {
+  const pdf = new jsPDF('landscape');
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const margin = 10;
+  let yPosition = 15;
+
+  // Title
+  pdf.setFillColor(255, 255, 255);
+  pdf.rect(0, 0, pageWidth, pageHeight, 'F');
+  
+  pdf.setFontSize(16);
+  pdf.setFont("helvetica", "bold");
+  pdf.setTextColor(229, 9, 20);
+  pdf.text(`STORYBOARD: ${projectTitle}`, pageWidth / 2, yPosition, { align: 'center' });
+  yPosition += 10;
+
+  // Grid layout: 3 columns x 2 rows per page
+  const frameWidth = 85;
+  const frameHeight = 55;
+  const framePadding = 8;
+  let frameIndex = 0;
+
+  scenes.forEach((scene) => {
+    const analysis = parseAnalysis(scene.analysis);
+    if (!analysis?.shot_list) return;
+
+    analysis.shot_list.forEach((shot, shotIdx) => {
+      // Calculate position in grid
+      const col = frameIndex % 3;
+      const row = Math.floor(frameIndex / 3) % 2;
+      
+      // New page every 6 frames
+      if (frameIndex > 0 && frameIndex % 6 === 0) {
+        pdf.addPage();
+        pdf.setFillColor(255, 255, 255);
+        pdf.rect(0, 0, pageWidth, pageHeight, 'F');
+      }
+
+      const xPos = margin + col * (frameWidth + framePadding);
+      const yPos = 25 + row * (frameHeight + framePadding + 15);
+
+      // Frame border
+      pdf.setDrawColor(100, 100, 100);
+      pdf.setLineWidth(0.5);
+      pdf.rect(xPos, yPos, frameWidth, frameHeight);
+
+      // Frame placeholder (for image)
+      pdf.setFillColor(240, 240, 240);
+      pdf.rect(xPos + 1, yPos + 1, frameWidth - 2, frameHeight - 15, 'F');
+
+      // Shot number badge
+      pdf.setFillColor(229, 9, 20);
+      pdf.rect(xPos + 2, yPos + 2, 18, 6, 'F');
+      pdf.setFontSize(6);
+      pdf.setFont("helvetica", "bold");
+      pdf.setTextColor(255, 255, 255);
+      pdf.text(`${scene.scene_number}.${shotIdx + 1}`, xPos + 4, yPos + 6);
+
+      // Shot type
+      pdf.setFillColor(50, 50, 50);
+      pdf.rect(xPos + 22, yPos + 2, 20, 6, 'F');
+      pdf.setFontSize(5);
+      pdf.text(shot.shot_type || 'WIDE', xPos + 24, yPos + 6);
+
+      // Subject/Description at bottom of frame
+      pdf.setFillColor(255, 255, 255);
+      pdf.rect(xPos + 1, yPos + frameHeight - 14, frameWidth - 2, 13, 'F');
+      
+      pdf.setFontSize(6);
+      pdf.setFont("helvetica", "bold");
+      pdf.setTextColor(0, 0, 0);
+      const subject = (shot.subject || shot.visual || shot.visualDescription || '').substring(0, 45);
+      pdf.text(subject, xPos + 3, yPos + frameHeight - 9);
+
+      pdf.setFontSize(5);
+      pdf.setFont("helvetica", "normal");
+      pdf.setTextColor(80, 80, 80);
+      const rationale = (shot.rationale || '').substring(0, 50);
+      pdf.text(rationale, xPos + 3, yPos + frameHeight - 4);
+
+      frameIndex++;
+    });
+  });
+
+  // Footer on all pages
+  const totalPages = pdf.internal.pages.length - 1;
+  for (let i = 1; i <= totalPages; i++) {
+    pdf.setPage(i);
+    pdf.setFontSize(7);
+    pdf.setTextColor(150, 150, 150);
+    pdf.text(
+      `Page ${i} of ${totalPages} • ${projectTitle} • ShotLogic Storyboard`,
+      pageWidth / 2,
+      pageHeight - 5,
+      { align: 'center' }
+    );
+  }
+
+  pdf.save(`${projectTitle}-storyboard.pdf`);
+};
+
+// ═══════════════════════════════════════════════════════════════
+// CSV EXPORT
+// ═══════════════════════════════════════════════════════════════
 export const exportShotListCSV = (scenes: Scene[], projectTitle: string) => {
   const rows: string[][] = [
-    ['Scene', 'Shot', 'Type', 'Movement', 'Description', 'Rationale', 'Duration', 'Image Prompt']
+    ['Scene', 'Shot', 'Type', 'Movement', 'Subject', 'Coverage', 'Rationale', 'Duration', 'Image Prompt']
   ];
 
   scenes.forEach((scene) => {
@@ -348,16 +754,17 @@ export const exportShotListCSV = (scenes: Scene[], projectTitle: string) => {
         `${scene.scene_number}.${idx + 1}`,
         shot.shot_type || 'WIDE',
         shot.movement || 'STATIC',
-        shot.visual || '',
+        shot.subject || shot.visual || shot.visualDescription || '',
+        shot.coverage || '',
         shot.rationale || '',
-        shot.duration || 'MEDIUM',
-        shot.image_prompt || ''
+        shot.duration || 'Standard',
+        shot.image_prompt || shot.aiImagePrompt || ''
       ]);
     });
   });
 
   const csvContent = rows.map(row => 
-    row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(',')
+    row.map(cell => `"${(cell || '').replace(/"/g, '""')}"`).join(',')
   ).join('\n');
 
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });

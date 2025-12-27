@@ -17,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Trash2, ArrowLeft, Film, Camera, Printer, Download, RefreshCw, FileText, Edit, Save, Menu, Sparkles, ImageIcon, Palette, X, Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
-import { exportShotListPDF, exportShotListCSV } from "@/utils/shotListExporter";
+import { exportShotListPDF, exportShotListCSV, exportStoryboardPDF } from "@/utils/shotListExporter";
 import { generatePromptPair } from "@/utils/promptBuilder";
 import { generateStoryboardPDF } from "@/utils/storyboardPdfGenerator";
 import { requestNotificationPermission, notifyAnalysisComplete } from "@/utils/notifications";
@@ -479,6 +479,12 @@ const ProjectDetails = () => {
         toast({
           title: "Full report exported",
           description: "Your complete analysis report has been downloaded",
+        });
+      } else if (type === "storyboard") {
+        exportStoryboardPDF(scenes, project?.title || "Untitled");
+        toast({
+          title: "Storyboard exported",
+          description: "Your storyboard PDF has been downloaded",
         });
       } else if (type === "shot-list") {
         exportShotListCSV(scenes, project?.title || "Untitled");

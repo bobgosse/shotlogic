@@ -55,6 +55,7 @@ export const ExportModal = ({ open, onOpenChange, onExport }: ExportModalProps) 
     setSelectedType(rolePresets[role]);
   };
 
+    console.log("ExportModal handleExport called with type:", selectedType);
   const handleExport = async () => {
     if (!selectedType) return;
 
