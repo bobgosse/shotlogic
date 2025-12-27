@@ -71,24 +71,33 @@ export default async function handler(
       return res.status(400).json({ error: 'Missing required fields', deployMarker: DEPLOY_TIMESTAMP })
     }
 
-    // Extract character names from dialogue headers
+    // Extract character names from dialogue headers (most reliable)
     const dialogueMatches = sceneText.match(/^[A-Z][A-Z\s]+(?=\n)/gm) || []
     const speakingCharacters = [...new Set(dialogueMatches.map(m => m.trim().replace(/\s*\(CONT'D\)/, '')))]
     
-    // Also find character names in action lines
-    const actionNameMatches = sceneText.match(/\b([A-Z][a-z]+)\b/g) || []
-    const commonWords = ['The', 'His', 'Her', 'She', 'He', 'They', 'Day', 'Night', 'Int', 'Ext', 'Cold', 'Gray', 'Arms', 'Head', 'Wet', 'Behind', 'Hair', 'Eyes', 'Skin', 'Wind', 'Scottish', 'Something', 'Moment', 'Comes', 'Grabs', 'Takes', 'Breathing', 'Waiting', 'Watching']
-    const potentialNames = actionNameMatches.filter(name => 
-      name.length > 2 && !commonWords.includes(name)
-    )
-    const actionCharacters = [...new Set(potentialNames)]
+    // Look for non-speaking characters: "Name stands", "Name watches", etc.
+    const actionPattern = /\b([A-Z][a-z]{2,})\s+(?:stands?|watches?|eyes|looks?|pushes?|pulls?|walks?|sits?|moves?|turns?|enters?|exits?|leaves?|waits?|unlocks?)\b/g
+    const actionMatches = [...sceneText.matchAll(actionPattern)]
+    const actionCharacters = actionMatches.map(m => m[1])
     
-    // Combine all characters
+    // Also catch "Name, Name stand watching" pattern
+    const groupPattern = /\b([A-Z][a-z]{2,}),\s*([A-Z][a-z]{2,})\s+(?:stand|watch|sit|wait)/g
+    const groupMatches = [...sceneText.matchAll(groupPattern)]
+    for (const m of groupMatches) {
+      actionCharacters.push(m[1], m[2])
+    }
+    
+    // Combine and dedupe
     const allCharacters = [...new Set([...speakingCharacters, ...actionCharacters])]
-    const characters = allCharacters.filter(c => c.length > 1)
+    
+    // Filter out words that aren't character names
+    const notCharacters = ['Camera', 'Shot', 'Scene', 'Something', 'Behind', 'Wind']
+    const characters = allCharacters.filter(c => c.length > 2 && !notCharacters.includes(c))
     
     const dialogueExchanges = dialogueMatches.length
     const sceneLength = sceneText.length
+
+    console.log(`📊 [${invocationId}] Characters: ${characters.join(', ')}`)
     
     // Calculate shot count
     const characterCount = characters.length
@@ -103,7 +112,7 @@ export default async function handler(
     minShots = Math.min(minShots, 20)
     maxShots = Math.min(maxShots, 30)
 
-    console.log(`📊 [${invocationId}] Characters: ${characters.join(', ')}`)
+    console.log(`📊 [${invocationId}] Requesting ${minShots}-${maxShots} shots`)
     console.log(`📊 [${invocationId}] Requesting ${minShots}-${maxShots} shots`)
 
     const userPrompt = `You are a professional 1st AD and script supervisor creating a shot list for Scene ${sceneNumber} of ${totalScenes}.
