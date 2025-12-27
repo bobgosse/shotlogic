@@ -1,9 +1,9 @@
 // api/analyze-scene.ts
-// PRODUCTION: Scene analysis with SYSTEMATIC COVERAGE PLANNING
+// Scene analysis using Claude API (Anthropic)
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
-const DEPLOY_TIMESTAMP = "2024-12-27T01:00:00Z_SYSTEMATIC_COVERAGE"
+const DEPLOY_TIMESTAMP = "2024-12-27T17:00:00Z_CLAUDE_API"
 
 function getEnvironmentVariable(name: string): string | undefined {
   try {
@@ -33,7 +33,7 @@ export default async function handler(
 ) {
   const invocationId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
   
-  console.log(`\n🎬 [${invocationId}] ═══ SCENE ANALYSIS ═══`)
+  console.log(`\n🎬 [${invocationId}] ═══ SCENE ANALYSIS (CLAUDE) ═══`)
   console.log(`📅 Timestamp: ${new Date().toISOString()}`)
   console.log(`🏷️  Deploy: ${DEPLOY_TIMESTAMP}`)
   
@@ -50,13 +50,13 @@ export default async function handler(
   }
 
   try {
-    const openaiKey = getEnvironmentVariable('OPENAI_API_KEY')
+    const anthropicKey = getEnvironmentVariable('ANTHROPIC_API_KEY')
     
-    if (!openaiKey) {
-      console.error(`❌ [${invocationId}] OPENAI_API_KEY not found`)
+    if (!anthropicKey) {
+      console.error(`❌ [${invocationId}] ANTHROPIC_API_KEY not found`)
       return res.status(500).json({ 
         error: 'Server Configuration Error',
-        message: 'OpenAI API Key is not configured',
+        message: 'Anthropic API Key is not configured',
         deployMarker: DEPLOY_TIMESTAMP
       })
     }
@@ -75,391 +75,249 @@ export default async function handler(
     const dialogueMatches = sceneText.match(/^[A-Z][A-Z\s]+(?=\n)/gm) || []
     const speakingCharacters = [...new Set(dialogueMatches.map(m => m.trim().replace(/\s*\(CONT'D\)/, '')))]
     
-    // Also look for character names mentioned in action lines (capitalized names)
+    // Also find character names in action lines
     const actionNameMatches = sceneText.match(/\b([A-Z][a-z]+)\b/g) || []
+    const commonWords = ['The', 'His', 'Her', 'She', 'He', 'They', 'Day', 'Night', 'Int', 'Ext', 'Cold', 'Gray', 'Arms', 'Head', 'Wet', 'Behind', 'Hair', 'Eyes', 'Skin', 'Wind', 'Scottish', 'Something', 'Moment', 'Comes', 'Grabs', 'Takes', 'Breathing', 'Waiting', 'Watching']
     const potentialNames = actionNameMatches.filter(name => 
-      name.length > 2 && 
-      !['The', 'His', 'Her', 'She', 'He', 'They', 'Day', 'Night', 'Int', 'Ext', 'Cold', 'Gray', 'Arms', 'Head', 'Wet', 'Behind', 'Hair', 'Eyes', 'Skin', 'Wind', 'Scottish'].includes(name)
+      name.length > 2 && !commonWords.includes(name)
     )
     const actionCharacters = [...new Set(potentialNames)]
     
-    // Combine speaking and action characters
+    // Combine all characters
     const allCharacters = [...new Set([...speakingCharacters, ...actionCharacters])]
     const characters = allCharacters.filter(c => c.length > 1)
     
     const dialogueExchanges = dialogueMatches.length
-    const hasAction = /\b(runs?|fights?|chases?|crashes?|explodes?|falls?|grabs?|throws?|hits?|punches?|shoots?|drives?|jumps?|climbs?|escapes?|reveals?|pulls?|pushes?)\b/i.test(sceneText)
     const sceneLength = sceneText.length
     
-    console.log(`📊 Characters detected: ${characters.join(', ')}`)
-    
-    // Calculate shot requirements - be more aggressive
+    // Calculate shot count
     const characterCount = characters.length
-    let minShots = Math.max(12, characterCount * 4) // At least 4 shots per character
-    let maxShots = Math.max(18, characterCount * 5)
+    let minShots = Math.max(12, characterCount * 3)
+    let maxShots = Math.max(18, characterCount * 4)
     
     if (dialogueExchanges > 8) {
-      minShots = Math.max(minShots, Math.ceil(dialogueExchanges * 1.2))
-      maxShots = Math.max(maxShots, dialogueExchanges * 2)
-    }
-    if (hasAction || sceneLength > 1500) {
-      minShots += 5
-      maxShots += 8
+      minShots = Math.max(minShots, dialogueExchanges)
+      maxShots = Math.max(maxShots, Math.ceil(dialogueExchanges * 1.5))
     }
     
-    // More generous limits for complex scenes
     minShots = Math.min(minShots, 20)
-    maxShots = Math.min(maxShots, 35)
+    maxShots = Math.min(maxShots, 30)
 
-    const systemPrompt = `You are a script supervisor creating a shot list. You MUST follow these ABSOLUTE RULES:
+    console.log(`📊 [${invocationId}] Characters: ${characters.join(', ')}`)
+    console.log(`📊 [${invocationId}] Requesting ${minShots}-${maxShots} shots`)
 
-RULE 1 - SUBJECT FIELD: Every shot MUST start with a CHARACTER NAME IN CAPS.
-- ✅ "LEO - drying off on dock"
-- ✅ "HUBER and ROSALIND - watching from wheelchait"
-- ✅ "POV LEO - looking at his bare feet"
-- ❌ "Gray sky and water" (NO! Who is in the shot?)
-- ❌ "Two figures on dock" (NO! Name them: HUBER and ROSALIND)
-- ❌ "Focus on legs" (NO! Say: VIRGINIA's withered legs)
+    const userPrompt = `You are a professional 1st AD and script supervisor creating a shot list for Scene ${sceneNumber} of ${totalScenes}.
 
-RULE 2 - COVERAGE FIELD: Must quote exact dialogue or describe specific action.
-- ✅ "LEO: 'Seven.' - his counter-offer"
-- ✅ "VIRGINIA: 'The water does not ask who you are.'"
-- ❌ "The negotiation" (NO! Quote the actual lines)
-- ❌ "Emotional moment" (NO! What emotion? Whose?)
-
-RULE 3 - RATIONALE FIELD: Explain WHY this shot matters to the story.
-- ✅ "Leo's pride battles poverty - he needs money but won't beg"
-- ❌ "Captures the dynamic" (NO! What dynamic specifically?)
-- ❌ "Sets the mood" (NO! What mood? Why?)
-
-If you write "two figures" instead of naming them, you have FAILED.
-If you write "captures the emotion" without specifics, you have FAILED.`
-
-    const userPrompt = `Analyze Scene ${sceneNumber} of ${totalScenes} for full production breakdown.
-
-SCENE TEXT:
-"""
+<scene_text>
 ${sceneText}
-"""
+</scene_text>
 
-${visualStyle ? `VISUAL STYLE: "${visualStyle}" - incorporate into all image prompts.` : ''}
+${visualStyle ? `<visual_style>${visualStyle}</visual_style>` : ''}
 
-DETECTED CHARACTERS: ${characters.join(', ')}
-DIALOGUE EXCHANGES: ${dialogueExchanges}
-SCENE LENGTH: ${sceneLength} chars
+<characters_in_scene>
+${characters.join(', ')}
+</characters_in_scene>
 
-=== PHASE 1: COVERAGE PLANNING ===
+<instructions>
+Create a detailed shot list with ${minShots}-${maxShots} shots.
 
-Before generating shots, ANALYZE the scene for:
+CRITICAL RULES YOU MUST FOLLOW:
 
-A) CHARACTER MOMENTS - For each character, what are their:
-   - Key dialogue lines (quote them!)
-   - Reaction moments (to what specifically?)
-   - Physical actions
+1. SUBJECT FIELD - Must name the character(s) in CAPS:
+   ✓ "LEO - emerging from water, toweling off"
+   ✓ "HUBER and ROSALIND - watching Leo from the dock"  
+   ✓ "VIRGINIA - in wheelchair, reciting poetry"
+   ✓ "POV LEO - looking down at his bare feet next to worn shoes"
+   ✓ "REVEAL - VIRGINIA's withered legs as blanket falls"
+   ✗ NEVER write "Two figures" - name them!
+   ✗ NEVER write "Gray sky and water" without saying who's in shot
+   ✗ NEVER write "Focus on legs" - say WHOSE legs!
 
-B) VISUAL REVEALS - Look for:
-   - Body parts revealed (legs, scars, tattoos)
-   - Objects revealed (money, weapons, documents)
-   - Character entrances/exits
-   
-C) POV OPPORTUNITIES - Look for:
-   - "He looks at..." or "She sees..." moments
-   - Character examining objects
-   - Character observing other characters
+2. COVERAGE FIELD - Must quote specific dialogue or describe exact action:
+   ✓ "LEO: 'Seven.' - his counter-offer"
+   ✓ "VIRGINIA: 'The water does not ask who you are. It only asks if you can breathe.'"
+   ✓ "Leo looks down at his bare feet, then at their expensive shoes"
+   ✗ NEVER write "The negotiation" or "emotional moment"
 
-D) POWER DYNAMICS - Track:
-   - Who has control at start vs end
-   - Moment the power shifts
-   - Physical positions (standing/sitting/moving)
+3. RATIONALE FIELD - Explain story purpose:
+   ✓ "Leo's pride battles his poverty - he needs money but won't beg"
+   ✓ "Virginia reveals she knows Leo's poetry, shifting power from money to connection"
+   ✗ NEVER write "Captures the dynamic" or "Sets the mood"
 
-For EACH character (${characters.join(', ')}), identify:
-- Their entrance/first appearance
-- Their most important line(s) - quote them
-- Their key reaction moments
-- Any physical action or reveal involving them
+4. EVERY CHARACTER must appear BY NAME in at least 2 shots:
+   ${characters.map(c => `- ${c}`).join('\n   ')}
+</instructions>
 
-Also identify:
-- POV SHOTS: Whose perspective do we see through? What do they look at?
-- REVEALS: Any physical reveals (body parts, objects, documents)?
-- INSERTS: Close-ups of hands, objects, or details that matter?
-
-=== PHASE 2: SHOT LIST ===
-
-Generate ${minShots}-${maxShots} shots that provide COMPLETE coverage.
-
-EXAMPLE OF A GOOD SHOT:
-{
-  "shot_type": "CLOSE_UP",
-  "subject": "VIRGINIA - reciting Leo's poetry",
-  "coverage": "VIRGINIA: 'The water does not ask who you are. It only asks if you can breathe.'",
-  "rationale": "Virginia reveals she knows Leo's poetry - this shifts power from Huber's money to her intellectual connection with Leo"
-}
-
-EXAMPLE OF A BAD SHOT - DO NOT DO THIS:
-{
-  "subject": "Two figures in formal attire",  ← WRONG! Say "HUBER and ROSALIND"
-  "coverage": "The negotiation scene",  ← WRONG! Quote the actual dialogue
-  "rationale": "Captures the dynamic"  ← WRONG! Explain WHAT dynamic and WHY it matters
-}
-
-REQUIREMENTS:
-- Every character in ${characters.join(', ')} must have at least ONE dedicated close-up
-- Every important line must specify which shot covers it
-- POV shots must specify whose POV and what they're looking at
-- Coverage field must quote SPECIFIC dialogue or describe SPECIFIC action
-
-Return this EXACT JSON structure:
+Return ONLY a JSON object with this structure:
 
 {
   "story_analysis": {
-    "synopsis": "2-3 sentences: WHO does WHAT to WHOM and what CHANGES",
-    "stakes": "What's SPECIFICALLY at risk in this scene?",
-    "ownership": "Who DRIVES this scene? What's their strategy?",
-    "breaking_point": "Quote the EXACT line that shifts the power dynamic",
-    "key_props": "Props that characters INTERACT with",
-    "tone": "Specific emotional quality (e.g., 'Tense negotiation with undercurrent of attraction')"
+    "synopsis": "2-3 sentence summary",
+    "stakes": "What's at risk",
+    "ownership": "Who drives the scene",
+    "breaking_point": "The exact line/moment that shifts power",
+    "key_props": "Important props",
+    "tone": "Specific emotional quality"
   },
-  
   "producing_logistics": {
-    "resource_impact": "Low or Medium or High",
-    "red_flags": ["Specific budget/logistics concerns"],
-    "departments_affected": ["Departments with specific requirements"],
+    "resource_impact": "Low/Medium/High",
+    "red_flags": ["specific concerns"],
+    "departments_affected": ["Camera", "Art", etc],
     "locations": {
-      "primary": "Location description",
-      "setting": "Location type",
-      "timeOfDay": "DAY/NIGHT/DAWN/DUSK",
+      "primary": "description",
+      "setting": "type",
+      "timeOfDay": "DAY/NIGHT",
       "intExt": "INT/EXT"
     },
     "cast": {
-      "principal": ["Main characters"],
-      "speaking": ["Characters with dialogue"],
-      "silent": ["Characters with action, no dialogue"],
-      "extras": { "count": "Number", "description": "What they do" }
+      "principal": ["names"],
+      "speaking": ["names"],
+      "silent": ["names"],
+      "extras": {"count": "number", "description": "what they do"}
     },
-    "key_props": ["Props characters interact with"],
-    "vehicles": ["If any"],
-    "sfx": {
-      "practical": ["Practical effects"],
-      "vfx": ["VFX needs"],
-      "stunts": ["Stunt work"]
-    },
-    "wardrobe": {
-      "principal": ["Costume notes"],
-      "notes": "Special requirements"
-    },
-    "makeup": {
-      "standard": ["Basic notes"],
-      "special": ["SFX makeup"]
-    },
-    "scheduling": {
-      "constraints": "Timing issues",
-      "notes": "Recommendations"
-    }
+    "key_props": ["list"],
+    "vehicles": ["if any"],
+    "sfx": {"practical": [], "vfx": [], "stunts": []},
+    "wardrobe": {"principal": [], "notes": ""},
+    "makeup": {"standard": [], "special": []},
+    "scheduling": {"constraints": "", "notes": ""}
   },
-  
   "directing_vision": {
-    "visual_metaphor": "How camera work reflects the scene's meaning",
-    "editorial_intent": "Pacing strategy - where to cut fast, where to hold",
-    "shot_motivation": "Why ${minShots}-${maxShots} shots? How does coverage serve the story?",
-    "subtext": "What's REALLY being communicated beneath the dialogue?",
+    "visual_metaphor": "How camera expresses meaning",
+    "editorial_intent": "Pacing strategy",
+    "shot_motivation": "Why this many shots",
+    "subtext": "What's beneath the dialogue",
     "conflict": {
-      "type": "NEGOTIATION, SEDUCTION, INTERROGATION, CONFESSION, CONFRONTATION, MANIPULATION, PERSUASION, REVELATION, DECEPTION, RECONCILIATION, ULTIMATUM, or POWER_PLAY",
-      "description": "WHO wants WHAT from WHOM using what TACTIC?",
-      "winner": "Who has the upper hand at scene's end?"
+      "type": "NEGOTIATION/SEDUCTION/CONFRONTATION/etc",
+      "description": "Who wants what from whom",
+      "winner": "Who has upper hand at end"
     },
     "tone_and_mood": {
-      "opening": "Emotional state at scene start",
-      "shift": "Quote the line where tone changes",
-      "closing": "Emotional state at scene end",
+      "opening": "Starting emotional state",
+      "shift": "Where/how it changes",
+      "closing": "Ending emotional state",
       "energy": "LOW/BUILDING/HIGH/DECLINING/VOLATILE"
     },
     "visual_strategy": {
-      "approach": "OBSERVATIONAL/INTIMATE/FORMAL/KINETIC/SUBJECTIVE",
-      "camera_personality": "Neutral observer, character-aligned, or omniscient?",
-      "lighting_mood": "Lighting approach"
+      "approach": "OBSERVATIONAL/INTIMATE/FORMAL/KINETIC",
+      "camera_personality": "Observer/aligned/omniscient",
+      "lighting_mood": "Description"
     },
     "character_motivations": [
-      {
-        "character": "Name",
-        "wants": "Goal in THIS scene",
-        "obstacle": "What blocks them",
-        "tactic": "How they try to get it"
-      }
+      {"character": "NAME", "wants": "goal", "obstacle": "what blocks", "tactic": "how they try"}
     ],
     "key_moments": [
-      {
-        "beat": "Quote specific line or describe action",
-        "emphasis": "How to shoot it",
-        "why": "Why this moment matters"
-      }
+      {"beat": "specific line/action", "emphasis": "how to shoot", "why": "importance"}
     ],
-    "performance_notes": ["Direction for each actor"],
+    "performance_notes": ["direction for each actor"],
     "blocking": {
-      "geography": "How characters use power in the space",
-      "movement": "Key crosses/gestures",
+      "geography": "How space is used",
+      "movement": "Key movements",
       "eyelines": "Important looks"
     }
   },
-  
-  "coverage_plan": {
-    "characters": [
-      {
-        "name": "Character name",
-        "entrance": "How/when they first appear",
-        "key_lines": ["Quote their most important lines"],
-        "reaction_beats": ["Moments where we need their reaction"],
-        "required_shots": ["CU needed for X", "Two-shot with Y"]
-      }
-    ],
-    "pov_shots": [
-      {
-        "whose_pov": "Character name",
-        "looking_at": "What they see",
-        "why": "Why this POV matters"
-      }
-    ],
-    "reveals": [
-      {
-        "what": "What's revealed",
-        "how": "Camera approach",
-        "why": "Story significance"
-      }
-    ],
-    "inserts": [
-      {
-        "subject": "What we see in close-up",
-        "why": "Why it matters"
-      }
-    ]
-  },
-  
   "shot_list": [
     {
       "shot_number": 1,
-      "shot_type": "WIDE or MEDIUM or CLOSE_UP or INSERT or POV or REVEAL or TWO_SHOT or GROUP",
-      "movement": "STATIC or PUSH_IN or DOLLY or HANDHELD etc",
-      "subject": "WRITE EXACTLY LIKE THIS: 'LEO - drying off on dock' or 'HUBER and ROSALIND - watching Leo' or 'POV LEO - his bare feet vs worn shoes' or 'REVEAL - VIRGINIA's withered legs'. NEVER write 'two figures' or 'gray sky' without naming the character.",
-      "action": "What the character DOES during this shot",
-      "coverage": "WRITE EXACTLY LIKE THIS: 'LEO: Seven. - his counter-offer turns the negotiation' or 'From HUBER: Five dollars a session through LEO taking the money'. ALWAYS quote dialogue or specify exact action.",
-      "duration": "Brief (1-2s) or Standard (3-5s) or Extended (6+s)",
-      "visual": "Composition and lighting details",
-      "rationale": "WRITE EXACTLY LIKE THIS: 'Leo's pride battles his poverty - he needs this money but won't appear desperate. Audience sees his internal conflict.' NEVER write 'captures the mood' or 'shows the emotion'.",
-      "image_prompt": "Start with character name: 'Leo Libretti, wet from swimming, towel to face, cold gray dock...'"
+      "shot_type": "WIDE/MEDIUM/CLOSE_UP/INSERT/POV/REVEAL/TWO_SHOT/GROUP",
+      "movement": "STATIC/PUSH_IN/DOLLY/HANDHELD/etc",
+      "subject": "CHARACTER NAME - what they're doing (MUST name the character!)",
+      "action": "What happens during shot",
+      "coverage": "Quote dialogue: 'CHARACTER: Line' OR describe specific action",
+      "duration": "Brief/Standard/Extended",
+      "visual": "Composition and lighting",
+      "rationale": "WHY this shot - story purpose, not generic terms",
+      "image_prompt": "Character name, action, setting, lighting, mood, 35mm film"
     }
   ],
-  
-  "shot_list_justification": "Explain your coverage strategy. How did you ensure every character (${characters.join(', ')}) gets their moments? Which editorial pairs did you plan? What POVs and inserts support the story?"
-}
+  "shot_list_justification": "How you ensured each character (${characters.join(', ')}) gets coverage"
+}`
 
-CRITICAL RULES:
-1. EVERY character in [${characters.join(', ')}] MUST have at least ONE dedicated close-up shot - if you skip a character, you have FAILED
-2. The "coverage" field must quote SPECIFIC DIALOGUE or describe SPECIFIC ACTION - never vague phrases like "his reaction" or "captures the dynamic"
-3. Include at least ONE POV shot if any character LOOKS at something important
-4. Include INSERT shots for important objects (money, hands, feet, documents, props mentioned in script)
-5. If there's a PHYSICAL REVEAL (body part, hidden object, etc.) it needs a dedicated shot
-6. Generate ${minShots}-${maxShots} shots - every shot must have a SPECIFIC purpose
-7. For every important LINE, there should be a shot that covers the speaker AND a shot for the listener's reaction
-
-VALIDATION - YOUR RESPONSE WILL BE REJECTED IF:
-- Any "subject" field doesn't start with a CHARACTER NAME IN CAPS
-- Any "subject" says "two figures" or "gray sky" without naming who
-- Any "coverage" field doesn't quote specific dialogue or action
-- Any "rationale" says "captures" or "sets the mood" or "dynamic"
-
-EVERY CHARACTER IN THIS SCENE NEEDS COVERAGE:
-${characters.join(', ')} - each must appear by name in at least 2 shots
-
-Return ONLY valid JSON. No markdown.`
-
-    console.log(`🤖 [${invocationId}] Calling OpenAI API...`)
-    console.log(`📊 [${invocationId}] Characters: ${characters.join(', ')}`)
-    console.log(`📊 [${invocationId}] Requesting ${minShots}-${maxShots} shots`)
-    const openaiStartTime = Date.now()
+    console.log(`🤖 [${invocationId}] Calling Claude API...`)
+    const startTime = Date.now()
     
-    const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+    const anthropicResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openaiKey}`,
+        'x-api-key': anthropicKey,
+        'anthropic-version': '2023-06-01',
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 8000,
         messages: [
-          { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
-        ],
-        temperature: 0.3,  // Lower for more consistent rule-following
-        max_tokens: 10000,
-        response_format: { type: 'json_object' }
+        ]
       }),
     })
 
-    const openaiDuration = Date.now() - openaiStartTime
-    console.log(`⏱️  [${invocationId}] OpenAI responded in ${openaiDuration}ms`)
+    const duration = Date.now() - startTime
+    console.log(`⏱️  [${invocationId}] Claude responded in ${duration}ms`)
 
-    if (!openaiResponse.ok) {
-      const errorText = await openaiResponse.text()
-      console.error(`❌ [${invocationId}] OpenAI error: ${errorText}`)
+    if (!anthropicResponse.ok) {
+      const errorText = await anthropicResponse.text()
+      console.error(`❌ [${invocationId}] Claude API error: ${errorText}`)
       return res.status(500).json({
-        error: 'OpenAI API Error',
+        error: 'Claude API Error',
         details: errorText,
         deployMarker: DEPLOY_TIMESTAMP
       })
     }
 
-    const openaiData = await openaiResponse.json()
-    const content = openaiData.choices?.[0]?.message?.content
+    const anthropicData = await anthropicResponse.json()
+    const content = anthropicData.content?.[0]?.text
 
     if (!content) {
       return res.status(500).json({
-        error: 'Empty response from OpenAI',
+        error: 'Empty response from Claude',
         deployMarker: DEPLOY_TIMESTAMP
       })
+    }
+
+    // Extract JSON from response (Claude might wrap it in markdown)
+    let jsonStr = content
+    const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/)
+    if (jsonMatch) {
+      jsonStr = jsonMatch[1]
+    }
+    
+    // Also try to find raw JSON object
+    const rawJsonMatch = content.match(/\{[\s\S]*\}/)
+    if (rawJsonMatch && !jsonMatch) {
+      jsonStr = rawJsonMatch[0]
     }
 
     let analysis
     try {
-      analysis = JSON.parse(content)
+      analysis = JSON.parse(jsonStr.trim())
     } catch (parseError) {
       console.error(`❌ [${invocationId}] JSON parse error:`, parseError)
+      console.error(`Raw content: ${content.substring(0, 500)}`)
       return res.status(500).json({
         error: 'Failed to parse analysis',
-        raw: content.substring(0, 500),
+        raw: content.substring(0, 1000),
         deployMarker: DEPLOY_TIMESTAMP
       })
     }
 
-    // Validate shot list has required coverage
     const shotList = analysis.shot_list || []
-    const charactersWithCU = new Set<string>()
-    shotList.forEach((shot: any) => {
-      if (shot.shot_type === 'CLOSE_UP' || shot.shot_type === 'MEDIUM_CLOSE') {
-        characters.forEach(char => {
-          if (shot.subject?.toLowerCase().includes(char.toLowerCase())) {
-            charactersWithCU.add(char)
-          }
-        })
-      }
-    })
-
+    
     console.log(`✅ [${invocationId}] Analysis complete`)
-    console.log(`   - Characters: ${characters.join(', ')}`)
-    console.log(`   - Characters with CU: ${[...charactersWithCU].join(', ') || 'None detected'}`)
     console.log(`   - Shots: ${shotList.length}`)
     console.log(`   - Conflict type: ${analysis.directing_vision?.conflict?.type || 'N/A'}`)
-    console.log(`   - POV shots planned: ${analysis.coverage_plan?.pov_shots?.length || 0}`)
-    console.log(`   - Inserts planned: ${analysis.coverage_plan?.inserts?.length || 0}`)
 
     return res.status(200).json({
       success: true,
       analysis: analysis,
       meta: {
         sceneNumber,
-        processingTime: openaiDuration,
+        processingTime: duration,
         characters,
         dialogueExchanges,
         requestedShots: `${minShots}-${maxShots}`,
         actualShots: shotList.length,
+        model: 'claude-sonnet-4-20250514',
         deployMarker: DEPLOY_TIMESTAMP
       }
     })
