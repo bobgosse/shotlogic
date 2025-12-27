@@ -1,9 +1,9 @@
 // api/analyze-scene.ts
-// PRODUCTION: Complete scene analysis matching ALL ProjectDetails.tsx UI fields
+// PRODUCTION: Scene analysis with SYSTEMATIC COVERAGE PLANNING
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
-const DEPLOY_TIMESTAMP = "2024-12-25T00:30:00Z_COMPLETE_FIELDS"
+const DEPLOY_TIMESTAMP = "2024-12-27T01:00:00Z_SYSTEMATIC_COVERAGE"
 
 function getEnvironmentVariable(name: string): string | undefined {
   try {
@@ -71,148 +71,304 @@ export default async function handler(
       return res.status(400).json({ error: 'Missing required fields', deployMarker: DEPLOY_TIMESTAMP })
     }
 
-    // Determine shot count based on complexity
-    const sceneLength = sceneText.length
-    const hasAction = /\b(runs?|fights?|chases?|crashes?|explodes?|falls?|grabs?|throws?|hits?|punches?|shoots?|drives?|jumps?|climbs?|escapes?)\b/i.test(sceneText)
+    // Extract character names from dialogue headers
     const dialogueMatches = sceneText.match(/^[A-Z][A-Z\s]+(?=\n)/gm) || []
-    const characterCount = new Set(dialogueMatches.map(m => m.trim())).size
+    const characters = [...new Set(dialogueMatches.map(m => m.trim().replace(/\s*\(CONT'D\)/, '')))]
+    const dialogueExchanges = dialogueMatches.length
+    const hasAction = /\b(runs?|fights?|chases?|crashes?|explodes?|falls?|grabs?|throws?|hits?|punches?|shoots?|drives?|jumps?|climbs?|escapes?|reveals?|pulls?|pushes?)\b/i.test(sceneText)
+    const sceneLength = sceneText.length
     
-    let shotCount = "6-8"
-    if (sceneLength > 1500 || hasAction || characterCount > 3) {
-      shotCount = "10-15"
-    } else if (sceneLength < 400) {
-      shotCount = "4-6"
+    // Calculate shot requirements - be more aggressive
+    const characterCount = characters.length
+    let minShots = Math.max(12, characterCount * 4) // At least 4 shots per character
+    let maxShots = Math.max(18, characterCount * 5)
+    
+    if (dialogueExchanges > 8) {
+      minShots = Math.max(minShots, Math.ceil(dialogueExchanges * 1.2))
+      maxShots = Math.max(maxShots, dialogueExchanges * 2)
     }
+    if (hasAction || sceneLength > 1500) {
+      minShots += 5
+      maxShots += 8
+    }
+    
+    // More generous limits for complex scenes
+    minShots = Math.min(minShots, 20)
+    maxShots = Math.min(maxShots, 35)
 
-    const systemPrompt = `You are an expert film production analyst combining story analysis, producing, and directing expertise. Return ONLY valid JSON matching the exact structure requested.`
+    const systemPrompt = `You are a veteran 1st AD and script supervisor. You plan coverage like David Fincher - OBSESSIVELY detailed.
 
-    const userPrompt = `Analyze Scene ${sceneNumber} of ${totalScenes}.
+EXAMPLES OF BAD COVERAGE (DO NOT DO THIS):
+❌ "Captures the dynamic between characters" - TOO VAGUE
+❌ "Highlights her significance" - MEANINGLESS  
+❌ "Sets the mood" - LAZY
+❌ "His reaction" - WHICH reaction? To WHAT line?
+
+EXAMPLES OF GOOD COVERAGE (DO THIS):
+✅ "CU VIRGINIA - covers her line: 'The water does not ask who you are. It only asks if you can breathe.' - the moment she reveals she knows his poetry"
+✅ "POV LEO looking down - his bare feet on wood next to his ink-repaired shoes vs their expensive leather - visual class contrast"
+✅ "INSERT - Virginia pulls blanket off her lap, REVEAL her withered legs - the moment Leo sees her vulnerability"
+✅ "CU HUBER - reaction to Leo's counter-offer 'Seven' - he's surprised but impressed"
+✅ "MEDIUM ROSALIND - unlocking wheelchair brake, her silent efficiency - she's more than just staff"
+
+RULES:
+1. If a character speaks, they need a CLOSE-UP for their important lines
+2. If a character is in the scene, they need at least ONE featured shot
+3. Physical reveals (body parts, objects) need dedicated INSERT or REVEAL shots
+4. POV shots must specify: whose eyes, what they see, WHY it matters
+5. Coverage field must QUOTE dialogue or describe SPECIFIC action - never vague phrases`
+
+    const userPrompt = `Analyze Scene ${sceneNumber} of ${totalScenes} for full production breakdown.
 
 SCENE TEXT:
+"""
 ${sceneText}
+"""
 
-${visualStyle ? `VISUAL STYLE: "${visualStyle}" - use in all image prompts.` : ''}
+${visualStyle ? `VISUAL STYLE: "${visualStyle}" - incorporate into all image prompts.` : ''}
 
-Return this EXACT JSON structure with ALL fields filled in:
+DETECTED CHARACTERS: ${characters.join(', ')}
+DIALOGUE EXCHANGES: ${dialogueExchanges}
+SCENE LENGTH: ${sceneLength} chars
+
+=== PHASE 1: COVERAGE PLANNING ===
+
+Before generating shots, ANALYZE the scene for:
+
+A) CHARACTER MOMENTS - For each character, what are their:
+   - Key dialogue lines (quote them!)
+   - Reaction moments (to what specifically?)
+   - Physical actions
+
+B) VISUAL REVEALS - Look for:
+   - Body parts revealed (legs, scars, tattoos)
+   - Objects revealed (money, weapons, documents)
+   - Character entrances/exits
+   
+C) POV OPPORTUNITIES - Look for:
+   - "He looks at..." or "She sees..." moments
+   - Character examining objects
+   - Character observing other characters
+
+D) POWER DYNAMICS - Track:
+   - Who has control at start vs end
+   - Moment the power shifts
+   - Physical positions (standing/sitting/moving)
+
+For EACH character (${characters.join(', ')}), identify:
+- Their entrance/first appearance
+- Their most important line(s) - quote them
+- Their key reaction moments
+- Any physical action or reveal involving them
+
+Also identify:
+- POV SHOTS: Whose perspective do we see through? What do they look at?
+- REVEALS: Any physical reveals (body parts, objects, documents)?
+- INSERTS: Close-ups of hands, objects, or details that matter?
+
+=== PHASE 2: SHOT LIST ===
+
+Generate ${minShots}-${maxShots} shots that provide COMPLETE coverage.
+
+EXAMPLE OF A GOOD SHOT ENTRY:
+{
+  "shot_number": 5,
+  "shot_type": "CLOSE_UP",
+  "movement": "STATIC",
+  "subject": "VIRGINIA's face",
+  "action": "She recites Leo's poetry, watching his reaction",
+  "coverage": "Covers VIRGINIA: 'The water does not ask who you are. It only asks if you can breathe.' - she's testing him",
+  "duration": "Extended hold",
+  "visual": "Tight on her face, shallow focus, sunken eyes sharp against soft background",
+  "rationale": "This is the TURN - she reveals she knows his poetry. Her knowledge shifts the power dynamic."
+}
+
+EXAMPLE OF A BAD SHOT ENTRY (DO NOT DO THIS):
+{
+  "shot_type": "MEDIUM",
+  "subject": "Virginia", 
+  "action": "Speaking",
+  "coverage": "Her important line",  // ❌ TOO VAGUE - which line?
+  "rationale": "Captures the emotional moment"  // ❌ MEANINGLESS - be specific!
+}
+
+REQUIREMENTS:
+- Every character in ${characters.join(', ')} must have at least ONE dedicated close-up
+- Every important line must specify which shot covers it
+- POV shots must specify whose POV and what they're looking at
+- Coverage field must quote SPECIFIC dialogue or describe SPECIFIC action
+
+Return this EXACT JSON structure:
 
 {
   "story_analysis": {
-    "synopsis": "2-3 sentence summary of the scene's action and outcome",
-    "stakes": "What's at risk? What could be lost or gained?",
-    "ownership": "Who drives this scene? Which character has the most agency and why?",
-    "breaking_point": "The turning point - quote a specific line or describe the pivotal moment that changes everything",
-    "key_props": "Comma-separated list of important props (phones, documents, weapons, etc.)",
-    "tone": "The emotional quality of the scene (e.g., Tense, Hopeful, Melancholic, Frantic)"
+    "synopsis": "2-3 sentences: WHO does WHAT to WHOM and what CHANGES",
+    "stakes": "What's SPECIFICALLY at risk in this scene?",
+    "ownership": "Who DRIVES this scene? What's their strategy?",
+    "breaking_point": "Quote the EXACT line that shifts the power dynamic",
+    "key_props": "Props that characters INTERACT with",
+    "tone": "Specific emotional quality (e.g., 'Tense negotiation with undercurrent of attraction')"
   },
   
   "producing_logistics": {
     "resource_impact": "Low or Medium or High",
-    "red_flags": ["Budget concern 1", "Budget concern 2"],
-    "departments_affected": ["Camera", "Art", "Sound", "Wardrobe", "Makeup", "Stunts", "VFX"],
+    "red_flags": ["Specific budget/logistics concerns"],
+    "departments_affected": ["Departments with specific requirements"],
     "locations": {
-      "primary": "Main location description",
-      "setting": "General setting type",
-      "timeOfDay": "DAY or NIGHT or DAWN or DUSK",
-      "intExt": "INT or EXT or INT/EXT"
+      "primary": "Location description",
+      "setting": "Location type",
+      "timeOfDay": "DAY/NIGHT/DAWN/DUSK",
+      "intExt": "INT/EXT"
     },
     "cast": {
-      "principal": ["Main character 1", "Main character 2"],
+      "principal": ["Main characters"],
       "speaking": ["Characters with dialogue"],
-      "silent": ["Background characters with action"],
-      "extras": {
-        "count": "Number estimate",
-        "description": "Type of extras needed"
-      }
+      "silent": ["Characters with action, no dialogue"],
+      "extras": { "count": "Number", "description": "What they do" }
     },
-    "key_props": ["prop1", "prop2", "prop3"],
-    "vehicles": ["Vehicle descriptions if any"],
+    "key_props": ["Props characters interact with"],
+    "vehicles": ["If any"],
     "sfx": {
-      "practical": ["Practical effects needed"],
-      "vfx": ["VFX shots needed"],
-      "stunts": ["Stunt work needed"]
+      "practical": ["Practical effects"],
+      "vfx": ["VFX needs"],
+      "stunts": ["Stunt work"]
     },
     "wardrobe": {
-      "principal": ["Costume descriptions"],
-      "notes": "Special wardrobe requirements"
+      "principal": ["Costume notes"],
+      "notes": "Special requirements"
     },
     "makeup": {
-      "standard": ["Basic makeup notes"],
-      "special": ["SFX makeup if needed"]
+      "standard": ["Basic notes"],
+      "special": ["SFX makeup"]
     },
     "scheduling": {
-      "constraints": "Time or scheduling concerns",
-      "notes": "Additional scheduling notes"
+      "constraints": "Timing issues",
+      "notes": "Recommendations"
     }
   },
   
   "directing_vision": {
-    "visual_metaphor": "Visual approach - how camera work reflects emotional content",
-    "editorial_intent": "Pacing and rhythm - how the scene should be cut",
-    "shot_motivation": "Why these shots serve the story",
-    "subtext": "What's really being communicated beneath the surface",
+    "visual_metaphor": "How camera work reflects the scene's meaning",
+    "editorial_intent": "Pacing strategy - where to cut fast, where to hold",
+    "shot_motivation": "Why ${minShots}-${maxShots} shots? How does coverage serve the story?",
+    "subtext": "What's REALLY being communicated beneath the dialogue?",
     "conflict": {
-      "type": "Internal or External or Both",
-      "description": "Core dramatic tension - who wants what from whom",
-      "resolution": "How the conflict shifts or resolves by scene end"
+      "type": "NEGOTIATION, SEDUCTION, INTERROGATION, CONFESSION, CONFRONTATION, MANIPULATION, PERSUASION, REVELATION, DECEPTION, RECONCILIATION, ULTIMATUM, or POWER_PLAY",
+      "description": "WHO wants WHAT from WHOM using what TACTIC?",
+      "winner": "Who has the upper hand at scene's end?"
     },
     "tone_and_mood": {
-      "opening": "How the scene opens emotionally",
-      "shift": "Where and how the tone changes (if it does)",
-      "closing": "How the scene ends emotionally",
-      "energy": "LOW or BUILDING or HIGH or DECLINING or VOLATILE"
+      "opening": "Emotional state at scene start",
+      "shift": "Quote the line where tone changes",
+      "closing": "Emotional state at scene end",
+      "energy": "LOW/BUILDING/HIGH/DECLINING/VOLATILE"
     },
     "visual_strategy": {
-      "approach": "Overall visual philosophy (e.g., Observational, Intimate, Kinetic)",
-      "camera_personality": "Objective observer, subjective POV, or character-aligned",
-      "lighting_mood": "Naturalistic, expressionistic, high-key, low-key"
+      "approach": "OBSERVATIONAL/INTIMATE/FORMAL/KINETIC/SUBJECTIVE",
+      "camera_personality": "Neutral observer, character-aligned, or omniscient?",
+      "lighting_mood": "Lighting approach"
     },
     "character_motivations": [
       {
-        "character": "Character name",
-        "wants": "What they want in this scene",
-        "obstacle": "What's preventing them",
-        "tactic": "How they're trying to get it"
+        "character": "Name",
+        "wants": "Goal in THIS scene",
+        "obstacle": "What blocks them",
+        "tactic": "How they try to get it"
       }
     ],
     "key_moments": [
       {
-        "beat": "Specific moment or line",
-        "emphasis": "How to shoot it for maximum impact",
+        "beat": "Quote specific line or describe action",
+        "emphasis": "How to shoot it",
         "why": "Why this moment matters"
       }
     ],
-    "performance_notes": ["Direction for actor 1", "Direction for actor 2"],
+    "performance_notes": ["Direction for each actor"],
     "blocking": {
-      "geography": "How characters use the space",
-      "movement": "Key character movements",
-      "eyelines": "Important looks or glances"
+      "geography": "How characters use power in the space",
+      "movement": "Key crosses/gestures",
+      "eyelines": "Important looks"
     }
+  },
+  
+  "coverage_plan": {
+    "characters": [
+      {
+        "name": "Character name",
+        "entrance": "How/when they first appear",
+        "key_lines": ["Quote their most important lines"],
+        "reaction_beats": ["Moments where we need their reaction"],
+        "required_shots": ["CU needed for X", "Two-shot with Y"]
+      }
+    ],
+    "pov_shots": [
+      {
+        "whose_pov": "Character name",
+        "looking_at": "What they see",
+        "why": "Why this POV matters"
+      }
+    ],
+    "reveals": [
+      {
+        "what": "What's revealed",
+        "how": "Camera approach",
+        "why": "Story significance"
+      }
+    ],
+    "inserts": [
+      {
+        "subject": "What we see in close-up",
+        "why": "Why it matters"
+      }
+    ]
   },
   
   "shot_list": [
     {
       "shot_number": 1,
-      "shot_type": "WIDE or MEDIUM or CLOSE_UP or INSERT or POV or OVER_SHOULDER or TWO_SHOT",
-      "movement": "STATIC or PAN or TILT or PUSH_IN or PULL_BACK or DOLLY or TRACK or HANDHELD or STEADICAM",
-      "subject": "Who/what is featured",
-      "action": "What happens during this shot",
-      "visual": "Detailed description of what we see",
-      "rationale": "Why this shot matters",
-      "image_prompt": "[Shot size], [Subject], [Setting], [Lighting], [Mood]${visualStyle ? `, ${visualStyle}` : ''}"
+      "shot_type": "WIDE/MEDIUM/MEDIUM_CLOSE/CLOSE_UP/EXTREME_CLOSE/INSERT/POV/OVER_SHOULDER/TWO_SHOT/GROUP",
+      "movement": "STATIC/PAN/TILT/PUSH_IN/PULL_BACK/DOLLY/TRACK/HANDHELD/STEADICAM/CRANE",
+      "subject": "Who/what is in frame - NAME THE CHARACTER",
+      "action": "What happens - BE SPECIFIC",
+      "coverage": "MUST quote specific dialogue like: 'Covers LEO: Seven.' OR describe specific action like: 'Leo looks down at his bare feet next to his worn shoes'",
+      "duration": "Brief/Standard/Extended hold",
+      "visual": "Composition, depth, lighting",
+      "rationale": "WHY this shot - must reference story/character, not generic film terms",
+      "image_prompt": "Cinematic still: [subject], [action], [specific visual details], [lighting], [mood]${visualStyle ? `, ${visualStyle}` : ''}, 35mm film, photorealistic"
     }
-  ]
+  ],
+  
+  "shot_list_justification": "Explain your coverage strategy. How did you ensure every character (${characters.join(', ')}) gets their moments? Which editorial pairs did you plan? What POVs and inserts support the story?"
 }
 
-IMPORTANT REQUIREMENTS:
-1. Fill in EVERY field - do not leave any empty or with placeholder text
-2. For character_motivations, include an entry for EACH speaking character
-3. For key_moments, identify 2-3 crucial beats in the scene
-4. For performance_notes, give specific direction for each main actor
-5. Generate ${shotCount} shots in the shot_list
+CRITICAL RULES:
+1. EVERY character in [${characters.join(', ')}] MUST have at least ONE dedicated close-up shot - if you skip a character, you have FAILED
+2. The "coverage" field must quote SPECIFIC DIALOGUE or describe SPECIFIC ACTION - never vague phrases like "his reaction" or "captures the dynamic"
+3. Include at least ONE POV shot if any character LOOKS at something important
+4. Include INSERT shots for important objects (money, hands, feet, documents, props mentioned in script)
+5. If there's a PHYSICAL REVEAL (body part, hidden object, etc.) it needs a dedicated shot
+6. Generate ${minShots}-${maxShots} shots - every shot must have a SPECIFIC purpose
+7. For every important LINE, there should be a shot that covers the speaker AND a shot for the listener's reaction
 
-Return ONLY the JSON object. No markdown, no explanation.`
+VALIDATION CHECKLIST - Your shot list MUST include:
+${characters.map(c => `- [ ] At least one CLOSE_UP or MEDIUM_CLOSE of ${c}`).join('\n')}
+- [ ] POV shot if any character looks at something significant
+- [ ] INSERT for any prop that's handled or mentioned specifically
+- [ ] Coverage that QUOTES specific dialogue, not vague descriptions
+- [ ] REVEAL shot for any physical reveal (body parts, hidden objects)
+
+COMMON MISTAKES TO AVOID:
+1. Forgetting silent characters (like assistants, drivers, guards) - they need shots too!
+2. Missing physical reveals mentioned in action lines
+3. Generic rationales like "sets the mood" or "captures the emotion" - BE SPECIFIC
+4. Skipping POV shots when the script says "he looks at" or "she sees"
+5. Not quoting dialogue in coverage field
+
+Return ONLY valid JSON. No markdown, no explanation.`
 
     console.log(`🤖 [${invocationId}] Calling OpenAI API...`)
+    console.log(`📊 [${invocationId}] Characters: ${characters.join(', ')}`)
+    console.log(`📊 [${invocationId}] Requesting ${minShots}-${maxShots} shots`)
     const openaiStartTime = Date.now()
     
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -228,7 +384,7 @@ Return ONLY the JSON object. No markdown, no explanation.`
           { role: 'user', content: userPrompt }
         ],
         temperature: 0.7,
-        max_tokens: 4500,
+        max_tokens: 10000,  // Increased for detailed coverage with more shots
         response_format: { type: 'json_object' }
       }),
     })
@@ -268,11 +424,26 @@ Return ONLY the JSON object. No markdown, no explanation.`
       })
     }
 
+    // Validate shot list has required coverage
+    const shotList = analysis.shot_list || []
+    const charactersWithCU = new Set<string>()
+    shotList.forEach((shot: any) => {
+      if (shot.shot_type === 'CLOSE_UP' || shot.shot_type === 'MEDIUM_CLOSE') {
+        characters.forEach(char => {
+          if (shot.subject?.toLowerCase().includes(char.toLowerCase())) {
+            charactersWithCU.add(char)
+          }
+        })
+      }
+    })
+
     console.log(`✅ [${invocationId}] Analysis complete`)
-    console.log(`   - Synopsis: ${analysis.story_analysis?.synopsis?.substring(0, 50) || 'N/A'}...`)
-    console.log(`   - Shots: ${analysis.shot_list?.length || 0}`)
-    console.log(`   - Character motivations: ${analysis.directing_vision?.character_motivations?.length || 0}`)
-    console.log(`   - Key moments: ${analysis.directing_vision?.key_moments?.length || 0}`)
+    console.log(`   - Characters: ${characters.join(', ')}`)
+    console.log(`   - Characters with CU: ${[...charactersWithCU].join(', ') || 'None detected'}`)
+    console.log(`   - Shots: ${shotList.length}`)
+    console.log(`   - Conflict type: ${analysis.directing_vision?.conflict?.type || 'N/A'}`)
+    console.log(`   - POV shots planned: ${analysis.coverage_plan?.pov_shots?.length || 0}`)
+    console.log(`   - Inserts planned: ${analysis.coverage_plan?.inserts?.length || 0}`)
 
     return res.status(200).json({
       success: true,
@@ -280,6 +451,10 @@ Return ONLY the JSON object. No markdown, no explanation.`
       meta: {
         sceneNumber,
         processingTime: openaiDuration,
+        characters,
+        dialogueExchanges,
+        requestedShots: `${minShots}-${maxShots}`,
+        actualShots: shotList.length,
         deployMarker: DEPLOY_TIMESTAMP
       }
     })
