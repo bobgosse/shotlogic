@@ -175,7 +175,7 @@ EXAMPLE OF A GOOD SHOT ENTRY:
   "shot_number": 5,
   "shot_type": "CLOSE_UP",
   "movement": "STATIC",
-  "subject": "VIRGINIA's face",
+  "subject": "VIRGINIA - CU on her face",
   "action": "She recites Leo's poetry, watching his reaction",
   "coverage": "Covers VIRGINIA: 'The water does not ask who you are. It only asks if you can breathe.' - she's testing him",
   "duration": "Extended hold",
@@ -186,11 +186,18 @@ EXAMPLE OF A GOOD SHOT ENTRY:
 EXAMPLE OF A BAD SHOT ENTRY (DO NOT DO THIS):
 {
   "shot_type": "MEDIUM",
-  "subject": "Virginia", 
+  "subject": "Medium shot of the scene",  // ❌ WHO IS IN THE SHOT? NAME THEM!
   "action": "Speaking",
   "coverage": "Her important line",  // ❌ TOO VAGUE - which line?
   "rationale": "Captures the emotional moment"  // ❌ MEANINGLESS - be specific!
 }
+
+SUBJECT FIELD RULES:
+- ALWAYS start with CHARACTER NAME in caps: "LEO - walking onto dock"
+- For two-shots: "LEO and HUBER - facing each other"  
+- For POV: "POV LEO - looking down at his feet"
+- For INSERT: "INSERT - Huber's money clip, bills being peeled"
+- NEVER just "Medium shot" or "Tight on face" without naming WHO
 
 REQUIREMENTS:
 - Every character in ${characters.join(', ')} must have at least ONE dedicated close-up
@@ -328,7 +335,7 @@ Return this EXACT JSON structure:
       "shot_number": 1,
       "shot_type": "WIDE/MEDIUM/MEDIUM_CLOSE/CLOSE_UP/EXTREME_CLOSE/INSERT/POV/OVER_SHOULDER/TWO_SHOT/GROUP",
       "movement": "STATIC/PAN/TILT/PUSH_IN/PULL_BACK/DOLLY/TRACK/HANDHELD/STEADICAM/CRANE",
-      "subject": "Who/what is in frame - NAME THE CHARACTER",
+      "subject": "CHARACTER NAME IN CAPS - brief description. Examples: 'LEO - emerging from water', 'VIRGINIA - in wheelchair', 'POV LEO - looking at his feet', 'INSERT - money clip'",
       "action": "What happens - BE SPECIFIC",
       "coverage": "MUST quote specific dialogue like: 'Covers LEO: Seven.' OR describe specific action like: 'Leo looks down at his bare feet next to his worn shoes'",
       "duration": "Brief/Standard/Extended hold",
