@@ -73,10 +73,25 @@ export default async function handler(
 
     // Extract character names from dialogue headers
     const dialogueMatches = sceneText.match(/^[A-Z][A-Z\s]+(?=\n)/gm) || []
-    const characters = [...new Set(dialogueMatches.map(m => m.trim().replace(/\s*\(CONT'D\)/, '')))]
+    const speakingCharacters = [...new Set(dialogueMatches.map(m => m.trim().replace(/\s*\(CONT'D\)/, '')))]
+    
+    // Also look for character names mentioned in action lines (capitalized names)
+    const actionNameMatches = sceneText.match(/\b([A-Z][a-z]+)\b/g) || []
+    const potentialNames = actionNameMatches.filter(name => 
+      name.length > 2 && 
+      !['The', 'His', 'Her', 'She', 'He', 'They', 'Day', 'Night', 'Int', 'Ext', 'Cold', 'Gray', 'Arms', 'Head', 'Wet', 'Behind', 'Hair', 'Eyes', 'Skin', 'Wind', 'Scottish'].includes(name)
+    )
+    const actionCharacters = [...new Set(potentialNames)]
+    
+    // Combine speaking and action characters
+    const allCharacters = [...new Set([...speakingCharacters, ...actionCharacters])]
+    const characters = allCharacters.filter(c => c.length > 1)
+    
     const dialogueExchanges = dialogueMatches.length
     const hasAction = /\b(runs?|fights?|chases?|crashes?|explodes?|falls?|grabs?|throws?|hits?|punches?|shoots?|drives?|jumps?|climbs?|escapes?|reveals?|pulls?|pushes?)\b/i.test(sceneText)
     const sceneLength = sceneText.length
+    
+    console.log(`📊 Characters detected: ${characters.join(', ')}`)
     
     // Calculate shot requirements - be more aggressive
     const characterCount = characters.length
@@ -96,27 +111,29 @@ export default async function handler(
     minShots = Math.min(minShots, 20)
     maxShots = Math.min(maxShots, 35)
 
-    const systemPrompt = `You are a veteran 1st AD and script supervisor. You plan coverage like David Fincher - OBSESSIVELY detailed.
+    const systemPrompt = `You are a script supervisor creating a shot list. You MUST follow these ABSOLUTE RULES:
 
-EXAMPLES OF BAD COVERAGE (DO NOT DO THIS):
-❌ "Captures the dynamic between characters" - TOO VAGUE
-❌ "Highlights her significance" - MEANINGLESS  
-❌ "Sets the mood" - LAZY
-❌ "His reaction" - WHICH reaction? To WHAT line?
+RULE 1 - SUBJECT FIELD: Every shot MUST start with a CHARACTER NAME IN CAPS.
+- ✅ "LEO - drying off on dock"
+- ✅ "HUBER and ROSALIND - watching from wheelchait"
+- ✅ "POV LEO - looking at his bare feet"
+- ❌ "Gray sky and water" (NO! Who is in the shot?)
+- ❌ "Two figures on dock" (NO! Name them: HUBER and ROSALIND)
+- ❌ "Focus on legs" (NO! Say: VIRGINIA's withered legs)
 
-EXAMPLES OF GOOD COVERAGE (DO THIS):
-✅ "CU VIRGINIA - covers her line: 'The water does not ask who you are. It only asks if you can breathe.' - the moment she reveals she knows his poetry"
-✅ "POV LEO looking down - his bare feet on wood next to his ink-repaired shoes vs their expensive leather - visual class contrast"
-✅ "INSERT - Virginia pulls blanket off her lap, REVEAL her withered legs - the moment Leo sees her vulnerability"
-✅ "CU HUBER - reaction to Leo's counter-offer 'Seven' - he's surprised but impressed"
-✅ "MEDIUM ROSALIND - unlocking wheelchair brake, her silent efficiency - she's more than just staff"
+RULE 2 - COVERAGE FIELD: Must quote exact dialogue or describe specific action.
+- ✅ "LEO: 'Seven.' - his counter-offer"
+- ✅ "VIRGINIA: 'The water does not ask who you are.'"
+- ❌ "The negotiation" (NO! Quote the actual lines)
+- ❌ "Emotional moment" (NO! What emotion? Whose?)
 
-RULES:
-1. If a character speaks, they need a CLOSE-UP for their important lines
-2. If a character is in the scene, they need at least ONE featured shot
-3. Physical reveals (body parts, objects) need dedicated INSERT or REVEAL shots
-4. POV shots must specify: whose eyes, what they see, WHY it matters
-5. Coverage field must QUOTE dialogue or describe SPECIFIC action - never vague phrases`
+RULE 3 - RATIONALE FIELD: Explain WHY this shot matters to the story.
+- ✅ "Leo's pride battles poverty - he needs money but won't beg"
+- ❌ "Captures the dynamic" (NO! What dynamic specifically?)
+- ❌ "Sets the mood" (NO! What mood? Why?)
+
+If you write "two figures" instead of naming them, you have FAILED.
+If you write "captures the emotion" without specifics, you have FAILED.`
 
     const userPrompt = `Analyze Scene ${sceneNumber} of ${totalScenes} for full production breakdown.
 
@@ -170,45 +187,20 @@ Also identify:
 
 Generate ${minShots}-${maxShots} shots that provide COMPLETE coverage.
 
-EXAMPLE OF A GOOD SHOT ENTRY:
+EXAMPLE OF A GOOD SHOT:
 {
-  "shot_number": 5,
   "shot_type": "CLOSE_UP",
-  "movement": "STATIC",
-  "subject": "VIRGINIA - CU on her face as she recites poetry",
-  "action": "She quotes Leo's poem, watching for his reaction",
-  "coverage": "VIRGINIA: 'The water does not ask who you are. It only asks if you can breathe.' - from her first line through Leo's stunned silence",
-  "duration": "Extended hold - let the words land",
-  "visual": "Tight on her face, shallow focus, sunken eyes sharp against soft gray sky background",
-  "rationale": "TURN of the scene - Virginia reveals she knows Leo's poetry, shifting power from Huber's money to her intellectual connection with Leo. This is the moment Leo decides to take the job."
+  "subject": "VIRGINIA - reciting Leo's poetry",
+  "coverage": "VIRGINIA: 'The water does not ask who you are. It only asks if you can breathe.'",
+  "rationale": "Virginia reveals she knows Leo's poetry - this shifts power from Huber's money to her intellectual connection with Leo"
 }
 
-EXAMPLE OF BAD SHOTS (DO NOT DO THIS):
-❌ "Gray sky and water, reflective mood" - WHO IS IN THE SHOT?
-❌ "Two figures on dock" - WHICH TWO? NAME THEM!
-❌ "Medium shot of departure" - WHO IS DEPARTING?
-❌ "Focus on legs" - WHOSE LEGS?
-❌ "Shows the emotional moment" - WHICH EMOTION? WHY?
-
-SUBJECT FIELD RULES - MANDATORY:
-- EVERY shot must name specific characters: "LEO - emerging from water"
-- Two-shots must name BOTH: "LEO and HUBER - handshake moment"
-- Group shots must list ALL: "HUBER, VIRGINIA, ROSALIND - watching Leo dress"
-- POV must specify whose eyes AND what they see: "POV LEO - looking down at his bare feet next to his ink-repaired shoes"
-- INSERT must specify the object AND context: "INSERT - HUBER's money clip, two bills being peeled off"
-- REVEAL must name what's revealed: "REVEAL - VIRGINIA's withered legs as blanket falls away"
-
-COVERAGE FIELD RULES - MANDATORY:
-- Must quote EXACT dialogue: "LEO: 'Seven.' - his counter-offer"
-- OR describe SPECIFIC action with character names: "LEO looks down at his feet, then at their expensive shoes - the class divide visualized"
-- Must specify START and END of coverage: "From HUBER's 'Five dollars a session' through LEO's 'Seven'"
-- NEVER vague phrases like "the negotiation" or "emotional moment"
-
-RATIONALE FIELD RULES - MANDATORY:
-- Must connect to scene's CONFLICT TYPE (this is a ${characters.length > 0 ? 'NEGOTIATION' : 'scene'})
-- Must reference CHARACTER MOTIVATION: "Leo needs money but resists being bought"
-- Must explain WHAT AUDIENCE LEARNS: "We see Leo's pride despite his poverty"
-- NEVER generic film-school language like "captures the dynamic" or "sets the mood"
+EXAMPLE OF A BAD SHOT - DO NOT DO THIS:
+{
+  "subject": "Two figures in formal attire",  ← WRONG! Say "HUBER and ROSALIND"
+  "coverage": "The negotiation scene",  ← WRONG! Quote the actual dialogue
+  "rationale": "Captures the dynamic"  ← WRONG! Explain WHAT dynamic and WHY it matters
+}
 
 REQUIREMENTS:
 - Every character in ${characters.join(', ')} must have at least ONE dedicated close-up
@@ -344,15 +336,15 @@ Return this EXACT JSON structure:
   "shot_list": [
     {
       "shot_number": 1,
-      "shot_type": "WIDE/MEDIUM/MEDIUM_CLOSE/CLOSE_UP/EXTREME_CLOSE/INSERT/POV/OVER_SHOULDER/TWO_SHOT/GROUP/REVEAL",
-      "movement": "STATIC/PAN/TILT/PUSH_IN/PULL_BACK/DOLLY/TRACK/HANDHELD/STEADICAM/CRANE",
-      "subject": "MANDATORY: CHARACTER NAME(S) IN CAPS + what they're doing. Examples: 'LEO - emerging from cold water', 'LEO and HUBER - tense handshake', 'POV LEO - his bare feet next to worn shoes', 'REVEAL - VIRGINIA's withered legs'",
-      "action": "SPECIFIC action during this shot",
-      "coverage": "MANDATORY: Quote dialogue 'CHARACTER: exact line' OR describe specific beat with names. Specify what lines/action this shot covers from START to END.",
-      "duration": "How long to hold: Brief (1-2 sec) / Standard (3-5 sec) / Extended (6+ sec, let it breathe)",
-      "visual": "Composition, framing, depth, lighting specifics",
-      "rationale": "MANDATORY: Connect to conflict type, character motivation, and what audience learns. NO generic phrases.",
-      "image_prompt": "Cinematic still: [character name], [specific action], [visual details], [lighting], [mood]${visualStyle ? `, ${visualStyle}` : ''}, 35mm film, photorealistic"
+      "shot_type": "WIDE or MEDIUM or CLOSE_UP or INSERT or POV or REVEAL or TWO_SHOT or GROUP",
+      "movement": "STATIC or PUSH_IN or DOLLY or HANDHELD etc",
+      "subject": "WRITE EXACTLY LIKE THIS: 'LEO - drying off on dock' or 'HUBER and ROSALIND - watching Leo' or 'POV LEO - his bare feet vs worn shoes' or 'REVEAL - VIRGINIA's withered legs'. NEVER write 'two figures' or 'gray sky' without naming the character.",
+      "action": "What the character DOES during this shot",
+      "coverage": "WRITE EXACTLY LIKE THIS: 'LEO: Seven. - his counter-offer turns the negotiation' or 'From HUBER: Five dollars a session through LEO taking the money'. ALWAYS quote dialogue or specify exact action.",
+      "duration": "Brief (1-2s) or Standard (3-5s) or Extended (6+s)",
+      "visual": "Composition and lighting details",
+      "rationale": "WRITE EXACTLY LIKE THIS: 'Leo's pride battles his poverty - he needs this money but won't appear desperate. Audience sees his internal conflict.' NEVER write 'captures the mood' or 'shows the emotion'.",
+      "image_prompt": "Start with character name: 'Leo Libretti, wet from swimming, towel to face, cold gray dock...'"
     }
   ],
   
@@ -368,22 +360,16 @@ CRITICAL RULES:
 6. Generate ${minShots}-${maxShots} shots - every shot must have a SPECIFIC purpose
 7. For every important LINE, there should be a shot that covers the speaker AND a shot for the listener's reaction
 
-VALIDATION CHECKLIST - YOUR SHOT LIST WILL BE REJECTED IF:
-${characters.map(c => `- [ ] ${c} is not named in at least 2 shots`).join('\n')}
-- [ ] ANY shot has vague subject like "two figures" instead of naming them
-- [ ] ANY shot has generic rationale like "captures the emotion" or "sets the mood"
-- [ ] ANY dialogue shot doesn't quote the specific line in coverage
-- [ ] POV shots don't specify WHOSE POV and WHAT THEY SEE
-- [ ] INSERT/REVEAL shots don't name the specific object/body part AND whose it is
+VALIDATION - YOUR RESPONSE WILL BE REJECTED IF:
+- Any "subject" field doesn't start with a CHARACTER NAME IN CAPS
+- Any "subject" says "two figures" or "gray sky" without naming who
+- Any "coverage" field doesn't quote specific dialogue or action
+- Any "rationale" says "captures" or "sets the mood" or "dynamic"
 
-COMMON MISTAKES TO AVOID:
-1. "Two figures on dock" ❌ → "HUBER and ROSALIND - watching Leo dress" ✅
-2. "Focus on legs" ❌ → "REVEAL - VIRGINIA's withered legs as Scottish wool blanket falls" ✅
-3. "Medium shot of departure" ❌ → "ROSALIND - pushing VIRGINIA's wheelchair, both looking back at Leo" ✅
-4. "Captures the negotiation" ❌ → "Leo's pride wars with his poverty - he needs this job but won't beg" ✅
-5. "Emotional moment" ❌ → "Virginia's poetry quote reveals she's researched Leo - this changes from a business transaction to a personal connection" ✅
+EVERY CHARACTER IN THIS SCENE NEEDS COVERAGE:
+${characters.join(', ')} - each must appear by name in at least 2 shots
 
-Return ONLY valid JSON. No markdown, no explanation.`
+Return ONLY valid JSON. No markdown.`
 
     console.log(`🤖 [${invocationId}] Calling OpenAI API...`)
     console.log(`📊 [${invocationId}] Characters: ${characters.join(', ')}`)
@@ -402,8 +388,8 @@ Return ONLY valid JSON. No markdown, no explanation.`
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        temperature: 0.7,
-        max_tokens: 10000,  // Increased for detailed coverage with more shots
+        temperature: 0.3,  // Lower for more consistent rule-following
+        max_tokens: 10000,
         response_format: { type: 'json_object' }
       }),
     })
