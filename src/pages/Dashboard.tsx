@@ -276,12 +276,12 @@ const Dashboard = () => {
               </div>
               
               <h1 className="text-4xl lg:text-5xl font-bold text-foreground leading-tight">
-                Plan your shots.<br />
-                <span className="text-[#D4A843]">Tell your story.</span>
+                Break down your script.<br />
+                <span className="text-[#D4A843]">Build your vision.</span>
               </h1>
               
               <p className="text-lg text-muted-foreground max-w-md">
-                Transform your screenplay into detailed shot lists, storyboards, and production breakdowns in minutes.
+                Story analysis, production & directing notes, shot lists, and storyboard exports—scene by scene, narrative-driven, with AI image prompts. Ready in minutes.
               </p>
 
               {mostRecentProject ? (
