@@ -1,337 +1,486 @@
-import React from 'react';
-import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Link } from 'react-router-dom'
-import { Loader2, Plus, Film, Search, Clock, AlertTriangle, CheckCircle2, BarChart3 } from 'lucide-react'
-import { UserButton, useUser } from '@clerk/clerk-react'
-import ProjectList from '../components/ProjectList'
+import { useState, useMemo, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useUser, useClerk } from "@clerk/clerk-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
+import { 
+  Plus, 
+  Search, 
+  Film, 
+  Clapperboard,
+  MoreHorizontal,
+  Trash2,
+  FolderOpen,
+  Pencil,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
+  ArrowRight,
+  Sparkles,
+  Target,
+  Layers,
+  LogOut
+} from "lucide-react";
+import shotlogicLogo from "@/assets/shotlogic-logo-netflix.png";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
-interface ProjectItem {
-  _id: string
-  name: string
-  updatedAt: string
-  status?: string
-  total_scenes?: number
-  scenes_analyzed?: number
+interface Project {
+  _id: string;
+  title: string;
+  createdAt: string;
+  updatedAt?: string;
+  status: string;
+  total_scenes?: number;
+  scenes_analyzed?: number;
 }
 
-function Dashboard() {
-  const { user, isLoaded } = useUser()
-  const [projects, setProjects] = useState<ProjectItem[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [sortBy, setSortBy] = useState<'recent' | 'name' | 'progress'>('recent')
+// Logo component using actual image
+const LogoSmall = () => (
+  <img src={shotlogicLogo} alt="ShotLogic" className="h-20 w-auto" />
+);
 
-  const showToast = useCallback((
-    title: string, 
-    description?: string, 
-    variant?: 'default' | 'destructive'
-  ) => {
-    const message = description ? `${title}\n${description}` : title
-    if (variant === 'destructive') {
-      console.error(message)
-      alert(`❌ ${message}`)
-    } else {
-      console.log(message)
-    }
-  }, [])
+// Styled logo text to match the angular font
+const LogoText = () => (
+  <span 
+    className="text-xl font-bold tracking-wide"
+    style={{ 
+      fontFamily: "'Orbitron', sans-serif",
+      letterSpacing: '0.05em'
+    }}
+  >
+    ShotLogic
+  </span>
+);
 
+const Dashboard = () => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { user } = useUser();
+  const { signOut } = useClerk();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null);
+  const [renameProject, setRenameProject] = useState<Project | null>(null);
+  const [newTitle, setNewTitle] = useState("");
+  const [showAllProjects, setShowAllProjects] = useState(false);
+
+  // Load Google Font
   useEffect(() => {
-    if (!isLoaded || !user) return
+    const link = document.createElement('link');
+    link.href = 'https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap';
+    link.rel = 'stylesheet';
+    document.head.appendChild(link);
+    return () => {
+      document.head.removeChild(link);
+    };
+  }, []);
 
-    const fetchProjects = async () => {
-      console.log('📂 Fetching projects for user:', user.id)
-      setIsLoading(true)
-      setError(null)
-      try {
-        const response = await fetch(`/api/projects/get-all?userId=${user.id}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        })
-        console.log(`📥 Response status: ${response.status}`)
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          console.error('❌ Fetch failed:', errorData)
-          throw new Error(
-            errorData.error || 
-            errorData.message || 
-            'Failed to load projects from cloud database'
-          )
-        }
-        const result = await response.json()
-        console.log('✅ Projects loaded:', result)
-        if (!result.success || !result.projects) {
-          throw new Error('Invalid response format from server')
-        }
-        setProjects(result.projects)
-        console.log(`📊 Total projects: ${result.projects.length}`)
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred'
-        console.error('❌ Load error:', errorMessage)
-        setError(errorMessage)
-        showToast('Failed to Load Projects', errorMessage, 'destructive')
-      } finally {
-        setIsLoading(false)
+  const { data: projects = [], isLoading } = useQuery({
+    queryKey: ["projects", user?.id],
+    queryFn: async () => {
+      if (!user?.id) {
+        console.log("[Dashboard] No user ID, skipping fetch");
+        return [];
       }
-    }
-    fetchProjects()
-  }, [isLoaded, user, showToast])
+      console.log("[Dashboard] Fetching projects for user:", user.id);
+      const response = await fetch(`/api/projects/get-all?userId=${user.id}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!response.ok) throw new Error("Failed to fetch projects");
+      const data = await response.json();
+      console.log("[Dashboard] Projects loaded:", data.projects?.length || 0);
+      return data.projects || [];
+    },
+    enabled: !!user?.id,
+  });
 
-  // Derived data
+  const deleteProjectMutation = useMutation({
+    mutationFn: async (projectId: string) => {
+      const response = await fetch(`/api/projects/delete?projectId=${projectId}`, {
+        method: "DELETE",
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!response.ok) throw new Error("Failed to delete project");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      toast({ title: "Project deleted", description: "Your project has been removed" });
+      setDeleteProjectId(null);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete project", variant: "destructive" });
+    },
+  });
+
+  const renameProjectMutation = useMutation({
+    mutationFn: async ({ projectId, title }: { projectId: string; title: string }) => {
+      const response = await fetch(`/api/projects/update?projectId=${projectId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title }),
+      });
+      if (!response.ok) throw new Error("Failed to rename project");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      toast({ title: "Project renamed", description: "Your project has been updated" });
+      setRenameProject(null);
+      setNewTitle("");
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to rename project", variant: "destructive" });
+    },
+  });
+
+  // Stats
+  const totalScenes = useMemo(() => {
+    return projects.reduce((sum: number, p: Project) => sum + (p.total_scenes || 0), 0);
+  }, [projects]);
+
+  const totalAnalyzed = useMemo(() => {
+    return projects.reduce((sum: number, p: Project) => sum + (p.scenes_analyzed || 0), 0);
+  }, [projects]);
+
   const mostRecentProject = useMemo(() => {
-    if (projects.length === 0) return null
-    return [...projects].sort((a, b) => 
-      new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-    )[0]
-  }, [projects])
+    if (projects.length === 0) return null;
+    return [...projects].sort((a: Project, b: Project) => 
+      new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime()
+    )[0];
+  }, [projects]);
 
-  const projectsNeedingAttention = useMemo(() => {
-    return projects.filter(p => 
-      p.status === 'pending' || 
-      p.status === 'analyzing' ||
-      (p.total_scenes && p.scenes_analyzed && p.scenes_analyzed < p.total_scenes)
-    )
-  }, [projects])
-
-  const totalScenesAnalyzed = useMemo(() => {
-    return projects.reduce((sum, p) => sum + (p.scenes_analyzed || 0), 0)
-  }, [projects])
-
-  // Filtered and sorted projects
   const filteredProjects = useMemo(() => {
-    let result = [...projects]
-    
-    // Filter by search
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase()
-      result = result.filter(p => 
-        p.name?.toLowerCase().includes(query)
-      )
-    }
-    
-    // Sort
-    switch (sortBy) {
-      case 'name':
-        result.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-        break
-      case 'progress':
-        result.sort((a, b) => {
-          const progA = a.total_scenes ? (a.scenes_analyzed || 0) / a.total_scenes : 0
-          const progB = b.total_scenes ? (b.scenes_analyzed || 0) / b.total_scenes : 0
-          return progB - progA
-        })
-        break
-      case 'recent':
-      default:
-        result.sort((a, b) => 
-          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-        )
-    }
-    
-    return result
-  }, [projects, searchQuery, sortBy])
+    if (!searchQuery) return projects;
+    return projects.filter((p: Project) => 
+      p.title.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [projects, searchQuery]);
 
-  const formatDate = (dateString: string): string => {
-    try {
-      const date = new Date(dateString)
-      const now = new Date()
-      const diffMs = now.getTime() - date.getTime()
-      const diffMins = Math.floor(diffMs / (1000 * 60))
-      const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
-      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+  const displayedProjects = showAllProjects ? filteredProjects : filteredProjects.slice(0, 4);
 
-      if (diffMins < 1) return 'Just now'
-      if (diffMins < 60) return `${diffMins}m ago`
-      if (diffHours < 24) return `${diffHours}h ago`
-      if (diffDays === 1) return 'Yesterday'
-      if (diffDays < 7) return `${diffDays}d ago`
-      
-      return date.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric'
-      })
-    } catch {
-      return dateString
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays === 1) return "Yesterday";
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+  };
+
+  const getStatusIcon = (project: Project) => {
+    if (project.scenes_analyzed && project.total_scenes && project.scenes_analyzed >= project.total_scenes) {
+      return <CheckCircle2 className="w-4 h-4 text-green-500" />;
     }
-  }
+    if (project.status === "analyzing") {
+      return <Clock className="w-4 h-4 text-yellow-500 animate-pulse" />;
+    }
+    return <AlertCircle className="w-4 h-4 text-muted-foreground" />;
+  };
 
-  if (!isLoaded) {
+  if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-[#E50914] animate-spin" />
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-pulse text-muted-foreground">Loading...</div>
       </div>
-    )
+    );
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-[#E50914] rounded flex items-center justify-center">
-            <Film className="w-4 h-4 text-white" />
+      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate("/")}>
+            <LogoSmall />
+            <LogoText />
           </div>
-          <span className="font-semibold text-lg">ShotLogic</span>
-        </Link>
-        
-        <div className="flex items-center gap-4">
-          <Link
-            to="/upload"
-            className="flex items-center gap-2 px-4 py-2 bg-[#E50914] hover:bg-[#B20710] rounded-lg font-medium transition-colors text-sm"
-          >
-            <Plus className="w-4 h-4" />
-            New Project
-          </Link>
-          <span className="text-white/60 text-sm hidden sm:block">
-            {user?.firstName || user?.emailAddresses?.[0]?.emailAddress || 'User'}
-          </span>
-          <UserButton afterSignOutUrl="/" />
+          <div className="flex items-center gap-4">
+            <Button 
+              onClick={() => navigate("/new-project")}
+              className="bg-[#E50914] hover:bg-[#E50914]/90 text-white"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              New Project
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="flex items-center gap-2 px-2">
+                  <span className="text-sm text-muted-foreground">{user?.firstName || 'User'}</span>
+                  <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center overflow-hidden">
+                    {user?.imageUrl ? (
+                      <img src={user.imageUrl} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-sm font-medium">{user?.firstName?.[0] || 'U'}</span>
+                    )}
+                  </div>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-card border-border z-[100]">
+                <DropdownMenuItem onClick={() => signOut()} className="cursor-pointer">
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </header>
 
-      {/* Main Layout */}
-      <div className="flex">
-        {/* Sidebar */}
-        <aside className="w-[280px] border-r border-white/10 min-h-[calc(100vh-65px)] p-4 hidden lg:block">
-          {/* Quick Stats */}
-          <div className="mb-6">
-            <h3 className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-3">Overview</h3>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <Film className="w-4 h-4 text-white/60" />
-                  <span className="text-sm text-white/80">Projects</span>
-                </div>
-                <span className="text-sm font-semibold">{projects.length}</span>
+      {/* Hero Section */}
+      <section className="relative overflow-hidden">
+        {/* Gradient background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-[#E50914]/10 via-background to-[#D4A843]/5" />
+        
+        <div className="relative max-w-7xl mx-auto px-6 py-16">
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            {/* Left: Welcome content */}
+            <div className="space-y-6">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#E50914]/10 border border-[#E50914]/20 text-[#E50914] text-sm">
+                <Sparkles className="w-4 h-4" />
+                AI-Powered Scene Analysis
               </div>
-              <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <BarChart3 className="w-4 h-4 text-white/60" />
-                  <span className="text-sm text-white/80">Scenes Analyzed</span>
-                </div>
-                <span className="text-sm font-semibold">{totalScenesAnalyzed}</span>
-              </div>
-            </div>
-          </div>
+              
+              <h1 className="text-4xl lg:text-5xl font-bold text-foreground leading-tight">
+                Plan your shots.<br />
+                <span className="text-[#D4A843]">Tell your story.</span>
+              </h1>
+              
+              <p className="text-lg text-muted-foreground max-w-md">
+                Transform your screenplay into detailed shot lists, storyboards, and production breakdowns in minutes.
+              </p>
 
-          {/* Continue Where You Left Off */}
-          {mostRecentProject && (
-            <div className="mb-6">
-              <h3 className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-3">Continue</h3>
-              <Link
-                to={`/project/${mostRecentProject._id}`}
-                className="block p-3 bg-[#E50914]/10 border border-[#E50914]/30 rounded-lg hover:bg-[#E50914]/20 transition-colors"
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <Clock className="w-3 h-3 text-[#E50914]" />
-                  <span className="text-xs text-[#E50914]">{formatDate(mostRecentProject.updatedAt)}</span>
-                </div>
-                <p className="text-sm font-medium text-white truncate">{mostRecentProject.name}</p>
-                {mostRecentProject.total_scenes && (
-                  <p className="text-xs text-white/50 mt-1">
-                    {mostRecentProject.scenes_analyzed || 0} / {mostRecentProject.total_scenes} scenes
-                  </p>
-                )}
-              </Link>
-            </div>
-          )}
-
-          {/* Needs Attention */}
-          {projectsNeedingAttention.length > 0 && (
-            <div>
-              <h3 className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-3">
-                Needs Attention
-              </h3>
-              <div className="space-y-2">
-                {projectsNeedingAttention.slice(0, 3).map(project => (
-                  <Link
-                    key={project._id}
-                    to={`/project/${project._id}`}
-                    className="flex items-center gap-2 p-2 rounded-lg hover:bg-white/5 transition-colors"
+              {mostRecentProject ? (
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <Button 
+                    size="lg"
+                    onClick={() => navigate(`/project/${mostRecentProject._id}`)}
+                    className="bg-[#E50914] hover:bg-[#E50914]/90 text-white"
                   >
-                    <AlertTriangle className="w-4 h-4 text-yellow-500 flex-shrink-0" />
-                    <span className="text-sm text-white/80 truncate">{project.name}</span>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
-        </aside>
-
-        {/* Main Content */}
-        <main className="flex-1 p-6">
-          <div className="max-w-4xl mx-auto">
-            {/* Search and Filters */}
-            <div className="flex items-center gap-4 mb-6">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
-                <input
-                  type="text"
-                  placeholder="Search projects..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-white/40 focus:outline-none focus:border-[#E50914] transition-colors"
-                />
-              </div>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
-                className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-[#E50914] transition-colors"
-              >
-                <option value="recent">Most Recent</option>
-                <option value="name">Name A-Z</option>
-                <option value="progress">Progress</option>
-              </select>
-            </div>
-
-            {/* Content */}
-            {isLoading ? (
-              <div className="flex items-center justify-center py-20">
-                <Loader2 className="w-8 h-8 text-[#E50914] animate-spin" />
-              </div>
-            ) : error ? (
-              <div className="text-center py-20">
-                <p className="text-red-400 mb-4">{error}</p>
-                <button 
-                  onClick={() => window.location.reload()}
-                  className="text-[#E50914] hover:underline"
-                >
-                  Try again
-                </button>
-              </div>
-            ) : projects.length === 0 ? (
-              <div className="text-center py-20">
-                <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Film className="w-8 h-8 text-white/30" />
+                    Continue: {mostRecentProject.name?.substring(0, 20)}{(mostRecentProject.name?.length || 0) > 20 ? '...' : ''}
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                  </Button>
+                  <Button 
+                    size="lg"
+                    variant="outline"
+                    onClick={() => navigate("/new-project")}
+                    className="border-[#D4A843]/50 text-[#D4A843] hover:bg-[#D4A843]/10"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    New Project
+                  </Button>
                 </div>
-                <h2 className="text-xl font-medium mb-2">No projects yet</h2>
-                <p className="text-white/50 mb-6">Upload a screenplay to get started</p>
-                <Link
-                  to="/upload"
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-[#E50914] hover:bg-[#B20710] rounded-lg font-medium transition-colors"
+              ) : (
+                <Button 
+                  size="lg"
+                  onClick={() => navigate("/new-project")}
+                  className="bg-[#E50914] hover:bg-[#E50914]/90 text-white"
                 >
-                  <Plus className="w-4 h-4" />
-                  Upload Screenplay
-                </Link>
-              </div>
-            ) : filteredProjects.length === 0 ? (
-              <div className="text-center py-20">
-                <p className="text-white/50">No projects match "{searchQuery}"</p>
-              </div>
-            ) : (
-              <ProjectList 
-                projects={filteredProjects} 
-                setProjects={setProjects}
-                showToast={showToast}
-              />
-            )}
+                  <Plus className="w-4 h-4 mr-2" />
+                  Start Your First Project
+                </Button>
+              )}
+            </div>
           </div>
-        </main>
-      </div>
-    </div>
-  )
-}
+        </div>
+      </section>
 
-export default Dashboard
+      {/* Projects Section */}
+      <section className="max-w-7xl mx-auto px-6 py-12">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold text-foreground">Your Projects</h2>
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search projects..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 w-64 bg-card border-border"
+              />
+            </div>
+          </div>
+        </div>
+
+        {projects.length === 0 ? (
+          <div className="text-center py-16 bg-card border border-border rounded-xl">
+            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+              <Film className="w-8 h-8 text-muted-foreground" />
+            </div>
+            <h3 className="text-lg font-semibold text-foreground mb-2">No projects yet</h3>
+            <p className="text-muted-foreground mb-6">Upload your first screenplay to get started</p>
+            <Button 
+              onClick={() => navigate("/new-project")}
+              className="bg-[#E50914] hover:bg-[#E50914]/90 text-white"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Create Project
+            </Button>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {displayedProjects.map((project: Project) => (
+                <div
+                  key={project._id}
+                  className="group bg-card border border-border rounded-xl p-5 hover:border-[#E50914]/50 transition-all cursor-pointer"
+                  onClick={() => navigate(`/project/${project._id}`)}
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#E50914]/20 to-[#D4A843]/20 flex items-center justify-center">
+                      <Film className="w-5 h-5 text-[#E50914]" />
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                        <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                          <MoreHorizontal className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="bg-card border-border">
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigate(`/project/${project._id}`); }}>
+                          <FolderOpen className="w-4 h-4 mr-2" />
+                          Open
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setRenameProject(project); setNewTitle(project.name); }}>
+                          <Pencil className="w-4 h-4 mr-2" />
+                          Rename
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem 
+                          onClick={(e) => { e.stopPropagation(); setDeleteProjectId(project._id); }}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+
+                  <h3 className="font-semibold text-foreground mb-1 truncate">{project.name}</h3>
+                  
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
+                    {getStatusIcon(project)}
+                    <span>{formatDate(project.updatedAt || project.createdAt)}</span>
+                  </div>
+
+                  {project.total_scenes && project.total_scenes > 0 && (
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>{project.scenes_analyzed || 0} of {project.total_scenes} scenes</span>
+                        <span>{Math.round(((project.scenes_analyzed || 0) / project.total_scenes) * 100)}%</span>
+                      </div>
+                      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-gradient-to-r from-[#E50914] to-[#D4A843] transition-all"
+                          style={{ width: `${((project.scenes_analyzed || 0) / project.total_scenes) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {filteredProjects.length > 4 && (
+              <div className="text-center mt-6">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowAllProjects(!showAllProjects)}
+                  className="border-border"
+                >
+                  {showAllProjects ? "Show Less" : `Show All ${filteredProjects.length} Projects`}
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+      </section>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteProjectId} onOpenChange={() => setDeleteProjectId(null)}>
+        <AlertDialogContent className="bg-card border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Project?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. All scenes and analysis data will be permanently deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteProjectId && deleteProjectMutation.mutate(deleteProjectId)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Rename Dialog */}
+      <Dialog open={!!renameProject} onOpenChange={() => setRenameProject(null)}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader>
+            <DialogTitle>Rename Project</DialogTitle>
+            <DialogDescription>Enter a new name for your project</DialogDescription>
+          </DialogHeader>
+          <Input
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+            placeholder="Project name"
+            className="bg-background border-border"
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameProject(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => renameProject && renameProjectMutation.mutate({ projectId: renameProject._id, title: newTitle })}
+              disabled={!newTitle.trim()}
+              className="bg-[#E50914] hover:bg-[#E50914]/90 text-white"
+            >
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
+export default Dashboard;

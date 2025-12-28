@@ -109,7 +109,6 @@ const parseAnalysis = (analysisString: string | null): AnalysisData | null => {
 
 export const exportShotListPDF = async (scenes: Scene[], projectTitle: string) => {
   const pdf = new jsPDF();
-  console.log("EXPORT PDF CALLED - scenes:", scenes.length);
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
   const margin = 15;
@@ -266,7 +265,6 @@ export const exportShotListPDF = async (scenes: Scene[], projectTitle: string) =
     // DIRECTING VISION SECTION
     // ═══════════════════════════════════════════════════════════════
     const dv = analysis.directing_vision;
-    console.log('Directing Vision data:', dv);
     if (dv) {
       checkPageBreak(40);
       pdf.setFont("helvetica", "bold");
@@ -634,7 +632,7 @@ export const exportShotListPDF = async (scenes: Scene[], projectTitle: string) =
 // ═══════════════════════════════════════════════════════════════
 // STORYBOARD PDF EXPORT
 // ═══════════════════════════════════════════════════════════════
-export const exportStoryboardPDF = async (scenes: Scene[], projectTitle: string) => {
+export const exportStoryboardPDF = async (scenes: Scene[], projectTitle: string, panelsPerPage: number = 6) => {
   const pdf = new jsPDF('landscape');
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
@@ -651,9 +649,15 @@ export const exportStoryboardPDF = async (scenes: Scene[], projectTitle: string)
   pdf.text(`STORYBOARD: ${projectTitle}`, pageWidth / 2, yPosition, { align: 'center' });
   yPosition += 10;
 
-  // Grid layout: 3 columns x 2 rows per page
-  const frameWidth = 85;
-  const frameHeight = 55;
+  // Grid layout based on panelsPerPage
+  // 4 panels = 2x2, 6 panels = 3x2, 9 panels = 3x3
+  const cols = panelsPerPage === 4 ? 2 : 3;
+  const rows = panelsPerPage === 9 ? 3 : 2;
+  
+  const availableWidth = pageWidth - (margin * 2) - ((cols - 1) * 8);
+  const availableHeight = pageHeight - 35 - ((rows - 1) * 20);
+  const frameWidth = availableWidth / cols;
+  const frameHeight = availableHeight / rows;
   const framePadding = 8;
   let frameIndex = 0;
 
@@ -663,18 +667,18 @@ export const exportStoryboardPDF = async (scenes: Scene[], projectTitle: string)
 
     analysis.shot_list.forEach((shot, shotIdx) => {
       // Calculate position in grid
-      const col = frameIndex % 3;
-      const row = Math.floor(frameIndex / 3) % 2;
+      const col = frameIndex % cols;
+      const row = Math.floor(frameIndex / cols) % rows;
       
-      // New page every 6 frames
-      if (frameIndex > 0 && frameIndex % 6 === 0) {
+      // New page every panelsPerPage frames
+      if (frameIndex > 0 && frameIndex % panelsPerPage === 0) {
         pdf.addPage();
         pdf.setFillColor(255, 255, 255);
         pdf.rect(0, 0, pageWidth, pageHeight, 'F');
       }
 
       const xPos = margin + col * (frameWidth + framePadding);
-      const yPos = 25 + row * (frameHeight + framePadding + 15);
+      const yPos = 25 + row * (frameHeight + 20);
 
       // Frame border
       pdf.setDrawColor(100, 100, 100);
@@ -706,13 +710,15 @@ export const exportStoryboardPDF = async (scenes: Scene[], projectTitle: string)
       pdf.setFontSize(6);
       pdf.setFont("helvetica", "bold");
       pdf.setTextColor(0, 0, 0);
-      const subject = (shot.subject || shot.visual || shot.visualDescription || '').substring(0, 45);
+      const maxSubjectLength = panelsPerPage === 4 ? 70 : 45;
+      const subject = (shot.subject || shot.visual || shot.visualDescription || '').substring(0, maxSubjectLength);
       pdf.text(subject, xPos + 3, yPos + frameHeight - 9);
 
       pdf.setFontSize(5);
       pdf.setFont("helvetica", "normal");
       pdf.setTextColor(80, 80, 80);
-      const rationale = (shot.rationale || '').substring(0, 50);
+      const maxRationaleLength = panelsPerPage === 4 ? 80 : 50;
+      const rationale = (shot.rationale || '').substring(0, maxRationaleLength);
       pdf.text(rationale, xPos + 3, yPos + frameHeight - 4);
 
       frameIndex++;

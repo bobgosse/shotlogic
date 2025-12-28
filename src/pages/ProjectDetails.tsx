@@ -472,7 +472,7 @@ const ProjectDetails = () => {
     setSelectedSceneId(sceneId);
   };
 
-  const handleExport = async (type: "full-report" | "storyboard" | "shot-list") => {
+  const handleExport = async (type: "full-report" | "storyboard" | "shot-list", options?: { panelsPerPage?: number }) => {
     try {
       if (type === "full-report") {
         exportShotListPDF(scenes, project?.title || "Untitled");
@@ -481,7 +481,7 @@ const ProjectDetails = () => {
           description: "Your complete analysis report has been downloaded",
         });
       } else if (type === "storyboard") {
-        exportStoryboardPDF(scenes, project?.title || "Untitled");
+        exportStoryboardPDF(scenes, project?.title || "Untitled", options?.panelsPerPage || 6);
         toast({
           title: "Storyboard exported",
           description: "Your storyboard PDF has been downloaded",

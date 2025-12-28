@@ -8,11 +8,12 @@ import { cn } from "@/lib/utils";
 
 type ExportType = "full-report" | "storyboard" | "shot-list";
 type UserRole = "director" | "cinematographer" | "editor" | null;
+type PanelsPerPage = 4 | 6 | 9;
 
 interface ExportModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onExport: (type: ExportType) => Promise<void>;
+  onExport: (type: ExportType, options?: { panelsPerPage?: PanelsPerPage }) => Promise<void>;
 }
 
 const exportOptions = [
@@ -45,9 +46,16 @@ const rolePresets: Record<string, ExportType> = {
   editor: "full-report",
 };
 
+const panelOptions = [
+  { value: "4", label: "4 panels (2×2)", description: "Larger frames" },
+  { value: "6", label: "6 panels (3×2)", description: "Standard" },
+  { value: "9", label: "9 panels (3×3)", description: "More per page" },
+];
+
 export const ExportModal = ({ open, onOpenChange, onExport }: ExportModalProps) => {
   const [selectedType, setSelectedType] = useState<ExportType | null>(null);
   const [selectedRole, setSelectedRole] = useState<UserRole>(null);
+  const [panelsPerPage, setPanelsPerPage] = useState<PanelsPerPage>(6);
   const [isExporting, setIsExporting] = useState(false);
 
   const handleRoleChange = (role: string) => {
@@ -55,13 +63,13 @@ export const ExportModal = ({ open, onOpenChange, onExport }: ExportModalProps) 
     setSelectedType(rolePresets[role]);
   };
 
-    console.log("ExportModal handleExport called with type:", selectedType);
   const handleExport = async () => {
     if (!selectedType) return;
 
     setIsExporting(true);
     try {
-      await onExport(selectedType);
+      const options = selectedType === "storyboard" ? { panelsPerPage } : undefined;
+      await onExport(selectedType, options);
       onOpenChange(false);
     } finally {
       setIsExporting(false);
@@ -72,6 +80,7 @@ export const ExportModal = ({ open, onOpenChange, onExport }: ExportModalProps) 
     if (!isExporting) {
       setSelectedType(null);
       setSelectedRole(null);
+      setPanelsPerPage(6);
       onOpenChange(false);
     }
   };
@@ -164,6 +173,32 @@ export const ExportModal = ({ open, onOpenChange, onExport }: ExportModalProps) 
             );
           })}
         </div>
+
+        {/* Storyboard Options - Only show when storyboard is selected */}
+        {selectedType === "storyboard" && (
+          <div className="space-y-3 p-4 bg-muted/30 rounded-lg border border-border">
+            <label className="text-sm font-medium text-foreground">
+              Panels Per Page
+            </label>
+            <div className="grid grid-cols-3 gap-3">
+              {panelOptions.map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() => setPanelsPerPage(parseInt(option.value) as PanelsPerPage)}
+                  className={cn(
+                    "p-3 rounded-lg border-2 transition-all text-left",
+                    panelsPerPage === parseInt(option.value)
+                      ? "border-netflix-red bg-netflix-red/10"
+                      : "border-border hover:border-muted-foreground"
+                  )}
+                >
+                  <div className="font-semibold text-foreground text-sm">{option.label}</div>
+                  <div className="text-xs text-muted-foreground">{option.description}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Actions */}
         <div className="flex justify-end gap-3 pt-4 border-t border-border">
