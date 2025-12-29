@@ -383,7 +383,7 @@ const ProjectDetails = () => {
   };
 
   const isShotListItem = (shot: string | ShotListItem): shot is ShotListItem => {
-    return typeof shot === 'object' && shot !== null && ('shot_type' in shot || 'shotType' in shot);
+    return typeof shot === 'object' && shot !== null && ('shot_type' in shot || 'shotType' in shot || 'subject' in shot || 'action' in shot);
   };
   
   // Helper to get shot properties (handles both snake_case and camelCase)
@@ -1145,7 +1145,7 @@ const ProjectDetails = () => {
                                   <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-sm">
                                     {idx + 1}
                                   </div>
-                                  <p className="text-sm text-foreground leading-relaxed flex-1">{shot}</p>
+                                  <p className="text-sm text-foreground leading-relaxed flex-1">{typeof shot === "object" ? (shot.subject || shot.action || "Shot data") : shot}</p>
                                 </div>
                               );
                             }
