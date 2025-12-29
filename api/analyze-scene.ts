@@ -98,21 +98,6 @@ export default async function handler(
     const sceneLength = sceneText.length
 
     console.log(`📊 [${invocationId}] Characters: ${characters.join(', ')}`)
-    
-    // Calculate shot count
-    const characterCount = characters.length
-    let minShots = Math.max(12, characterCount * 3)
-    let maxShots = Math.max(18, characterCount * 4)
-    
-    if (dialogueExchanges > 8) {
-      minShots = Math.max(minShots, dialogueExchanges)
-      maxShots = Math.max(maxShots, Math.ceil(dialogueExchanges * 1.5))
-    }
-    
-    minShots = Math.min(minShots, 20)
-    maxShots = Math.min(maxShots, 30)
-
-    console.log(`📊 [${invocationId}] Requesting ${minShots}-${maxShots} shots`)
     console.log(`📊 [${invocationId}] Requesting ${minShots}-${maxShots} shots`)
 
     const userPrompt = `You are a professional 1st AD and script supervisor creating a shot list for Scene ${sceneNumber} of ${totalScenes}.
@@ -126,35 +111,46 @@ ${visualStyle ? `<visual_style>${visualStyle}</visual_style>` : ''}
 <characters_in_scene>
 ${characters.join(', ')}
 </characters_in_scene>
-
 <instructions>
-Create a detailed shot list with ${minShots}-${maxShots} shots.
+DETERMINE SHOT COUNT BASED ON SCENE COMPLEXITY:
+- A quiet scene with one character doing one thing might need only 3-5 shots
+- A dialogue scene between two characters might need 8-15 shots for proper coverage
+- A complex scene with multiple characters, action, and dialogue might need 20+ shots
+- Base your shot count on: number of significant narrative events, number of characters requiring coverage, amount of dialogue needing shot/reverse-shot coverage
 
-CRITICAL RULES YOU MUST FOLLOW:
+HITCHCOCK'S RULE - SHOT SIZE = STORY IMPORTANCE:
+"The size of an object in the frame should be proportional to its importance in the story at that moment."
+- If something MATTERS (clue, threat, emotional trigger, key prop), give it a CLOSE-UP or foreground dominance
+- If something doesn't matter yet, keep it smaller, backgrounded, or visually de-emphasized
+- A key, knife, letter, photograph, glass of milk: BIG and unmistakable when story-critical
+- Apply this to characters too: the character with power/focus in the moment gets the tighter shot
 
-1. SUBJECT FIELD - Must name the character(s) in CAPS:
-   ✓ "LEO - emerging from water, toweling off"
-   ✓ "HUBER and ROSALIND - watching Leo from the dock"  
-   ✓ "VIRGINIA - in wheelchair, reciting poetry"
-   ✓ "POV LEO - looking down at his bare feet next to worn shoes"
-   ✓ "REVEAL - VIRGINIA's withered legs as blanket falls"
-   ✗ NEVER write "Two figures" - name them!
-   ✗ NEVER write "Gray sky and water" without saying who's in shot
-   ✗ NEVER write "Focus on legs" - say WHOSE legs!
+ABSOLUTE RULE - CHARACTER NAMES, NEVER PRONOUNS:
+- EVERY shot description MUST name the character by NAME in CAPS
+- ✓ "CLOSE-UP: LEO - his jaw tightens as he processes the insult"
+- ✓ "TWO-SHOT: VIRGINIA and HUBER - exchanging a knowing glance"
+- ✗ NEVER write "He turns away" - write "LEO turns away"
+- ✗ NEVER write "She reaches for it" - write "VIRGINIA reaches for the letter"
+- ✗ NEVER write "They embrace" - write "LEO and MARIA embrace"
 
-2. COVERAGE FIELD - Must quote specific dialogue or describe exact action:
-   ✓ "LEO: 'Seven.' - his counter-offer"
-   ✓ "VIRGINIA: 'The water does not ask who you are. It only asks if you can breathe.'"
-   ✓ "Leo looks down at his bare feet, then at their expensive shoes"
-   ✗ NEVER write "The negotiation" or "emotional moment"
+SUBJECT FIELD - Must name the character(s) in CAPS:
+- ✓ "LEO - emerging from water, toweling off"
+- ✓ "HUBER and ROSALIND - watching Leo from the dock"
+- ✓ "INSERT: THE LETTER - Virginia's handwriting visible"
+- ✗ NEVER write "Two figures" or "Focus on legs" without naming WHO
 
-3. RATIONALE FIELD - Explain story purpose:
-   ✓ "Leo's pride battles his poverty - he needs money but won't beg"
-   ✓ "Virginia reveals she knows Leo's poetry, shifting power from money to connection"
-   ✗ NEVER write "Captures the dynamic" or "Sets the mood"
+COVERAGE FIELD - Must quote specific dialogue or describe exact action:
+- ✓ "LEO: 'Seven.' - his counter-offer"
+- ✓ "Leo looks down at his bare feet, then at their expensive shoes"
+- ✗ NEVER write vague descriptions like "The negotiation" or "emotional moment"
 
-4. EVERY CHARACTER must appear BY NAME in at least 2 shots:
-   ${characters.map(c => `- ${c}`).join('\n   ')}
+RATIONALE FIELD - Explain WHY this shot, using Hitchcock's principle:
+- ✓ "Close-up on the knife NOW because Leo has just noticed it - it becomes his way out"
+- ✓ "Wide shot here to diminish Virginia's power as Leo walks away"
+- ✗ NEVER write "Captures the dynamic" or "Sets the mood"
+
+EVERY CHARACTER in the scene must appear BY NAME in at least 2 shots:
+${characters.map(c => `- ${c}`).join('\n')}
 </instructions>
 
 Return ONLY a JSON object with this structure:
