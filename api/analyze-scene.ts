@@ -225,16 +225,16 @@ Return ONLY a JSON object with this structure:
       "shot_number": 1,
       "shot_type": "WIDE/MEDIUM/CLOSE_UP/INSERT/POV/REVEAL/TWO_SHOT/GROUP",
       "movement": "STATIC/PUSH_IN/DOLLY/HANDHELD/etc",
-      "subject": "CHARACTER NAME - what they're doing (MUST name the character!)",
-      "action": "What happens during shot",
-      "coverage": "Quote dialogue: 'CHARACTER: Line' OR describe specific action",
+      "subject": "CHARACTER_NAME in CAPS - what they are doing (NEVER use he/she/they - ALWAYS the name)",
+      "action": "CHARACTER_NAME does specific action (use their NAME, not pronouns)",
+      "coverage": "CHARACTER_NAME: 'Dialogue line' OR CHARACTER_NAME performs specific action",
       "duration": "Brief/Standard/Extended",
-      "visual": "Composition and lighting",
-      "rationale": "WHY this shot - story purpose, not generic terms",
-      "image_prompt": "Character name, action, setting, lighting, mood, 35mm film"
+      "visual": "Composition showing CHARACTER_NAME - describe their position/framing",
+      "rationale": "Why CHARACTER_NAME gets this shot size now - apply Hitchcock principle",
+      "image_prompt": "CHARACTER_NAME (full name), specific action, setting, lighting, 35mm film"
     }
   ],
-  "shot_list_justification": "How you ensured each character (${characters.join(', ')}) gets coverage"
+  "shot_list_justification": "List each character and which shot numbers feature them by NAME"
 }`
 
     console.log(`🤖 [${invocationId}] Calling Claude API...`)
