@@ -31,7 +31,20 @@ export default function Index() {
   const [currentSceneIndex, setCurrentSceneIndex] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [projectId, setProjectId] = useState<string | null>(null);
+  const [elapsedTime, setElapsedTime] = useState(0);
 
+
+  // Timer effect for showing elapsed time during analysis
+  React.useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isAnalyzing) {
+      setElapsedTime(0);
+      interval = setInterval(() => {
+        setElapsedTime(prev => prev + 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isAnalyzing]);
   const analyzeScene = async (scene: AnalyzedScene, totalScenes: number): Promise<AnalyzedScene> => {
     try {
       const response = await fetch('/api/analyze-scene', {
@@ -389,7 +402,10 @@ export default function Index() {
               ))}
             </div>
             <p className="text-center text-white/40 text-sm mt-6">
-              Processing 4 scenes in parallel. You can close this tab - your progress is saved.
+              Analyzing {Math.ceil(totalScenes / 4)} batch{Math.ceil(totalScenes / 4) > 1 ? 'es' : ''} • Elapsed: {Math.floor(elapsedTime / 60)}:{(elapsedTime % 60).toString().padStart(2, '0')}
+            </p>
+            <p className="text-center text-white/50 text-xs mt-2">
+              Each batch takes 60-90 seconds. You can close this tab - progress is saved automatically.
             </p>
           </div>
         )}
