@@ -289,7 +289,12 @@ export default function Index() {
 
   const completedScenes = scenes.filter(s => s.status === 'complete' || s.status === 'error').length;
   const totalScenes = scenes.length;
-  const progressPercent = totalScenes > 0 ? Math.round((completedScenes / totalScenes) * 100) : 0;
+  const estimatedSecondsPerBatch = 75;
+  const totalBatches = Math.ceil(totalScenes / 4);
+  const estimatedTotalSeconds = totalBatches * estimatedSecondsPerBatch;
+  const timeBasedPercent = Math.min(95, Math.round((elapsedTime / estimatedTotalSeconds) * 100));
+  const completionPercent = totalScenes > 0 ? Math.round((completedScenes / totalScenes) * 100) : 0;
+  const progressPercent = Math.max(timeBasedPercent, completionPercent);
   const currentScene = scenes[currentSceneIndex];
 
   const getSceneHeader = (text: string) => {
