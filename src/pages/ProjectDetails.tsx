@@ -1145,7 +1145,7 @@ const ProjectDetails = () => {
                                   <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-sm">
                                     {idx + 1}
                                   </div>
-                                  <p className="text-sm text-foreground leading-relaxed flex-1">{typeof shot === "object" ? (shot.subject || shot.action || "Shot data") : shot}</p>
+                                  <p className="text-sm text-foreground leading-relaxed flex-1">{typeof shot === "object" ? String(shot.subject || shot.action || "Shot data") : String(shot)}</p>
                                 </div>
                               );
                             }
