@@ -98,7 +98,6 @@ export default async function handler(
     const sceneLength = sceneText.length
 
     console.log(`📊 [${invocationId}] Characters: ${characters.join(', ')}`)
-    console.log(`📊 [${invocationId}] Requesting ${minShots}-${maxShots} shots`)
 
     const userPrompt = `You are a professional 1st AD and script supervisor creating a shot list for Scene ${sceneNumber} of ${totalScenes}.
 
@@ -320,7 +319,7 @@ Return ONLY a JSON object with this structure:
         processingTime: duration,
         characters,
         dialogueExchanges,
-        requestedShots: `${minShots}-${maxShots}`,
+        requestedShots: "variable",
         actualShots: shotList.length,
         model: 'claude-sonnet-4-20250514',
         deployMarker: DEPLOY_TIMESTAMP
