@@ -35,6 +35,7 @@ function App() {
           <Route path="/projects" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/upload" element={<ProtectedRoute><Index /></ProtectedRoute>} />
           <Route path="/analyze" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+          <Route path="/new-project" element={<ProtectedRoute><Index /></ProtectedRoute>} />
           <Route path="/project/:id" element={<ProtectedRoute><ProjectDetails /></ProtectedRoute>} />
         </Routes>
       </BrowserRouter>
