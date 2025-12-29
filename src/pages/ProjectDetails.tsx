@@ -582,7 +582,7 @@ const ProjectDetails = () => {
       {/* Main Content */}
       <div className={`flex-1 transition-all duration-300 ${showNavigator && !isTablet && !isEditMode ? "ml-[280px]" : "ml-0"}`}>
         {/* Header */}
-        <div className="bg-background border-b border-border p-4 sticky top-0 z-50">
+        <div className="bg-[#0a0a0a] border-b border-border p-4 sticky top-0 z-50">
           <div className="max-w-5xl mx-auto">
             <div className="flex justify-between items-start mb-3">
               <div className="flex gap-2 items-center">
