@@ -732,9 +732,9 @@ const ProjectDetails = () => {
               Select a scene from the navigator
             </div>
           ) : (
-            <div className="bg-card border border-border rounded-lg overflow-hidden">
+            <div className="bg-[#0a0a0a] border border-border rounded-lg overflow-hidden">
               {/* Scene Header */}
-              <div className="p-4 border-b border-border bg-muted/30">
+              <div className="p-4 border-b border-border bg-[#1a1a1a]">
                 <div className="flex items-center justify-between gap-4">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 mb-1">
