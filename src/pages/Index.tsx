@@ -362,11 +362,12 @@ export default function Index() {
                 <span className="text-white/60">Progress</span>
                 <span className="font-medium">{completedScenes} of {totalScenes} scenes</span>
               </div>
-              <div className="h-3 bg-white/10 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-[#E50914] transition-all duration-300"
-                  style={{ width: progressPercent + '%' }}
-                />
+              <div className="h-3 bg-white/10 rounded-full overflow-hidden relative">
+                {progressPercent === 0 && isAnalyzing ? (
+                  <div className="h-full w-full bg-gradient-to-r from-transparent via-[#E50914] to-transparent animate-pulse" style={{ animation: "pulse 1.5s ease-in-out infinite" }} />
+                ) : (
+                  <div className="h-full bg-[#E50914] transition-all duration-300" style={{ width: progressPercent + "%"  }} />
+                )}
               </div>
               <div className="text-right text-sm text-white/50 mt-1">{progressPercent}%</div>
             </div>
