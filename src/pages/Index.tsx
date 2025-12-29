@@ -53,15 +53,15 @@ export default function Index() {
 
   const saveSceneToDb = async (projectId: string, scene: AnalyzedScene) => {
     try {
+      const sceneKey = `scene-${scene.number}`;
       await fetch('/api/projects/save-scene', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           projectId: projectId,
-          sceneNumber: scene.number,
-          sceneText: scene.text,
-          analysis: scene.analysis ? JSON.stringify(scene.analysis) : null,
-          status: scene.status === 'complete' ? 'COMPLETED' : scene.status.toUpperCase()
+          sceneUpdates: {
+            [sceneKey]: scene.analysis
+          }
         })
       });
     } catch (err) {
