@@ -231,7 +231,7 @@ Return ONLY a JSON object with this structure:
       "duration": "Brief/Standard/Extended",
       "visual": "Composition showing CHARACTER_NAME - describe their position/framing",
       "rationale": "Why CHARACTER_NAME gets this shot size now - apply Hitchcock principle",
-      "image_prompt": "CHARACTER_NAME (full name), specific action, setting, lighting, 35mm film"
+      "image_prompt": "Use the visual_style provided above as the base, then add: CHARACTER_NAME (full name), specific action, setting details. The visual_style MUST be the foundation of every image prompt."
     }
   ],
   "shot_list_justification": "List each character and which shot numbers feature them by NAME"
