@@ -1122,7 +1122,7 @@ const ProjectDetails = () => {
                                           variant="ghost"
                                           className="h-7 px-2 text-xs"
                                           onClick={() => {
-                                            const prompts = generatePromptPair(normalizeShot(shot), selectedScene, selectedAnalysis);
+                                            const prompts = generatePromptPair(normalizeShot(shot), selectedScene, selectedAnalysis, undefined, project?.visual_style);
                                             navigator.clipboard.writeText(prompts.previs);
                                             toast({ title: "Previs Prompt Copied!" });
                                           }}
@@ -1178,7 +1178,7 @@ const ProjectDetails = () => {
                         </p>
                         {selectedAnalysis.shot_list.map((shot, idx) => {
                           if (!isShotListItem(shot)) return null;
-                          const prompts = generatePromptPair(normalizeShot(shot), selectedScene, selectedAnalysis);
+                          const prompts = generatePromptPair(normalizeShot(shot), selectedScene, selectedAnalysis, undefined, project?.visual_style);
                           return (
                             <div key={idx} className="bg-muted/30 rounded-lg border border-border p-4 space-y-3">
                               <div className="flex items-center justify-between">

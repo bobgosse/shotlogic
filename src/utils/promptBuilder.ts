@@ -130,6 +130,7 @@ export const buildMidjourneyPrompt = (
     aspectRatio?: string;
     stylize?: number;
     seed?: number;
+    visualStyle?: string;
   } = { style: 'previs' }
 ): string => {
   const { intExt, location, timeOfDay } = parseSceneHeader(scene.header);
@@ -155,10 +156,12 @@ export const buildMidjourneyPrompt = (
     ? `, ${shot.movement.toLowerCase()} camera movement feel` 
     : ', static camera';
   
-  // Style prefix
-  const stylePrefix = options.style === 'storyboard'
-    ? 'clean storyboard frame, professional previs, clear silhouettes, readable composition'
-    : 'cinematic film still, photorealistic, anamorphic lens, film grain, professional cinematography';
+  // Style prefix - USE PROJECT'S VISUAL STYLE IF PROVIDED
+  const stylePrefix = options.visualStyle 
+    ? options.visualStyle
+    : (options.style === 'storyboard'
+      ? 'clean storyboard frame, professional previs, clear silhouettes, readable composition'
+      : 'cinematic film still, photorealistic, anamorphic lens, film grain, professional cinematography');
   
   // Build the prompt
   const promptParts = [
@@ -190,7 +193,8 @@ export const generatePromptPair = (
   shot: ShotData,
   scene: SceneData,
   analysis: AnalysisData | null,
-  sceneSeed?: number
+  sceneSeed?: number,
+  visualStyle?: string
 ): { storyboard: string; previs: string } => {
   const seed = sceneSeed || Math.floor(Math.random() * 999999999);
   
@@ -198,12 +202,14 @@ export const generatePromptPair = (
     storyboard: buildMidjourneyPrompt(shot, scene, analysis, { 
       style: 'storyboard', 
       stylize: 50,
-      seed 
+      seed,
+      visualStyle
     }),
     previs: buildMidjourneyPrompt(shot, scene, analysis, { 
       style: 'previs', 
       stylize: 150,
-      seed 
+      seed,
+      visualStyle
     }),
   };
 };
