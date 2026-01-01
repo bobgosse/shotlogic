@@ -148,6 +148,11 @@ RATIONALE FIELD - Explain WHY this shot, using Hitchcock's principle:
 - ✓ "Wide shot here to diminish Virginia's power as Leo walks away"
 - ✗ NEVER write "Captures the dynamic" or "Sets the mood"
 
+IMAGE_PROMPT FIELD - CRITICAL:
+- EVERY image_prompt MUST START with the exact visual_style text provided above
+- The visual_style defines the film stock, era, and look - it MUST be included verbatim
+- Example: "[visual_style text here], wide shot, LEO emerging from water, beach dock, morning light"
+
 EVERY CHARACTER in the scene must appear BY NAME in at least 2 shots:
 ${characters.map(c => `- ${c}`).join('\n')}
 </instructions>
