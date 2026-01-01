@@ -3,7 +3,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
-const DEPLOY_TIMESTAMP = "2024-12-27T17:00:00Z_CLAUDE_API"
+const DEPLOY_TIMESTAMP = "2025-01-01T15:00:00Z_VISUAL_STYLE_FIX"
 
 function getEnvironmentVariable(name: string): string | undefined {
   try {
@@ -66,6 +66,7 @@ export default async function handler(
     
     console.log(`📊 [${invocationId}] Scene: ${sceneNumber}/${totalScenes}`)
     console.log(`📊 [${invocationId}] Text length: ${sceneText?.length || 0} chars`)
+    console.log(`📊 [${invocationId}] Visual style: ${visualStyle ? 'YES' : 'NO'}`)
 
     if (!sceneText || sceneNumber == null || totalScenes == null) {
       return res.status(400).json({ error: 'Missing required fields', deployMarker: DEPLOY_TIMESTAMP })
@@ -104,8 +105,6 @@ export default async function handler(
 <scene_text>
 ${sceneText}
 </scene_text>
-
-${visualStyle ? `<visual_style>${visualStyle}</visual_style>` : ''}
 
 <characters_in_scene>
 ${characters.join(', ')}
@@ -148,10 +147,9 @@ RATIONALE FIELD - Explain WHY this shot, using Hitchcock's principle:
 - ✓ "Wide shot here to diminish Virginia's power as Leo walks away"
 - ✗ NEVER write "Captures the dynamic" or "Sets the mood"
 
-IMAGE_PROMPT FIELD - CRITICAL:
-- EVERY image_prompt MUST START with the exact visual_style text provided above
-- The visual_style defines the film stock, era, and look - it MUST be included verbatim
-- Example: "[visual_style text here], wide shot, LEO emerging from water, beach dock, morning light"
+IMAGE_PROMPT FIELD:
+- Describe shot type, CHARACTER_NAME, specific action, setting details
+- Example: "wide shot, LEO emerging from water, beach dock, morning light"
 
 EVERY CHARACTER in the scene must appear BY NAME in at least 2 shots:
 ${characters.map(c => `- ${c}`).join('\n')}
@@ -236,7 +234,7 @@ Return ONLY a JSON object with this structure:
       "duration": "Brief/Standard/Extended",
       "visual": "Composition showing CHARACTER_NAME - describe their position/framing",
       "rationale": "Why CHARACTER_NAME gets this shot size now - apply Hitchcock principle",
-      "image_prompt": "Use the visual_style provided above as the base, then add: CHARACTER_NAME (full name), specific action, setting details. The visual_style MUST be the foundation of every image prompt."
+      "image_prompt": "shot type, CHARACTER_NAME, specific action, setting, lighting"
     }
   ],
   "shot_list_justification": "List each character and which shot numbers feature them by NAME"
@@ -311,6 +309,18 @@ Return ONLY a JSON object with this structure:
     }
 
     const shotList = analysis.shot_list || []
+    
+    // ═══════════════════════════════════════════════════════════════
+    // PREPEND VISUAL STYLE TO EVERY IMAGE PROMPT (GUARANTEED TO WORK)
+    // ═══════════════════════════════════════════════════════════════
+    if (visualStyle && shotList.length > 0) {
+      console.log(`🎨 [${invocationId}] Prepending visual style to ${shotList.length} image prompts`)
+      shotList.forEach((shot: any) => {
+        if (shot.image_prompt) {
+          shot.image_prompt = visualStyle + ", " + shot.image_prompt
+        }
+      })
+    }
     
     console.log(`✅ [${invocationId}] Analysis complete`)
     console.log(`   - Shots: ${shotList.length}`)
