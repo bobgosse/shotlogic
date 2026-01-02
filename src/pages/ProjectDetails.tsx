@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { StoryboardDialog } from "@/components/StoryboardDialog";
 import { ExportModal } from "@/components/ExportModal";
 import { AnalysisProgressCard } from "@/components/AnalysisProgressCard";
