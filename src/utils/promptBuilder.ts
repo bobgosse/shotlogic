@@ -1,5 +1,6 @@
 // ShotLogic Prompt Builder
 // Converts scene analysis + shot data into Midjourney-ready prompts
+// REVISED: Prioritizes story content over technical camera jargon
 
 interface ShotData {
   shot_number?: number;
@@ -22,11 +23,11 @@ interface AnalysisData {
   story_analysis?: {
     synopsis?: string;
     stakes?: string;
-    ownership?: string; // conflict type
+    ownership?: string;
     key_props?: string;
   };
   directing_vision?: {
-    visual_metaphor?: string; // tone
+    visual_metaphor?: string;
     visual_approach?: string;
   };
   producing_logistics?: {
@@ -40,7 +41,6 @@ const parseSceneHeader = (header: string) => {
   const timeMatch = header.match(/(DAY|NIGHT|DAWN|DUSK|MORNING|EVENING|CONTINUOUS|LATER|SAME)/i);
   const timeOfDay = timeMatch?.[0] || 'DAY';
   
-  // Extract location (between INT/EXT and time of day or end)
   let location = header
     .replace(/^(INT|EXT|INT\/EXT)[.\s-]*/i, '')
     .replace(/[-–]\s*(DAY|NIGHT|DAWN|DUSK|MORNING|EVENING|CONTINUOUS|LATER|SAME).*$/i, '')
@@ -51,76 +51,32 @@ const parseSceneHeader = (header: string) => {
   return { intExt, location, timeOfDay };
 };
 
-// Extract character names from scene content
-const extractCharacters = (content: string): string[] => {
-  const characterPattern = /^([A-Z][A-Z\s]+)(?:\s*\([^)]*\))?\s*$/gm;
-  const matches = content.match(characterPattern) || [];
-  const characters = [...new Set(matches.map(m => m.replace(/\s*\([^)]*\)/, '').trim()))];
-  return characters.filter(c => c.length > 1 && c.length < 30);
-};
-
-// Get lighting based on time of day and tone
-const getLighting = (timeOfDay: string, tone?: string): string => {
-  const toneLC = (tone || '').toLowerCase();
-  
-  const baseLighting: Record<string, string> = {
-    'DAY': 'natural daylight, soft shadows',
-    'NIGHT': 'low-key lighting, practical lights, deep shadows',
-    'DAWN': 'golden hour, warm side lighting, long shadows',
-    'DUSK': 'blue hour, ambient twilight, soft contrast',
-    'MORNING': 'bright morning light, clean shadows',
-    'EVENING': 'warm tungsten interior lighting',
-  };
-  
-  let lighting = baseLighting[timeOfDay.toUpperCase()] || 'natural lighting';
-  
-  // Modify based on tone
-  if (toneLC.includes('tense') || toneLC.includes('suspense')) {
-    lighting += ', high contrast, dramatic shadows';
-  } else if (toneLC.includes('warm') || toneLC.includes('intimate')) {
-    lighting += ', warm color temperature, soft fill';
-  } else if (toneLC.includes('cold') || toneLC.includes('isolation')) {
-    lighting += ', cool color temperature, harsh edges';
-  }
-  
-  return lighting;
-};
-
-// Get camera angle based on shot type
-const getCameraAngle = (shotType: string, rationale?: string): string => {
+// Simple shot size descriptor
+const getShotSize = (shotType: string): string => {
   const type = shotType.toUpperCase();
-  const rationaleLC = (rationale || '').toLowerCase();
-  
-  if (rationaleLC.includes('power') || rationaleLC.includes('dominat')) {
-    return 'low angle, looking up';
-  }
-  if (rationaleLC.includes('vulnerab') || rationaleLC.includes('small')) {
-    return 'high angle, looking down';
-  }
-  
   switch (type) {
     case 'WIDE':
     case 'ESTABLISHING':
-      return 'wide angle, eye level';
+      return 'wide shot';
     case 'MEDIUM':
     case 'TWO_SHOT':
-      return 'medium focal length, eye level';
+      return 'medium shot';
     case 'CLOSE_UP':
     case 'MEDIUM_CLOSE':
-      return 'tight framing, slight telephoto, eye level';
+      return 'close-up';
     case 'EXTREME_CLOSE':
     case 'INSERT':
-      return 'macro detail, shallow depth of field';
+      return 'extreme close-up';
     case 'OVER_SHOULDER':
-      return 'over-the-shoulder angle, foreground blur';
+      return 'over-the-shoulder shot';
     case 'POV':
-      return 'first-person perspective, subjective camera';
+      return 'POV shot';
     default:
-      return 'eye level, neutral angle';
+      return 'shot';
   }
 };
 
-// Build the full Midjourney prompt
+// Build the full Midjourney prompt - STORY FIRST
 export const buildMidjourneyPrompt = (
   shot: ShotData,
   scene: SceneData,
@@ -133,55 +89,42 @@ export const buildMidjourneyPrompt = (
     visualStyle?: string;
   } = { style: 'previs' }
 ): string => {
-  const { intExt, location, timeOfDay } = parseSceneHeader(scene.header);
-  const characters = extractCharacters(scene.content);
-  const tone = analysis?.directing_vision?.visual_metaphor || '';
-  const lighting = getLighting(timeOfDay, tone);
-  const cameraAngle = getCameraAngle(shot.shot_type, shot.rationale);
+  const { location, timeOfDay } = parseSceneHeader(scene.header);
+  const shotSize = getShotSize(shot.shot_type);
   
-  // Build character descriptions
-  const charDesc = characters.slice(0, 3).map((char, i) => {
-    return `[CHAR_${i + 1}] ${char.toLowerCase()}, cinematic character`;
-  }).join(', ');
-  
-  // Build location description
-  const locDesc = `${intExt.toLowerCase()} ${location.toLowerCase()}, ${timeOfDay.toLowerCase()}`;
-  
-  // Props
-  const props = analysis?.producing_logistics?.key_props?.slice(0, 3).join(', ') || 
-                analysis?.story_analysis?.key_props || '';
-  
-  // Movement description
-  const movementDesc = shot.movement && shot.movement !== 'STATIC' 
-    ? `, ${shot.movement.toLowerCase()} camera movement feel` 
-    : ', static camera';
-  
-  // Style prefix - USE PROJECT'S VISUAL STYLE IF PROVIDED
+  // Style prefix - project visual style or fallback
   const stylePrefix = options.visualStyle 
     ? options.visualStyle
     : (options.style === 'storyboard'
-      ? 'clean storyboard frame, professional previs, clear silhouettes, readable composition'
-      : 'cinematic film still, photorealistic, anamorphic lens, film grain, professional cinematography');
+      ? 'clean storyboard frame, professional previs, clear silhouettes'
+      : 'cinematic film still, 35mm photography');
   
-  // Build the prompt
+  // STORY CONTENT - the most important part
+  // Use visual field first (most descriptive), fall back to subject, then action
+  const storyContent = shot.visual || shot.subject || shot.action || 'dramatic scene moment';
+  
+  // Props - keep brief
+  const props = analysis?.producing_logistics?.key_props?.slice(0, 2).join(', ') || 
+                analysis?.story_analysis?.key_props || '';
+  
+  // Simple location context
+  const locationContext = `${location.toLowerCase()}, ${timeOfDay.toLowerCase()}`;
+  
+  // Build prompt: STYLE, then STORY, then minimal technical
   const promptParts = [
     stylePrefix,
-    `${shot.shot_type.toLowerCase()} shot`,
-    cameraAngle,
-    shot.visual || shot.subject || 'scene moment',
-    charDesc ? `featuring ${charDesc}` : '',
-    `set in ${locDesc}`,
+    storyContent,
     props ? `with ${props}` : '',
-    lighting,
-    movementDesc,
-    tone ? `${tone.toLowerCase()} mood` : '',
+    locationContext,
+    shotSize,
   ].filter(Boolean);
   
   // Negative prompt
   const negatives = '--no text, subtitles, watermark, logo, UI, caption, signature, frame border';
   
-  // Parameters
-  const ar = options.aspectRatio || '16:9';
+  // Parameters - use 4:3 if visual style mentions it, otherwise default
+  const defaultAR = options.visualStyle?.includes('4:3') ? '4:3' : '16:9';
+  const ar = options.aspectRatio || defaultAR;
   const stylize = options.stylize || (options.style === 'storyboard' ? 50 : 150);
   const seedParam = options.seed ? ` --seed ${options.seed}` : '';
   
