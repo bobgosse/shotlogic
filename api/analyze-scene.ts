@@ -147,8 +147,11 @@ RATIONALE FIELD - Explain WHY this shot, using Hitchcock's principle:
 - ✓ "Wide shot here to diminish Virginia's power as Leo walks away"
 - ✗ NEVER write "Captures the dynamic" or "Sets the mood"
 
-IMAGE_PROMPT FIELD:
-- Describe shot type, CHARACTER_NAME, specific action, setting details
+IMAGE_PROMPT FIELD (CRITICAL - THIS IS WHAT MIDJOURNEY SEES):
+- MUST describe: CHARACTER_NAME + CONCRETE PHYSICAL ACTION + LOCATION
+- Focus on WHAT IS HAPPENING, not abstract concepts
+- NO compositional language like "triangle of power" or "visual tension"
+- Write as if describing a photograph to someone who cannot see it
 - Example: "wide shot, LEO emerging from water, beach dock, morning light"
 
 EVERY CHARACTER in the scene must appear BY NAME in at least 2 shots:
