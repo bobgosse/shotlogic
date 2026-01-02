@@ -148,12 +148,13 @@ RATIONALE FIELD - Explain WHY this shot, using Hitchcock's principle:
 - ✗ NEVER write "Captures the dynamic" or "Sets the mood"
 
 IMAGE_PROMPT FIELD (CRITICAL - THIS IS WHAT MIDJOURNEY SEES):
-- MUST describe: CHARACTER_NAME + CONCRETE PHYSICAL ACTION + LOCATION
-- Focus on WHAT IS HAPPENING, not abstract concepts
-- NO compositional language like "triangle of power" or "visual tension"
-- Write as if describing a photograph to someone who cannot see it
-- Example: "wide shot, LEO emerging from water, beach dock, morning light"
-
+- Describe the SPECIFIC ACTION happening in this shot, not positions
+- BAD: "VIRGINIA in wheelchair by window, EDMUND at fireplace"
+- GOOD: "ROSALIND pins VIRGINIA's legs under blanket while VIRGINIA stares longingly at book, EDMUND ignores them checking pocket watch"
+- Include: WHO is doing WHAT to WHOM, facial expressions, body language
+- Every prompt must answer: "What is the character DOING in this moment?"
+- Keep it under 30 words after the shot type
+EVERY CHARACTER in the scene must appear BY NAME in at least 2 shots:
 EVERY CHARACTER in the scene must appear BY NAME in at least 2 shots:
 ${characters.map(c => `- ${c}`).join('\n')}
 </instructions>
