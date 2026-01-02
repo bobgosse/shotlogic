@@ -150,7 +150,8 @@ RATIONALE FIELD - Explain WHY this shot, using Hitchcock's principle:
 IMAGE_PROMPT FIELD (CRITICAL - THIS IS WHAT MIDJOURNEY SEES):
 - Describe the SPECIFIC ACTION happening in this shot, not positions
 - BAD: "VIRGINIA in wheelchair by window, EDMUND at fireplace"
-- GOOD: "ROSALIND pins VIRGINIA's legs under blanket while VIRGINIA stares longingly at book, EDMUND ignores them checking pocket watch"
+- GOOD: "ROSALIND (stern 40s woman) pins VIRGINIA (frail 16-year-old girl in wheelchair)'s legs under blanket while VIRGINIA stares longingly at book, EDMUND ignores them checking pocket watch"
+- Include CHARACTER DESCRIPTORS: "VIRGINIA (frail teenage girl)" not just "VIRGINIA"
 - Include: WHO is doing WHAT to WHOM, facial expressions, body language
 - Every prompt must answer: "What is the character DOING in this moment?"
 - Keep it under 30 words after the shot type
