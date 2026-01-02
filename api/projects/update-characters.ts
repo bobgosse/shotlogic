@@ -19,8 +19,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'projectId is required' })
     }
     
-    console.log(`👥 Updating characters for project ${projectId}`)
-    console.log(`   Character count: ${characters?.length || 0}`)
+    console.log("👥 Updating characters for project", projectId)
+    console.log("   Character count:", characters?.length || 0)
     
     const db = await getDb()
     const collection = db.collection('projects')
@@ -35,7 +35,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     )
     
-    console.log(`✅ Characters updated, modified: ${result.modifiedCount}`)
+    console.log("✅ Characters updated, modified:", result.modifiedCount)
     
     return res.status(200).json({
       success: true,
