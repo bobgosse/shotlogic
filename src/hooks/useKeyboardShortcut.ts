@@ -16,6 +16,16 @@ export const useKeyboardShortcut = (
     if (!enabled) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      // Ignore if user is typing in an input field
+      const target = event.target as HTMLElement;
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+
       const matchesKey = event.key.toLowerCase() === key.toLowerCase();
       const matchesCtrl = ctrlKey ? event.ctrlKey || event.metaKey : !event.ctrlKey && !event.metaKey;
       const matchesShift = shiftKey ? event.shiftKey : !event.shiftKey;
