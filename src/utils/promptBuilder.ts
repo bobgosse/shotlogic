@@ -1,6 +1,5 @@
 // ShotLogic Prompt Builder
-// Converts scene analysis + shot data into Midjourney-ready prompts
-// REVISED: Prioritizes story content over technical camera jargon
+// SIMPLIFIED: Uses Claude's image_prompt directly when available
 
 interface ShotData {
   shot_number?: number;
@@ -35,48 +34,7 @@ interface AnalysisData {
   };
 }
 
-// Parse scene header for location and time
-const parseSceneHeader = (header: string) => {
-  const intExt = header.match(/^(INT|EXT|INT\/EXT)/i)?.[0] || 'INT';
-  const timeMatch = header.match(/(DAY|NIGHT|DAWN|DUSK|MORNING|EVENING|CONTINUOUS|LATER|SAME)/i);
-  const timeOfDay = timeMatch?.[0] || 'DAY';
-  
-  let location = header
-    .replace(/^(INT|EXT|INT\/EXT)[.\s-]*/i, '')
-    .replace(/[-–]\s*(DAY|NIGHT|DAWN|DUSK|MORNING|EVENING|CONTINUOUS|LATER|SAME).*$/i, '')
-    .trim();
-  
-  if (location.length > 50) location = location.substring(0, 50);
-  
-  return { intExt, location, timeOfDay };
-};
-
-// Simple shot size descriptor
-const getShotSize = (shotType: string): string => {
-  const type = shotType.toUpperCase();
-  switch (type) {
-    case 'WIDE':
-    case 'ESTABLISHING':
-      return 'wide shot';
-    case 'MEDIUM':
-    case 'TWO_SHOT':
-      return 'medium shot';
-    case 'CLOSE_UP':
-    case 'MEDIUM_CLOSE':
-      return 'close-up';
-    case 'EXTREME_CLOSE':
-    case 'INSERT':
-      return 'extreme close-up';
-    case 'OVER_SHOULDER':
-      return 'over-the-shoulder shot';
-    case 'POV':
-      return 'POV shot';
-    default:
-      return 'shot';
-  }
-};
-
-// Build the full Midjourney prompt - STORY FIRST
+// Build the full Midjourney prompt
 export const buildMidjourneyPrompt = (
   shot: ShotData,
   scene: SceneData,
@@ -89,40 +47,42 @@ export const buildMidjourneyPrompt = (
     visualStyle?: string;
   } = { style: 'previs' }
 ): string => {
-  const { location, timeOfDay } = parseSceneHeader(scene.header);
-  const shotSize = getShotSize(shot.shot_type);
   
-  // Style prefix - project visual style or fallback
+  // IF CLAUDE GENERATED AN IMAGE_PROMPT, USE IT DIRECTLY
+  // It already has the visual style prepended from the backend
+  if (shot.image_prompt && shot.image_prompt.length > 20) {
+    const basePrompt = shot.image_prompt;
+    
+    // Add Midjourney parameters
+    const defaultAR = options.visualStyle?.includes('4:3') ? '4:3' : '16:9';
+    const ar = options.aspectRatio || defaultAR;
+    const stylize = options.stylize || (options.style === 'storyboard' ? 50 : 150);
+    const seedParam = options.seed ? ` --seed ${options.seed}` : '';
+    const negatives = '--no text, subtitles, watermark, logo, UI, caption, signature, frame border';
+    
+    // Check if prompt already has parameters
+    if (basePrompt.includes('--')) {
+      return basePrompt;
+    }
+    
+    return `${basePrompt} ${negatives} --ar ${ar} --s ${stylize}${seedParam} --v 6`;
+  }
+  
+  // FALLBACK: Build prompt from scratch if no image_prompt
   const stylePrefix = options.visualStyle 
     ? options.visualStyle
     : (options.style === 'storyboard'
       ? 'clean storyboard frame, professional previs, clear silhouettes'
       : 'cinematic film still, 35mm photography');
   
-  // STORY CONTENT - the most important part
-  // Use visual field first (most descriptive), fall back to subject, then action
-  const storyContent = shot.visual || shot.subject || shot.action || 'dramatic scene moment';
+  const storyContent = shot.action || shot.subject || shot.visual || 'dramatic scene moment';
   
-  // Props - keep brief
-  const props = analysis?.producing_logistics?.key_props?.slice(0, 2).join(', ') || 
-                analysis?.story_analysis?.key_props || '';
-  
-  // Simple location context
-  const locationContext = `${location.toLowerCase()}, ${timeOfDay.toLowerCase()}`;
-  
-  // Build prompt: STYLE, then STORY, then minimal technical
   const promptParts = [
     stylePrefix,
     storyContent,
-    props ? `with ${props}` : '',
-    locationContext,
-    shotSize,
   ].filter(Boolean);
   
-  // Negative prompt
   const negatives = '--no text, subtitles, watermark, logo, UI, caption, signature, frame border';
-  
-  // Parameters - use 4:3 if visual style mentions it, otherwise default
   const defaultAR = options.visualStyle?.includes('4:3') ? '4:3' : '16:9';
   const ar = options.aspectRatio || defaultAR;
   const stylize = options.stylize || (options.style === 'storyboard' ? 50 : 150);
