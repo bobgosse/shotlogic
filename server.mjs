@@ -99,7 +99,15 @@ app.post("/api/projects/save-scene", async (req, res) => {
 
 // Update visual style
 app.post("/api/projects/update-style", async (req, res) => {
+
+app.post("/api/projects/update-characters", async (req, res) => {
+  await apiHandler(req, res, join(__dirname, "api/projects/update-characters.ts"));
+});
   await apiHandler(req, res, join(__dirname, "api/projects/update-style.ts"));
+
+app.post("/api/projects/update-characters", async (req, res) => {
+  await apiHandler(req, res, join(__dirname, "api/projects/update-characters.ts"));
+});
 });
 
 // Update scene analysis
