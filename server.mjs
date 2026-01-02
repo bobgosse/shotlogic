@@ -96,20 +96,15 @@ app.post("/api/projects/save-scene", async (req, res) => {
   await apiHandler(req, res, join(__dirname, "api/projects/save-scene.ts"));
 });
 
-
 // Update visual style
 app.post("/api/projects/update-style", async (req, res) => {
-
-app.post("/api/projects/update-characters", async (req, res) => {
-  await apiHandler(req, res, join(__dirname, "api/projects/update-characters.ts"));
-});
   await apiHandler(req, res, join(__dirname, "api/projects/update-style.ts"));
+});
 
+// Update characters
 app.post("/api/projects/update-characters", async (req, res) => {
   await apiHandler(req, res, join(__dirname, "api/projects/update-characters.ts"));
 });
-});
-
 // Update scene analysis
 app.post("/api/projects/update-scene-analysis", async (req, res) => {
   await apiHandler(req, res, join(__dirname, "api/projects/update-scene-analysis.ts"));
