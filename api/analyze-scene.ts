@@ -25,6 +25,7 @@ interface AnalyzeSceneRequest {
   sceneNumber: number
   totalScenes: number
   visualStyle?: string
+  characters?: Array<{ name: string; physical: string }>
 }
 
 export default async function handler(
@@ -62,7 +63,7 @@ export default async function handler(
     }
 
     const requestBody = req.body as AnalyzeSceneRequest
-    const { sceneText, sceneNumber, totalScenes, visualStyle } = requestBody
+    const { sceneText, sceneNumber, totalScenes, visualStyle, characters: projectCharacters } = requestBody
     
     console.log(`📊 [${invocationId}] Scene: ${sceneNumber}/${totalScenes}`)
     console.log(`📊 [${invocationId}] Text length: ${sceneText?.length || 0} chars`)
@@ -98,6 +99,15 @@ export default async function handler(
     const dialogueExchanges = dialogueMatches.length
     const sceneLength = sceneText.length
 
+
+    // Build character definitions for prompt
+    let characterDefinitions = "";
+    if (projectCharacters && projectCharacters.length > 0) {
+      characterDefinitions = projectCharacters
+        .filter((c: any) => c.name && c.physical)
+        .map((c: any) => `- ${c.name}: ${c.physical}`)
+        .join("\n");
+    }
     console.log(`📊 [${invocationId}] Characters: ${characters.join(', ')}`)
 
     const userPrompt = `You are a professional 1st AD and script supervisor creating a shot list for Scene ${sceneNumber} of ${totalScenes}.
@@ -109,6 +119,11 @@ ${sceneText}
 <characters_in_scene>
 ${characters.join(', ')}
 </characters_in_scene>
+${characterDefinitions ? `<character_physical_descriptions>
+USE THESE EXACT PHYSICAL DESCRIPTIONS IN ALL IMAGE_PROMPTS:
+${characterDefinitions}
+(Wardrobe should be inferred from scene context - swimming=swimsuit, formal=period suit, bedroom=nightgown, etc.)
+</character_physical_descriptions>` : ""}
 <instructions>
 DETERMINE SHOT COUNT BASED ON SCENE COMPLEXITY:
 - A quiet scene with one character doing one thing might need only 3-5 shots

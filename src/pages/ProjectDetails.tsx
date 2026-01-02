@@ -270,7 +270,8 @@ const ProjectDetails = () => {
             sceneText: scene.content,
             sceneNumber: scene.scene_number,
             totalScenes: scenes.length,
-            visualStyle: project?.visual_style || null
+            visualStyle: project?.visual_style || null,
+            characters: project?.characters || []
           })
         });
         if (!analyzeResponse.ok) throw new Error('Analysis failed');
@@ -335,7 +336,8 @@ const ProjectDetails = () => {
           sceneText: sceneContent,
           sceneNumber: sceneNumber,
           totalScenes: project?.total_scenes || 1,
-          visualStyle: project?.visual_style || null
+          visualStyle: project?.visual_style || null,
+            characters: project?.characters || []
         })
       });
       

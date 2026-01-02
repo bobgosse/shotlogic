@@ -183,6 +183,7 @@ export default async function handler(
         current_scene: transformedScenes.length,
         status: 'COMPLETED',
         visual_style: project.visual_style || null,
+        characters: project.characters || [],
         createdAt: project.createdAt,
         updatedAt: project.updatedAt
       },
