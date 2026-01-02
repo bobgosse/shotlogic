@@ -14,7 +14,7 @@ import { SceneNavigator } from "@/components/SceneNavigator";
 import { MobileSceneView } from "@/components/MobileSceneView";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, ArrowLeft, Film, Camera, Printer, Download, RefreshCw, FileText, Edit, Save, Menu, Sparkles, ImageIcon, Palette, X, Check, ChevronLeft, ChevronRight } from "lucide-react";
+import { Trash2, ArrowLeft, Film, Camera, Printer, Download, RefreshCw, FileText, Edit, Save, Menu, Sparkles, ImageIcon, Palette, X, Check, ChevronLeft, ChevronRight, Users } from "lucide-react";
 import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { exportShotListPDF, exportShotListCSV, exportStoryboardPDF } from "@/utils/shotListExporter";
@@ -42,6 +42,7 @@ interface Project {
   current_scene: number;
   status: string;
   visual_style?: string | null;
+  characters?: Array<{ name: string; physical: string }>;
 }
 
 interface ShotListItem {
@@ -108,6 +109,8 @@ const ProjectDetails = () => {
   const [forceMobileView, setForceMobileView] = useState(false);
   const [forceDesktopView, setForceDesktopView] = useState(false);
   const [editingVisualStyle, setEditingVisualStyle] = useState(false);
+  const [editingCharacters, setEditingCharacters] = useState(false);
+  const [tempCharacters, setTempCharacters] = useState<Array<{ name: string; physical: string }>>([]);
   const [tempVisualStyle, setTempVisualStyle] = useState("");
   const isMobile = useMediaQuery("(max-width: 768px)");
   const isTablet = useMediaQuery("(max-width: 1024px)");
@@ -235,6 +238,46 @@ const ProjectDetails = () => {
       });
     } catch (error: any) {
       console.error('Error updating visual style:', error);
+      toast({
+        title: "Update failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSaveCharacters = async () => {
+    if (!project) {
+      setEditingCharacters(false);
+      return;
+    }
+    try {
+      const response = await fetch("/api/projects/update-characters", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId: id,
+          characters: tempCharacters.filter(c => c.name.trim())
+        })
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to update");
+      }
+      queryClient.setQueryData(["project", id], (oldData: any) => ({
+        ...oldData,
+        project: { ...oldData.project, characters: tempCharacters.filter(c => c.name.trim()) }
+      }));
+      setEditingCharacters(false);
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["project", id] });
+      }, 100);
+      toast({
+        title: "Characters updated",
+        description: "These descriptions will be used in all scene analyses",
+      });
+    } catch (error: any) {
+      console.error("Error updating characters:", error);
       toast({
         title: "Update failed",
         description: error.message,
@@ -705,6 +748,80 @@ const ProjectDetails = () => {
                       </div>
                       <div className="text-sm text-foreground/80 group-hover:text-foreground transition-colors">
                         {project?.visual_style || "Click to add visual style..."}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {/* Characters */}
+                <div className="mt-4">
+                  {editingCharacters ? (
+                    <div className="space-y-3 max-w-xl">
+                      <div className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                        <Users className="w-3 h-3" />
+                        Character Descriptions
+                      </div>
+                      {tempCharacters.map((char, idx) => (
+                        <div key={idx} className="flex gap-2 items-start">
+                          <Input
+                            value={char.name}
+                            onChange={(e) => {
+                              const updated = [...tempCharacters];
+                              updated[idx].name = e.target.value.toUpperCase();
+                              setTempCharacters(updated);
+                            }}
+                            placeholder="NAME"
+                            className="w-28 text-sm font-mono"
+                          />
+                          <Input
+                            value={char.physical}
+                            onChange={(e) => {
+                              const updated = [...tempCharacters];
+                              updated[idx].physical = e.target.value;
+                              setTempCharacters(updated);
+                            }}
+                            placeholder="physical description (age, build, hair, distinguishing features)"
+                            className="flex-1 text-sm"
+                          />
+                          <Button size="sm" variant="ghost" onClick={() => {
+                            setTempCharacters(tempCharacters.filter((_, i) => i !== idx));
+                          }}>
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" onClick={() => {
+                          setTempCharacters([...tempCharacters, { name: "", physical: "" }]);
+                        }}>
+                          + Add Character
+                        </Button>
+                        <Button size="sm" onClick={handleSaveCharacters}>
+                          <Check className="w-4 h-4 mr-1" /> Save
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => {
+                          setEditingCharacters(false);
+                          setTempCharacters(project?.characters || []);
+                        }}>
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      onClick={() => {
+                        setEditingCharacters(true);
+                        setTempCharacters(project?.characters || []);
+                      }}
+                      className="cursor-pointer group max-w-xl"
+                    >
+                      <div className="text-xs text-muted-foreground mb-0.5 flex items-center gap-1">
+                        <Users className="w-3 h-3" />
+                        Characters
+                      </div>
+                      <div className="text-sm text-foreground/80 group-hover:text-foreground transition-colors">
+                        {project?.characters && project.characters.length > 0
+                          ? project.characters.map(c => c.name).join(", ")
+                          : "Click to add character descriptions..."}
                       </div>
                     </div>
                   )}
