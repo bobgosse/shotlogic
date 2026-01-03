@@ -445,6 +445,26 @@ const ProjectDetails = () => {
     image_prompt: shot.image_prompt || shot.aiImagePrompt || ''
   });
 
+  // Handle editing a shot in the current scene
+  const handleShotEdit = (shotIndex: number, field: keyof ShotListItem, value: string) => {
+    if (!selectedScene || !selectedAnalysis) return;
+    const currentEdits = editedScenes[selectedScene.id] || { ...selectedAnalysis };
+    const updatedShotList = [...(currentEdits.shot_list || [])];
+    if (updatedShotList[shotIndex] && typeof updatedShotList[shotIndex] === "object") {
+      updatedShotList[shotIndex] = { ...updatedShotList[shotIndex] as ShotListItem, [field]: value };
+    }
+    setEditedScenes({ ...editedScenes, [selectedScene.id]: { ...currentEdits, shot_list: updatedShotList } });
+  };
+
+  // Get current shot data (edited or original)
+  const getCurrentShot = (shotIndex: number): ShotListItem | null => {
+    if (!selectedScene || !selectedAnalysis?.shot_list) return null;
+    const edits = editedScenes[selectedScene.id];
+    const shotList = edits?.shot_list || selectedAnalysis.shot_list;
+    const shot = shotList[shotIndex];
+    return isShotListItem(shot) ? shot : null;
+  };
+
   const handleSaveEdits = async () => {
     if (!id) return;
     setIsSaving(true);
@@ -1213,7 +1233,7 @@ const ProjectDetails = () => {
                     ) : (
                       <>
                         <div className="flex items-center justify-between">
-                          <p className="text-sm text-muted-foreground">{selectedAnalysis.shot_list.length} shots</p>
+                          <p className="text-sm text-muted-foreground">{selectedAnalysis.shot_list.length} shots {isEditMode && <span className="text-primary">(Editing)</span>}</p>
                           <Button
                             variant="outline"
                             size="sm"
@@ -1224,7 +1244,7 @@ const ProjectDetails = () => {
                           </Button>
                         </div>
                         <div className="space-y-3">
-                          {selectedAnalysis.shot_list.map((shot, idx) => {
+                          {(editedScenes[selectedScene.id]?.shot_list || selectedAnalysis.shot_list).map((shot, idx) => {
                             if (isShotListItem(shot)) {
                               return (
                                 <div key={idx} className="flex gap-4 p-4 bg-muted/30 rounded-lg border border-border">
@@ -1232,29 +1252,68 @@ const ProjectDetails = () => {
                                     {idx + 1}
                                   </div>
                                   <div className="flex-1 space-y-2">
-                                    <div className="flex items-center justify-between gap-2">
-                                      <span className="text-sm font-bold text-primary uppercase tracking-wide">
-                                        {getShotType(shot)}
-                                      </span>
-                                      <div className="flex gap-1">
-                                        <Button
-                                          size="sm"
-                                          variant="ghost"
-                                          className="h-7 px-2 text-xs"
-                                          onClick={() => {
-                                            const prompts = generatePromptPair(normalizeShot(shot), selectedScene, selectedAnalysis, undefined, project?.visual_style);
-                                            navigator.clipboard.writeText(prompts.previs);
-                                            toast({ title: "Previs Prompt Copied!" });
-                                          }}
-                                        >
-                                          <ImageIcon className="h-3 w-3 mr-1" />
-                                          Copy
-                                        </Button>
-                                      </div>
-                                    </div>
-                                    <p className="text-sm text-foreground leading-relaxed">{getShotVisual(shot)}</p>
-                                    {getShotRationale(shot) && (
-                                      <p className="text-xs text-muted-foreground italic">{getShotRationale(shot)}</p>
+                                    {isEditMode ? (
+                                      <>
+                                        <div className="flex items-center gap-2">
+                                          <label className="text-xs text-muted-foreground w-20">Shot Type:</label>
+                                          <Input
+                                            value={getCurrentShot(idx)?.shot_type || getShotType(shot)}
+                                            onChange={(e) => handleShotEdit(idx, 'shot_type', e.target.value)}
+                                            className="h-8 text-sm font-bold uppercase"
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="text-xs text-muted-foreground">Visual:</label>
+                                          <Textarea
+                                            value={getCurrentShot(idx)?.visual || getShotVisual(shot)}
+                                            onChange={(e) => handleShotEdit(idx, 'visual', e.target.value)}
+                                            className="mt-1 text-sm min-h-[60px]"
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="text-xs text-muted-foreground">Rationale:</label>
+                                          <Textarea
+                                            value={getCurrentShot(idx)?.rationale || getShotRationale(shot)}
+                                            onChange={(e) => handleShotEdit(idx, 'rationale', e.target.value)}
+                                            className="mt-1 text-sm min-h-[40px]"
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="text-xs text-muted-foreground">Image Prompt:</label>
+                                          <Textarea
+                                            value={getCurrentShot(idx)?.image_prompt || shot.image_prompt || ''}
+                                            onChange={(e) => handleShotEdit(idx, 'image_prompt', e.target.value)}
+                                            className="mt-1 text-sm font-mono min-h-[60px]"
+                                          />
+                                        </div>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <div className="flex items-center justify-between gap-2">
+                                          <span className="text-sm font-bold text-primary uppercase tracking-wide">
+                                            {getShotType(shot)}
+                                          </span>
+                                          <div className="flex gap-1">
+                                            <Button
+                                              size="sm"
+                                              variant="ghost"
+                                              className="h-7 px-2 text-xs"
+                                              onClick={() => {
+                                                const prompts = generatePromptPair(normalizeShot(shot), selectedScene, selectedAnalysis, undefined, project?.visual_style);
+                                                navigator.clipboard.writeText(prompts.previs);
+                                                toast({ title: "Previs Prompt Copied!" });
+                                              }}
+                                            >
+                                              <ImageIcon className="h-3 w-3 mr-1" />
+                                              Copy
+                                            </Button>
+                                          </div>
+                                        </div>
+                                        <p className="text-sm text-foreground leading-relaxed">{getShotVisual(shot)}</p>
+                                        {getShotRationale(shot) && (
+                                          <p className="text-xs text-muted-foreground italic">{getShotRationale(shot)}</p>
+                                        )}
+                                      </>
                                     )}
                                   </div>
                                 </div>
@@ -1296,7 +1355,7 @@ const ProjectDetails = () => {
                         <p className="text-sm text-muted-foreground">
                           Click to copy prompts for Midjourney, DALL-E, or other AI image generators.
                         </p>
-                        {selectedAnalysis.shot_list.map((shot, idx) => {
+                        {(editedScenes[selectedScene.id]?.shot_list || selectedAnalysis.shot_list).map((shot, idx) => {
                           if (!isShotListItem(shot)) return null;
                           const prompts = generatePromptPair(normalizeShot(shot), selectedScene, selectedAnalysis, undefined, project?.visual_style);
                           return (
