@@ -213,6 +213,7 @@ Return ONLY a JSON object with this structure:
     "scheduling": {"constraints": "", "notes": ""}
   },
   "directing_vision": {
+    "scene_setting": "CRITICAL: Describe the physical environment in detail - room/location type, key furniture/objects, lighting source, color palette, atmosphere. This MUST be included in every image_prompt for visual continuity.",
     "visual_metaphor": "How camera expresses meaning",
     "editorial_intent": "Pacing strategy",
     "shot_motivation": "Why this many shots",
@@ -257,7 +258,7 @@ Return ONLY a JSON object with this structure:
       "duration": "Brief/Standard/Extended",
       "visual": "Composition showing CHARACTER_NAME - describe their position/framing",
       "rationale": "Why CHARACTER_NAME gets this shot size now - apply Hitchcock principle",
-      "image_prompt": "shot type, CHARACTER_NAME, specific action, setting, lighting"
+      "image_prompt": "MUST START WITH scene_setting description, then shot type, CHARACTER_NAME with physical description, specific action, lighting mood - ensure visual continuity across all shots"
     }
   ],
   "shot_list_justification": "List each character and which shot numbers feature them by NAME"
