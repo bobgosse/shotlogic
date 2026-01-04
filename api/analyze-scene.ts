@@ -341,7 +341,7 @@ Return ONLY a JSON object with this structure:
       console.log(`🎨 [${invocationId}] Prepending visual style to ${shotList.length} image prompts`)
       shotList.forEach((shot: any) => {
         if (shot.image_prompt) {
-          shot.image_prompt = visualStyle + ", " + shot.image_prompt
+          const cleanStyle = visualStyle.replace(/--[a-z]+\s*[^\s,]*/gi, "").replace(/\s+/g, " ").trim(); shot.image_prompt = cleanStyle + ", " + shot.image_prompt
         }
       })
     }
