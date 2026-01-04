@@ -984,6 +984,16 @@ const ProjectDetails = () => {
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* The Core - Most Important */}
+                        <div className="space-y-2 md:col-span-2">
+                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🎯 The Core</h3>
+                          <div className="bg-primary/10 border border-primary/30 rounded-lg p-4">
+                            <p className="text-base text-foreground font-medium italic">
+                              "{selectedAnalysis.story_analysis?.the_core || selectedAnalysis.story_analysis?.stakes || 'What MUST this scene accomplish?'}"
+                            </p>
+                          </div>
+                        </div>
+
                         {/* Synopsis */}
                         <div className="space-y-2 md:col-span-2">
                           <h3 className="text-sm font-semibold text-primary flex items-center gap-2">📝 Synopsis</h3>
@@ -992,30 +1002,61 @@ const ProjectDetails = () => {
                           </p>
                         </div>
 
-                        {/* Conflict */}
+                        {/* The Turn */}
                         <div className="space-y-2">
-                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">⚔️ Conflict</h3>
-                          <p className="text-sm text-foreground bg-muted/30 rounded-lg p-3">
-                            {selectedAnalysis.story_analysis?.ownership || 'No conflict analysis'}
-                          </p>
-                        </div>
-
-                        {/* Scene Turn */}
-                        <div className="space-y-2">
-                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">⚡ Scene Turn</h3>
+                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">⚡ The Turn</h3>
                           <div className="bg-accent/20 border border-accent/30 rounded-lg p-3">
                             <p className="text-sm text-foreground">
-                              {selectedAnalysis.story_analysis?.breaking_point || 'No scene turn identified'}
+                              {selectedAnalysis.story_analysis?.the_turn || selectedAnalysis.story_analysis?.breaking_point || 'The pivot moment'}
                             </p>
                           </div>
                         </div>
 
+                        {/* Ownership */}
+                        <div className="space-y-2">
+                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">👤 Ownership</h3>
+                          <p className="text-sm text-foreground bg-muted/30 rounded-lg p-3">
+                            {selectedAnalysis.story_analysis?.ownership || 'Who drives this scene?'}
+                          </p>
+                        </div>
+
+                        {/* The Times */}
+                        <div className="space-y-2">
+                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🕰️ The Times</h3>
+                          <p className="text-sm text-foreground bg-muted/30 rounded-lg p-3">
+                            {selectedAnalysis.story_analysis?.the_times || 'Historical/cultural context'}
+                          </p>
+                        </div>
+
+                        {/* Imagery & Tone */}
+                        <div className="space-y-2">
+                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🎨 Imagery & Tone</h3>
+                          <p className="text-sm text-foreground bg-muted/30 rounded-lg p-3">
+                            {selectedAnalysis.story_analysis?.imagery_and_tone || selectedAnalysis.story_analysis?.tone || 'Visual language'}
+                          </p>
+                        </div>
+
                         {/* Stakes */}
                         <div className="space-y-2 md:col-span-2">
-                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🎯 Stakes</h3>
+                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">⚔️ Stakes</h3>
                           <p className="text-sm text-foreground leading-relaxed bg-muted/30 rounded-lg p-3">
-                            {selectedAnalysis.story_analysis?.stakes || 'No stakes identified'}
+                            {selectedAnalysis.story_analysis?.stakes || 'What is at risk?'}
                           </p>
+                        </div>
+
+                        {/* Pitfalls */}
+                        <div className="space-y-2 md:col-span-2">
+                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">⚠️ Pitfalls</h3>
+                          <div className="flex flex-wrap gap-2">
+                            {(selectedAnalysis.story_analysis?.pitfalls || []).map((pitfall: string, idx: number) => (
+                              <span key={idx} className="px-3 py-1 bg-red-500/10 border border-red-500/30 rounded-full text-xs text-red-400">
+                                {pitfall}
+                              </span>
+                            ))}
+                            {(!selectedAnalysis.story_analysis?.pitfalls || selectedAnalysis.story_analysis.pitfalls.length === 0) && (
+                              <p className="text-sm text-muted-foreground italic">No pitfalls identified</p>
+                            )}
+                          </div>
                         </div>
                       </div>
                     )}

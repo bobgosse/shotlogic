@@ -179,12 +179,15 @@ Return ONLY a JSON object with this structure:
 
 {
   "story_analysis": {
-    "synopsis": "2-3 sentence summary",
-    "stakes": "What's at risk",
-    "ownership": "Who drives the scene",
-    "breaking_point": "The exact line/moment that shifts power",
-    "key_props": "Important props",
-    "tone": "Specific emotional quality"
+    "synopsis": "2-3 sentence summary of what happens",
+    "the_core": "ONE sentence - what MUST this scene accomplish or the film fails. The distilled emotional/dramatic/thematic essence.",
+    "the_turn": "The exact moment the scene pivots - the line or action that shifts power, reveals truth, or changes everything",
+    "the_times": "Historical/cultural context that matters - laws, customs, period details that inform the scene",
+    "imagery_and_tone": "How are the images serving the story? What visual language expresses the scene's meaning?",
+    "pitfalls": ["Creative risks to avoid - cliché, parody, empty spectacle, tonal mistakes"],
+    "stakes": "What's at risk - for the characters and the story",
+    "ownership": "Who drives the scene and why",
+    "key_props": "Important props that carry meaning"
   },
   "producing_logistics": {
     "resource_impact": "Low/Medium/High",
