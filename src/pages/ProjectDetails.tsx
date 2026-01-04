@@ -1406,45 +1406,24 @@ const ProjectDetails = () => {
                                   Shot {idx + 1}: {getShotType(shot)}
                                 </span>
                               </div>
-                              <div className="space-y-2">
-                                <div>
-                                  <div className="flex items-center justify-between mb-1">
-                                    <span className="text-xs text-muted-foreground">Previs Prompt (Cinematic)</span>
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      className="h-6 px-2 text-xs"
-                                      onClick={() => {
-                                        navigator.clipboard.writeText(prompts.previs);
-                                        toast({ title: "Previs prompt copied!" });
-                                      }}
-                                    >
-                                      Copy
-                                    </Button>
-                                  </div>
-                                  <p className="text-xs text-foreground bg-background rounded p-2 font-mono">
-                                    {prompts.previs}
-                                  </p>
+                              <div>
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="text-xs text-muted-foreground">Image Prompt (works with Midjourney, Grok, Runway, DALL-E, etc.)</span>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-6 px-2 text-xs"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(prompts.previs);
+                                      toast({ title: "Prompt copied!" });
+                                    }}
+                                  >
+                                    Copy
+                                  </Button>
                                 </div>
-                                <div>
-                                  <div className="flex items-center justify-between mb-1">
-                                    <span className="text-xs text-muted-foreground">Storyboard Prompt (Clean)</span>
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      className="h-6 px-2 text-xs"
-                                      onClick={() => {
-                                        navigator.clipboard.writeText(prompts.storyboard);
-                                        toast({ title: "Storyboard prompt copied!" });
-                                      }}
-                                    >
-                                      Copy
-                                    </Button>
-                                  </div>
-                                  <p className="text-xs text-foreground bg-background rounded p-2 font-mono">
-                                    {prompts.storyboard}
-                                  </p>
-                                </div>
+                                <p className="text-sm text-foreground bg-background rounded p-3 font-mono leading-relaxed">
+                                  {prompts.previs}
+                                </p>
                               </div>
                             </div>
                           );

@@ -1,5 +1,5 @@
 // ShotLogic Prompt Builder
-// SIMPLIFIED: Uses Claude's image_prompt directly when available
+// Platform-agnostic image prompts
 
 interface ShotData {
   shot_number?: number;
@@ -34,64 +34,27 @@ interface AnalysisData {
   };
 }
 
-// Build the full Midjourney prompt
-export const buildMidjourneyPrompt = (
+// Build a clean, platform-agnostic image prompt
+export const buildImagePrompt = (
   shot: ShotData,
   scene: SceneData,
   analysis: AnalysisData | null,
-  options: {
-    style: 'storyboard' | 'previs';
-    aspectRatio?: string;
-    stylize?: number;
-    seed?: number;
-    visualStyle?: string;
-  } = { style: 'previs' }
+  visualStyle?: string
 ): string => {
   
-  // IF CLAUDE GENERATED AN IMAGE_PROMPT, USE IT DIRECTLY
-  // It already has the visual style prepended from the backend
+  // Use Claude's image_prompt directly if available
   if (shot.image_prompt && shot.image_prompt.length > 20) {
-    const basePrompt = shot.image_prompt;
-    
-    // Add Midjourney parameters
-    const defaultAR = options.visualStyle?.includes('4:3') ? '4:3' : '16:9';
-    const ar = options.aspectRatio || defaultAR;
-    const stylize = options.stylize || (options.style === 'storyboard' ? 50 : 150);
-    const seedParam = options.seed ? ` --seed ${options.seed}` : '';
-    const negatives = '--no text, subtitles, watermark, logo, UI, caption, signature, frame border';
-    
-    // Check if prompt already has parameters
-    if (basePrompt.includes('--')) {
-      return basePrompt;
-    }
-    
-    return `${basePrompt} ${negatives} --ar ${ar} --s ${stylize}${seedParam} --v 6`;
+    return shot.image_prompt;
   }
   
-  // FALLBACK: Build prompt from scratch if no image_prompt
-  const stylePrefix = options.visualStyle 
-    ? options.visualStyle
-    : (options.style === 'storyboard'
-      ? 'clean storyboard frame, professional previs, clear silhouettes'
-      : 'cinematic film still, 35mm photography');
+  // Fallback: Build from shot data
+  const stylePrefix = visualStyle || 'cinematic film still';
+  const content = shot.visual || shot.action || shot.subject || 'dramatic scene';
   
-  const storyContent = shot.action || shot.subject || shot.visual || 'dramatic scene moment';
-  
-  const promptParts = [
-    stylePrefix,
-    storyContent,
-  ].filter(Boolean);
-  
-  const negatives = '--no text, subtitles, watermark, logo, UI, caption, signature, frame border';
-  const defaultAR = options.visualStyle?.includes('4:3') ? '4:3' : '16:9';
-  const ar = options.aspectRatio || defaultAR;
-  const stylize = options.stylize || (options.style === 'storyboard' ? 50 : 150);
-  const seedParam = options.seed ? ` --seed ${options.seed}` : '';
-  
-  return `${promptParts.join(', ')} ${negatives} --ar ${ar} --s ${stylize}${seedParam} --v 6`;
+  return `${stylePrefix}, ${content}`;
 };
 
-// Generate both storyboard and previs prompts
+// For backwards compatibility - returns same prompt for both
 export const generatePromptPair = (
   shot: ShotData,
   scene: SceneData,
@@ -99,20 +62,29 @@ export const generatePromptPair = (
   sceneSeed?: number,
   visualStyle?: string
 ): { storyboard: string; previs: string } => {
-  const seed = sceneSeed || Math.floor(Math.random() * 999999999);
+  const prompt = buildImagePrompt(shot, scene, analysis, visualStyle);
   
   return {
-    storyboard: buildMidjourneyPrompt(shot, scene, analysis, { 
-      style: 'storyboard', 
-      stylize: 50,
-      seed,
-      visualStyle
-    }),
-    previs: buildMidjourneyPrompt(shot, scene, analysis, { 
-      style: 'previs', 
-      stylize: 150,
-      seed,
-      visualStyle
-    }),
+    storyboard: prompt,
+    previs: prompt,
   };
+};
+
+// Helper to add Midjourney-specific parameters if needed
+export const addMidjourneyParams = (
+  prompt: string,
+  options: {
+    aspectRatio?: string;
+    stylize?: number;
+    seed?: number;
+    version?: number;
+  } = {}
+): string => {
+  const ar = options.aspectRatio || '16:9';
+  const stylize = options.stylize || 150;
+  const version = options.version || 6;
+  const seedParam = options.seed ? ` --seed ${options.seed}` : '';
+  const negatives = '--no text, subtitles, watermark, logo, UI, caption, signature, frame border';
+  
+  return `${prompt} ${negatives} --ar ${ar} --s ${stylize}${seedParam} --v ${version}`;
 };
