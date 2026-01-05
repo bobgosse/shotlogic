@@ -258,7 +258,7 @@ Return ONLY a JSON object with this structure:
       "duration": "Brief/Standard/Extended",
       "visual": "Composition showing CHARACTER_NAME - describe their position/framing",
       "rationale": "Why CHARACTER_NAME gets this shot size now - apply Hitchcock principle",
-      "image_prompt": "MUST START WITH scene_setting description, then shot type, CHARACTER_NAME with physical description, specific action, lighting mood - ensure visual continuity across all shots"
+      "image_prompt": "CRITICAL FORMAT: [scene_setting], [shot type], [BLOCKING: describe each character SEPARATELY with specific position - LEFT/RIGHT/CENTER, FOREGROUND/BACKGROUND, facing direction, body position (standing/sitting/lying on stomach/etc)], [ACTION CONTEXT: what motivated this pose - hiding from someone? searching for something? reacting to what?], [CHARACTER 1: NAME (age, physical) + exact pose], [CHARACTER 2 if present: NAME (age, physical) + exact pose + spatial relationship to Character 1 (e.g. 3 feet apart, opposite sides, etc)], [lighting mood]. Be EXPLICIT about spatial separation between characters to avoid ambiguous compositions."
     }
   ],
   "shot_list_justification": "List each character and which shot numbers feature them by NAME"
