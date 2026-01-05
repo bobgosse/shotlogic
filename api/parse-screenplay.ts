@@ -23,22 +23,50 @@ async function parsePDF(buffer: Buffer): Promise<string> {
     
     let fullText = ''
     
-    // Extract text from each page
+    // Extract text from each page, preserving line breaks
     for (let pageNum = 1; pageNum <= numPages; pageNum++) {
       const page = await pdfDocument.getPage(pageNum)
       const textContent = await page.getTextContent()
-      const pageText = textContent.items
-        .map((item: any) => item.str)
-        .join(' ')
       
-      fullText += pageText + '\n'
+      // Sort items by Y position (top to bottom) then X position (left to right)
+      const items = textContent.items.sort((a: any, b: any) => {
+        const yDiff = b.transform[5] - a.transform[5]  // Y is inverted in PDF
+        if (Math.abs(yDiff) > 5) return yDiff  // Different line
+        return a.transform[4] - b.transform[4]  // Same line, sort by X
+      })
+      
+      let lastY: number | null = null
+      let pageText = ''
+      
+      for (const item of items as any[]) {
+        const currentY = item.transform[5]
+        const text = item.str
+        
+        if (lastY !== null && Math.abs(currentY - lastY) > 5) {
+          // New line detected
+          pageText += '\n'
+        } else if (lastY !== null && pageText.length > 0 && !pageText.endsWith(' ') && !pageText.endsWith('\n')) {
+          // Same line, add space between items
+          pageText += ' '
+        }
+        
+        pageText += text
+        lastY = currentY
+      }
+      
+      fullText += pageText + '\n\n'
     }
     
     if (!fullText || fullText.trim().length < 50) {
       throw new Error('PDF contains no extractable text')
     }
     
-    return fullText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim()
+    // Clean up and normalize
+    return fullText
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n')
+      .replace(/\n{4,}/g, '\n\n\n')
+      .trim()
     
   } catch (err) {
     console.error('PDF parsing error:', err)
