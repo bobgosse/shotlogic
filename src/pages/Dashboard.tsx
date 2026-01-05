@@ -270,18 +270,13 @@ const Dashboard = () => {
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             {/* Left: Welcome content */}
             <div className="space-y-6">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#E50914]/10 border border-[#E50914]/20 text-[#E50914] text-sm">
-                <Sparkles className="w-4 h-4" />
-                AI-Powered Scene Analysis
-              </div>
-              
               <h1 className="text-4xl lg:text-5xl font-bold text-foreground leading-tight">
-                Break down your script.<br />
-                <span className="text-[#D4A843]">Build your vision.</span>
+                Preserve your intent<br />
+                <span className="text-[#D4A843]">from page to screen.</span>
               </h1>
               
               <p className="text-lg text-muted-foreground max-w-md">
-                Story analysis, production & directing notes, shot lists, and storyboard exports—scene by scene, narrative-driven, with AI image prompts. Ready in minutes.
+                The bridge between your script and your shoot. Story logic, coverage strategy, and editorial intent—scene by scene—so meaning survives production.
               </p>
 
               {mostRecentProject ? (
