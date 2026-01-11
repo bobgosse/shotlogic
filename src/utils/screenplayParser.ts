@@ -103,13 +103,14 @@ function cleanSpacedText(text: string): string {
 
 function sanitizeScreenplayText(text: string): string {
   // Merge split headers (e.g., "INT. ROOM\nDAY" -> "INT. ROOM - DAY")
-  text = text.replace(/(INT\.|EXT\.|INT\/EXT\.)\s*\n\s*(DAY|NIGHT|MORNING|EVENING|AFTERNOON|DUSK|DAWN|CONTINUOUS|LATER)/gi, '$1 $2');
-  
+  // Support standard time designations AND non-standard ones like "MOMENTS LATER", "SAME TIME", "SAME", etc.
+  text = text.replace(/(INT\.|EXT\.|INT\/EXT\.)\s*\n\s*(DAY|NIGHT|MORNING|EVENING|AFTERNOON|DUSK|DAWN|CONTINUOUS|LATER|MOMENTS LATER|SAME TIME|SAME|SHORTLY AFTER|A MOMENT LATER|SECONDS LATER|MINUTES LATER|HOURS LATER|INTERCUT)/gi, '$1 $2');
+
   // Preserve newlines but fix excessive spacing
   text = text.replace(/ +/g, ' '); // Multiple spaces to single space
   text = text.replace(/\n +/g, '\n'); // Remove leading spaces after newlines
   text = text.replace(/ +\n/g, '\n'); // Remove trailing spaces before newlines
-  
+
   return text.trim();
 }
 
@@ -262,23 +263,46 @@ export function parseScreenplay(text: string): Scene[] {
   let i = 0;
   const seenSceneNumbers = new Set<number>();
 
-  // Skip title page
+  // Skip title page - look for first valid scene header
+  // Only skip lines that are clearly NOT scene headers
+  console.log(`[Parser] Searching for first scene header in ${lines.length} lines`);
+  let previewLines = 0;
+
   while (i < lines.length) {
     const line = lines[i].trim();
 
-    if (line.toUpperCase().includes('SCRIPT TITLE') ||
-        line.toUpperCase().includes('WRITTEN BY') ||
-        line.toUpperCase().includes('BY:') ||
-        (!line.match(/^(\d+[\s\.\)])?(INT\.|EXT\.|INT\/EXT\.|[A-Z]+)/) && i < 20)) {
+    // Skip empty lines
+    if (!line) {
       i++;
       continue;
     }
 
-    if (line.match(/^(\d+[\s\.\)])?(INT\.|EXT\.|INT\/EXT\.)/i) || line.match(/^(\d+)[\s\.\)]\s*[A-Z]/)) {
+    // DEBUG: Show first 30 non-empty lines
+    if (previewLines < 30) {
+      console.log(`[Parser] Line ${i}: "${line.substring(0, 80)}${line.length > 80 ? '...' : ''}"`);
+      previewLines++;
+    }
+
+    // Check if this line is a valid scene header (same logic as main parser)
+    const isSceneHeader =
+      line.match(/^\s*(?:(\d+)\s+)?(INT\.|EXT\.|INT\/EXT\.|EXT\/INT\.|I\/E\.)(.*)$/i) ||
+      line.match(/^\s*(?:(\d+)\s+)?(INT|EXT|I\/E)\s*:\s*(.*)$/i) ||
+      line.match(/^\s*(?:(\d+)\s+)?(INT|EXT|I\/E)\s*,\s*(.*)$/i) ||
+      line.match(/^\s*(?:(\d+)\s+)?(INT|EXT|I\/E)\s+(.+)$/i) ||
+      line.match(/^\s*(?:(\d+)\s+)?(.+?)\s*[-–—]\s*(INT|EXT|I\/E)\s*(.*)$/i);
+
+    // If we found a scene header, stop skipping
+    if (isSceneHeader) {
+      console.log(`[Parser] ✓ Found first scene header at line ${i}: "${line}"`);
       break;
     }
 
+    // Otherwise, skip this line (it's part of title page/front matter)
     i++;
+  }
+
+  if (i >= lines.length) {
+    console.error('[Parser] ✗ Reached end of file without finding any scene headers');
   }
 
   // Parse scenes
@@ -289,10 +313,12 @@ export function parseScreenplay(text: string): Scene[] {
 
     // ENHANCED HEADER DETECTION: More forgiving pattern matching
     // Supports: "INT.", "INT:", "INT,", "INT LOCATION", "I/E", "LOCATION - INT"
+    // Also supports non-standard time designations: "MOMENTS LATER", "SAME TIME", etc.
     // Auto-increment fallback ensures we never skip scenes even if explicit numbers are missing
 
     // Try multiple patterns in order of specificity
-    let headerMatch = line.match(/^\s*(?:(\d+)\s+)?(INT\.|EXT\.|INT\/EXT\.|EXT\/INT\.|I\/E\.|LATER|EST\.)(.*)$/i);
+    // Accept INT/EXT with any text following (including non-standard time markers)
+    let headerMatch = line.match(/^\s*(?:(\d+)\s+)?(INT\.|EXT\.|INT\/EXT\.|EXT\/INT\.|I\/E\.)(.*)$/i);
 
     if (!headerMatch) {
       // Try with colon separator: "INT: LOCATION"

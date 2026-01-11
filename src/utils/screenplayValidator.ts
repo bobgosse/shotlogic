@@ -104,8 +104,15 @@ function validateFileSize(file: File): ValidationResult {
 function validateTextContent(text: string, fileName: string): ValidationResult {
   const warnings: string[] = [];
 
+  // DEBUG: Log what we received
+  console.log('[Validator] validateTextContent called');
+  console.log('[Validator] fileName:', fileName);
+  console.log('[Validator] text type:', typeof text);
+  console.log('[Validator] text length:', text?.length || 0);
+
   // Check minimum length
   if (text.length < MIN_CONTENT_LENGTH) {
+    console.log('[Validator] ✗ FAILED: Text too short');
     return {
       valid: false,
       error: `File content is too short (${text.length} characters).\n\nMinimum ${MIN_CONTENT_LENGTH} characters required. The file may be:\n• Empty\n• A scanned image (use OCR first)\n• Corrupted`
@@ -114,6 +121,10 @@ function validateTextContent(text: string, fileName: string): ValidationResult {
 
   // Estimate pages
   const estimatedPages = Math.ceil(text.length / 3000); // ~3000 chars per page
+
+  // DEBUG: Show first 1000 characters of extracted text
+  console.log('[Validator] First 1000 chars of extracted text:', text.substring(0, 1000));
+  console.log('[Validator] Text length:', text.length);
 
   // Check for scene headers using multiple patterns
   const sceneHeaderPatterns = [
@@ -127,11 +138,15 @@ function validateTextContent(text: string, fileName: string): ValidationResult {
 
   for (const pattern of sceneHeaderPatterns) {
     const matches = text.match(new RegExp(pattern, 'gim'));
+    console.log(`[Validator] Pattern ${pattern} found ${matches?.length || 0} matches`);
     if (matches && matches.length > 0) {
+      console.log('[Validator] Sample matches:', matches.slice(0, 3));
       hasSceneHeaders = true;
       sceneHeaderCount = Math.max(sceneHeaderCount, matches.length);
     }
   }
+
+  console.log(`[Validator] hasSceneHeaders: ${hasSceneHeaders}, count: ${sceneHeaderCount}`);
 
   if (!hasSceneHeaders) {
     return {

@@ -143,6 +143,8 @@ async function parsePDF(buffer: Buffer): Promise<string> {
     console.log(`[PDF] Detected spaced-out text (${(spacePercentage * 100).toFixed(1)}% spaces), normalizing...`)
     // Collapse single spaces between letters/numbers: "I N T ." -> "INT."
     normalized = normalized.replace(/([A-Za-z0-9])\s(?=[A-Za-z0-9])/g, '$1')
+    // Remove spaces before periods: "INT ." -> "INT."
+    normalized = normalized.replace(/\s+\./g, '.')
     // Clean up remaining double spaces
     normalized = normalized.replace(/  +/g, ' ')
   }

@@ -192,18 +192,13 @@ export default function Index() {
   function processExtractedText(text: string): ParsedScene[] {
     console.log("[DEBUG] Text length:", text?.length);
     console.log("[DEBUG] First 1000 chars:", text?.substring(0, 1000));
-    
-    if (text && text.match(/[A-Z] [A-Z] [A-Z]/)) {
-      console.log("[DEBUG] Detected spaced-out text, fixing...");
-      text = text.split(/  +/).map(segment => {
-        return segment.replace(/ /g, '');
-      }).join(' ');
-      console.log("[DEBUG] After spacing fix, first 500 chars:", text.substring(0, 500));
-    }
-    
+
+    // Server-side PDF parser already handles spaced-out text correctly
+    // No client-side spacing fix needed
+
     text = text.replace(/  +/g, ' ');
     text = text.replace(/\s+(INT\.|EXT\.|I\/E\.|I\.E\.)\s+/gi, '\n$1 ');
-    
+
     console.log("[DEBUG] After newline injection, first 500 chars:", text.substring(0, 500));
     
     const firstSceneMatch = text.match(/(?:^|\n)\s*\d*\s*(INT\.|EXT\.|I\/E|I\.E\.)\s+/i);
@@ -308,11 +303,22 @@ export default function Index() {
 
       const { screenplayText } = parseResult;
 
+      // DEBUG: Log what we got from the API
+      console.log('[Validation] API response received');
+      console.log('[Validation] screenplayText type:', typeof screenplayText);
+      console.log('[Validation] screenplayText length:', screenplayText?.length || 0);
+      console.log('[Validation] screenplayText preview:', screenplayText?.substring(0, 200) || 'undefined');
+
       // STEP 2: Content validation (screenplay format, scene headers)
       console.log('[Validation] Validating screenplay content...');
+      console.log('[Validation] About to check for scanned PDF...');
+      console.log('[Validation] fileType:', fileType);
+      console.log('[Validation] file.size:', file.size);
+      console.log('[Validation] screenplayText exists:', !!screenplayText);
 
       // Check for scanned PDF
       if (fileType === 'pdf' && checkForScannedPDF(screenplayText, file.size)) {
+        console.log('[Validation] ✗ Detected as scanned PDF');
         setError(
           'This PDF appears to be a scanned image.\n\n' +
           'The file contains very little extractable text, which usually means it\'s a scanned document rather than a text-based PDF.\n\n' +
