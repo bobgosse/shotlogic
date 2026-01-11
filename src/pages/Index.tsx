@@ -3,6 +3,14 @@ import { useState, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Upload, Loader2, Film, CheckCircle, XCircle } from 'lucide-react'
 import { useUser } from '@clerk/clerk-react'
+import { ScreenplayUploadProgress, UploadStep } from '@/components/ScreenplayUploadProgress'
+import { api, ApiError } from '@/utils/apiClient'
+import {
+  validateFileBeforeUpload,
+  validateScreenplayContent,
+  formatValidationError,
+  checkForScannedPDF
+} from '@/utils/screenplayValidator'
 
 interface ParsedScene {
   number: number;
@@ -24,8 +32,8 @@ export default function Index() {
   const [fileInfo, setFileInfo] = useState<{ name: string, type: string } | null>(null);
   const [projectName, setProjectName] = useState('Untitled Project');
   const [error, setError] = useState<string | null>(null);
+  const [uploadStep, setUploadStep] = useState<UploadStep | null>(null);
   const [isParsing, setIsParsing] = useState(false);
-  const [parsingMessage, setParsingMessage] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [scenes, setScenes] = useState<AnalyzedScene[]>([]);
   const [currentSceneIndex, setCurrentSceneIndex] = useState(0);
@@ -47,38 +55,40 @@ export default function Index() {
   }, [isAnalyzing]);
   const analyzeScene = async (scene: AnalyzedScene, totalScenes: number): Promise<AnalyzedScene> => {
     try {
-      const response = await fetch('/api/analyze-scene', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sceneText: scene.text,
-          sceneNumber: scene.number,
-          totalScenes: totalScenes
-        })
+      const result = await api.post('/api/analyze-scene', {
+        sceneText: scene.text,
+        sceneNumber: scene.number,
+        totalScenes: totalScenes
+      }, {
+        context: `Analyzing scene ${scene.number}`,
+        timeoutMs: 90000, // 90 seconds for AI analysis
+        maxRetries: 2
       });
-      if (!response.ok) throw new Error('Analysis failed');
-      const result = await response.json();
+
       return { ...scene, analysis: result.analysis, status: 'complete', error: null };
     } catch (err) {
-      return { ...scene, analysis: null, status: 'error', error: 'Analysis failed' };
+      const errorMsg = (err as ApiError).userMessage || 'Analysis failed';
+      console.error(`[Scene ${scene.number}] Analysis error:`, err);
+      return { ...scene, analysis: null, status: 'error', error: errorMsg };
     }
   };
 
   const saveSceneToDb = async (projectId: string, scene: AnalyzedScene) => {
     try {
       const sceneKey = `scene-${scene.number}`;
-      await fetch('/api/projects/save-scene', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectId: projectId,
-          sceneUpdates: {
-            [sceneKey]: scene.analysis
-          }
-        })
+      await api.post('/api/projects/save-scene', {
+        projectId: projectId,
+        sceneUpdates: {
+          [sceneKey]: scene.analysis
+        }
+      }, {
+        context: `Saving scene ${scene.number}`,
+        timeoutMs: 30000,
+        maxRetries: 2
       });
     } catch (err) {
       console.error('[DEBUG] Failed to save scene:', scene.number, err);
+      // Don't throw - log and continue with other scenes
     }
   };
 
@@ -92,76 +102,91 @@ export default function Index() {
         error: null
       }));
 
-      const response = await fetch('/api/projects/save', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: name,
-          scenes: scenesForDb,
-          userId: user?.id,
-          createdAt: new Date().toISOString(),
-          status: 'processing'
-        })
+      const result = await api.post('/api/projects/save', {
+        name: name,
+        scenes: scenesForDb,
+        userId: user?.id,
+        createdAt: new Date().toISOString(),
+        status: 'processing'
+      }, {
+        context: 'Creating project',
+        timeoutMs: 30000,
+        maxRetries: 2
       });
 
-      if (!response.ok) throw new Error('Failed to create project');
-      const result = await response.json();
       console.log('[DEBUG] Project created with ID:', result.id);
       return result.id;
     } catch (err) {
       console.error('[DEBUG] Failed to create project:', err);
+      const errorMsg = (err as ApiError).userMessage || 'Failed to create project';
+      setError(errorMsg);
       return null;
     }
   };
 
   const analyzeAllScenes = async (parsedScenes: ParsedScene[], name: string) => {
     setIsAnalyzing(true);
+    setUploadStep('analyzing');
     setCurrentSceneIndex(0);
-    
+
     const initialScenes: AnalyzedScene[] = parsedScenes.map(s => ({
       number: s.number, text: s.text, analysis: null, status: 'pending', error: null
     }));
     setScenes(initialScenes);
-    
+
     const newProjectId = await createProjectRecord(name, parsedScenes);
     if (!newProjectId) {
       setError('Failed to create project. Please try again.');
       setIsAnalyzing(false);
+      setUploadStep(null);
       return;
     }
     setProjectId(newProjectId);
-    
+
     const analyzedScenes: AnalyzedScene[] = [...initialScenes];
     const BATCH_SIZE = 4;
-    
+
     for (let batchStart = 0; batchStart < parsedScenes.length; batchStart += BATCH_SIZE) {
       const batchEnd = Math.min(batchStart + BATCH_SIZE, parsedScenes.length);
       const batchIndices: number[] = [];
-      
+
       for (let i = batchStart; i < batchEnd; i++) {
         batchIndices.push(i);
         analyzedScenes[i] = { ...analyzedScenes[i], status: 'analyzing' };
       }
       setScenes([...analyzedScenes]);
-      setCurrentSceneIndex(batchStart);
-      
-      const batchPromises = batchIndices.map(i => 
+      setCurrentSceneIndex(batchStart + 1); // +1 for display (1-indexed)
+
+      const batchPromises = batchIndices.map(i =>
         analyzeScene(analyzedScenes[i], parsedScenes.length)
       );
-      
+
       const batchResults = await Promise.all(batchPromises);
-      
+
+      // Step 4: Generate breakdown (save results)
+      setUploadStep('generating');
+
       for (let j = 0; j < batchResults.length; j++) {
         const i = batchIndices[j];
         analyzedScenes[i] = batchResults[j];
         await saveSceneToDb(newProjectId, analyzedScenes[i]);
       }
-      
+
       setScenes([...analyzedScenes]);
+
+      // Switch back to analyzing for next batch
+      if (batchEnd < parsedScenes.length) {
+        setUploadStep('analyzing');
+      }
     }
-    
+
     setIsAnalyzing(false);
-    navigate('/project/' + newProjectId);
+    setUploadStep('complete');
+
+    // Navigate after a brief moment to show completion
+    setTimeout(() => {
+      navigate('/project/' + newProjectId);
+    }, 500);
   };
 
   function processExtractedText(text: string): ParsedScene[] {
@@ -214,28 +239,51 @@ export default function Index() {
     setError(null);
     setScenes([]);
     setProjectId(null);
-    
+    setUploadStep(null);
+
+    // STEP 1: Pre-upload validation (file type, size)
+    console.log('[Validation] Starting pre-upload validation...');
+    const preValidation = validateFileBeforeUpload(file);
+
+    if (!preValidation.valid) {
+      setError(formatValidationError(preValidation));
+      return;
+    }
+
+    // Show warnings if any
+    if (preValidation.warnings && preValidation.warnings.length > 0) {
+      console.warn('[Validation] Warnings:', preValidation.warnings);
+      const proceed = window.confirm(
+        `⚠️ Upload Warning:\n\n${preValidation.warnings.join('\n')}\n\nContinue anyway?`
+      );
+      if (!proceed) {
+        setError('Upload cancelled by user');
+        return;
+      }
+    }
+
     const fileName = file.name.toLowerCase();
     let fileType: 'txt' | 'pdf' | 'fdx' | null = null;
     if (fileName.endsWith('.txt')) fileType = 'txt';
     else if (fileName.endsWith('.pdf')) fileType = 'pdf';
     else if (fileName.endsWith('.fdx')) fileType = 'fdx';
-    
+
     if (!fileType) {
       setError('Please upload a .txt, .pdf, or .fdx file');
       return;
     }
-    
+
     setFileInfo({ name: file.name, type: fileType });
-    
+
     const extractedName = file.name.replace(/\.(txt|pdf|fdx)$/i, '');
     setProjectName(extractedName);
     console.log('[DEBUG] Project name extracted:', extractedName);
-    
+
     setIsParsing(true);
-    setParsingMessage('Reading file...');
-    
+    setUploadStep('uploading');
+
     try {
+      // Step 1: Upload and read file
       const buffer = await file.arrayBuffer();
       const bytes = new Uint8Array(buffer);
       let binary = '';
@@ -245,35 +293,103 @@ export default function Index() {
         binary += String.fromCharCode.apply(null, chunk as any);
       }
       const base64 = btoa(binary);
-      
-      setParsingMessage('Parsing screenplay...');
-      const response = await fetch('/api/parse-screenplay', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileData: base64, fileName: file.name, fileType })
+
+      // Step 2: Detect scenes
+      setUploadStep('detecting');
+      const parseResult = await api.post('/api/parse-screenplay', {
+        fileData: base64,
+        fileName: file.name,
+        fileType
+      }, {
+        context: 'Parsing screenplay',
+        timeoutMs: 120000, // 2 minutes for large PDFs
+        maxRetries: 2
       });
-      
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || 'Failed to parse screenplay');
+
+      const { screenplayText } = parseResult;
+
+      // STEP 2: Content validation (screenplay format, scene headers)
+      console.log('[Validation] Validating screenplay content...');
+
+      // Check for scanned PDF
+      if (fileType === 'pdf' && checkForScannedPDF(screenplayText, file.size)) {
+        setError(
+          'This PDF appears to be a scanned image.\n\n' +
+          'The file contains very little extractable text, which usually means it\'s a scanned document rather than a text-based PDF.\n\n' +
+          'Please:\n' +
+          '• Use OCR software to convert it to text first\n' +
+          '• Export from your screenwriting software as a text-based PDF\n' +
+          '• Upload a .txt or .fdx version instead'
+        );
+        setIsParsing(false);
+        setUploadStep(null);
+        return;
       }
-      
-      const { screenplayText } = await response.json();
-      setParsingMessage('Extracting scenes...');
+
+      const contentValidation = validateScreenplayContent(screenplayText, file.name);
+
+      if (!contentValidation.valid) {
+        setError(formatValidationError(contentValidation));
+        setIsParsing(false);
+        setUploadStep(null);
+        return;
+      }
+
+      // Show content warnings
+      if (contentValidation.warnings && contentValidation.warnings.length > 0) {
+        console.warn('[Validation] Content warnings:', contentValidation.warnings);
+        const proceedWithWarnings = window.confirm(
+          `⚠️ Format Warning:\n\n${contentValidation.warnings.join('\n')}\n\nContinue with analysis?`
+        );
+        if (!proceedWithWarnings) {
+          setError('Analysis cancelled by user');
+          setIsParsing(false);
+          setUploadStep(null);
+          return;
+        }
+      }
+
       const parsedScenes = processExtractedText(screenplayText);
-      
+
       if (parsedScenes.length === 0) {
         setError('No scene headers found. Make sure your screenplay has INT. or EXT. headers.');
         setIsParsing(false);
+        setUploadStep(null);
         return;
       }
-      
+
       setIsParsing(false);
+
+      // Check for potentially incomplete parsing and warn user
+      const estimatedPages = Math.ceil(screenplayText.length / 3000); // ~60 lines/page, ~50 chars/line
+      const estimatedScenes = Math.ceil(estimatedPages / 1.5); // Rough estimate: 1 scene per 1.5 pages
+
+      if (parsedScenes.length < estimatedScenes * 0.5) {
+        console.warn(`[PARSE WARNING] Only found ${parsedScenes.length} scenes, expected ~${estimatedScenes} based on screenplay length`);
+        // Show warning but continue - let user decide
+        const shouldContinue = window.confirm(
+          `Found ${parsedScenes.length} scene${parsedScenes.length === 1 ? '' : 's'} in your screenplay.\n\n` +
+          `Based on the file size, we expected around ${estimatedScenes} scenes. Some scenes may be missing if they use non-standard headers.\n\n` +
+          `Continue with ${parsedScenes.length} scene${parsedScenes.length === 1 ? '' : 's'}?`
+        );
+
+        if (!shouldContinue) {
+          setError(`Found ${parsedScenes.length} scenes (expected ~${estimatedScenes}). Please check that all scene headers use INT. or EXT. format.`);
+          setUploadStep(null);
+          return;
+        }
+      }
+
+      // Step 3: Analyze elements (handled in analyzeAllScenes)
       await analyzeAllScenes(parsedScenes, extractedName);
-      
+
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to process file');
+      const errorMsg = (err as ApiError).userMessage ||
+                      (err instanceof Error ? err.message : 'Failed to process file');
+      console.error('[Upload] Error:', err);
+      setError(errorMsg);
       setIsParsing(false);
+      setUploadStep(null);
     }
   }, [user, navigate]);
 
@@ -346,15 +462,18 @@ export default function Index() {
           </>
         )}
 
-        {isParsing && (
-          <div className="text-center py-20">
-            <Loader2 className="w-12 h-12 text-[#E50914] animate-spin mx-auto mb-4" />
-            <h2 className="text-xl font-medium mb-2">{parsingMessage}</h2>
-            <p className="text-white/50">Processing {fileInfo?.name}</p>
+        {(isParsing || isAnalyzing) && uploadStep && (
+          <div className="py-12">
+            <ScreenplayUploadProgress
+              currentStep={uploadStep}
+              currentScene={uploadStep === 'analyzing' ? currentSceneIndex : undefined}
+              totalScenes={uploadStep === 'analyzing' ? scenes.length : undefined}
+              fileName={fileInfo?.name}
+            />
           </div>
         )}
 
-        {isAnalyzing && (
+        {isAnalyzing && !uploadStep && (
           <div className="py-8">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-bold mb-2">Analyzing Screenplay</h2>

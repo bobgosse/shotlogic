@@ -3,19 +3,20 @@
 
 import { useCallback, useState, useRef, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { 
-  Loader2, 
-  Calendar, 
-  AlertCircle, 
-  Pencil, 
-  Check, 
-  X, 
+import {
+  Loader2,
+  Calendar,
+  AlertCircle,
+  Pencil,
+  Check,
+  X,
   MoreHorizontal,
   Trash2,
   ExternalLink,
   CheckCircle2,
   Clock
 } from 'lucide-react'
+import { api, ApiError } from '@/utils/apiClient'
 
 // ═══════════════════════════════════════════════════════════════
 // TYPE DEFINITIONS
@@ -177,28 +178,20 @@ function ProjectList({ projects, setProjects, showToast }: ProjectListProps) {
     setSavingId(projectId)
 
     try {
-      const response = await fetch('/api/projects/rename', {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          projectId,
-          newName: trimmedName
-        })
+      const result = await api.post('/api/projects/rename', {
+        projectId,
+        newName: trimmedName
+      }, {
+        context: 'Renaming project',
+        timeoutMs: 15000,
+        maxRetries: 2
       })
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || 'Failed to rename project')
-      }
-
-      const result = await response.json()
       console.log('✅ Rename successful:', result)
 
-      setProjects(prevProjects => 
-        prevProjects.map(p => 
-          p._id === projectId 
+      setProjects(prevProjects =>
+        prevProjects.map(p =>
+          p._id === projectId
             ? { ...p, name: trimmedName, updatedAt: new Date().toISOString() }
             : p
         )
@@ -213,11 +206,9 @@ function ProjectList({ projects, setProjects, showToast }: ProjectListProps) {
     } catch (error) {
       console.error('❌ Rename error:', error)
       setSavingId(null)
-      safeToast(
-        'Rename Failed',
-        error instanceof Error ? error.message : 'Failed to rename project.',
-        'destructive'
-      )
+      const errorMsg = (error as ApiError).userMessage ||
+                      (error instanceof Error ? error.message : 'Failed to rename project.')
+      safeToast('Rename Failed', errorMsg, 'destructive')
     }
   }, [editName, setProjects])
 
@@ -250,17 +241,11 @@ function ProjectList({ projects, setProjects, showToast }: ProjectListProps) {
     setDeletingId(projectId)
 
     try {
-      const response = await fetch(`/api/projects/delete?projectId=${projectId}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json'
-        }
+      await api.delete(`/api/projects/delete?projectId=${projectId}`, {
+        context: 'Deleting project',
+        timeoutMs: 15000,
+        maxRetries: 1
       })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || 'Failed to delete project')
-      }
 
       setProjects(prevProjects => prevProjects.filter(p => p._id !== projectId))
       setDeletingId(null)
@@ -270,11 +255,9 @@ function ProjectList({ projects, setProjects, showToast }: ProjectListProps) {
     } catch (error) {
       console.error('❌ Delete error:', error)
       setDeletingId(null)
-      safeToast(
-        'Delete Failed',
-        error instanceof Error ? error.message : 'Failed to delete project.',
-        'destructive'
-      )
+      const errorMsg = (error as ApiError).userMessage ||
+                      (error instanceof Error ? error.message : 'Failed to delete project.')
+      safeToast('Delete Failed', errorMsg, 'destructive')
     }
   }, [setProjects])
 

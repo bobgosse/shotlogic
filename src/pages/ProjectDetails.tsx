@@ -13,6 +13,9 @@ import { ExportModal } from "@/components/ExportModal";
 import { AnalysisProgressCard } from "@/components/AnalysisProgressCard";
 import { SceneNavigator } from "@/components/SceneNavigator";
 import { MobileSceneView } from "@/components/MobileSceneView";
+import { RetryAnalysisDialog } from "@/components/RetryAnalysisDialog";
+import { VisualProfileEditor } from "@/components/VisualProfileEditor";
+import { VisualProfile } from "@/types/visualProfile";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Trash2, ArrowLeft, Film, Camera, Printer, Download, RefreshCw, FileText, Edit, Save, Menu, Sparkles, ImageIcon, Palette, X, Check, ChevronLeft, ChevronRight, Users } from "lucide-react";
@@ -26,6 +29,7 @@ import jsPDF from "jspdf";
 import { parseScreenplay } from "@/utils/screenplayParser";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import logo from "@/assets/shotlogic-logo-netflix.png";
+import { api, ApiError } from "@/utils/apiClient";
 
 interface Scene {
   id: string;
@@ -44,6 +48,7 @@ interface Project {
   status: string;
   visual_style?: string | null;
   characters?: Array<{ name: string; physical: string }>;
+  visual_profile?: VisualProfile | null;
 }
 
 interface ShotListItem {
@@ -113,6 +118,9 @@ const ProjectDetails = () => {
   const [editingCharacters, setEditingCharacters] = useState(false);
   const [tempCharacters, setTempCharacters] = useState<Array<{ name: string; physical: string }>>([]);
   const [tempVisualStyle, setTempVisualStyle] = useState("");
+  const [showRetryDialog, setShowRetryDialog] = useState(false);
+  const [retrySceneData, setRetrySceneData] = useState<{ id: string; number: number; content: string } | null>(null);
+  const [isSavingVisualProfile, setIsSavingVisualProfile] = useState(false);
   const isMobile = useMediaQuery("(max-width: 768px)");
   const isTablet = useMediaQuery("(max-width: 1024px)");
 
@@ -120,13 +128,13 @@ const ProjectDetails = () => {
     queryKey: ['project', id],
     queryFn: async () => {
       console.log('[ProjectDetails] Fetching project with ID:', id);
-      
-      const projectResponse = await fetch(`/api/projects/get-one?projectId=${id}`);
-      if (!projectResponse.ok) {
-        throw new Error('Failed to fetch project');
-      }
-      const projectResult = await projectResponse.json();
-      
+
+      const projectResult = await api.get(`/api/projects/get-one?projectId=${id}`, {
+        context: 'Loading project',
+        timeoutMs: 30000,
+        maxRetries: 2
+      });
+
       if (!projectResult.success || !projectResult.project) {
         console.warn('[ProjectDetails] No project found with ID:', id);
         return { project: null, scenes: [] };
@@ -134,10 +142,10 @@ const ProjectDetails = () => {
 
       const project = projectResult.project;
       const scenes = project.scenes || [];
-      
-      console.log('[ProjectDetails] Project loaded:', { 
-        projectId: project._id, 
-        scenesCount: scenes.length 
+
+      console.log('[ProjectDetails] Project loaded:', {
+        projectId: project._id,
+        scenesCount: scenes.length
       });
 
       return { project, scenes };
@@ -209,39 +217,35 @@ const ProjectDetails = () => {
       return;
     }
     try {
-      const response = await fetch('/api/projects/update-style', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectId: id,
-          visualStyle: tempVisualStyle.trim() || null
-        })
+      await api.post('/api/projects/update-style', {
+        projectId: id,
+        visualStyle: tempVisualStyle.trim() || null
+      }, {
+        context: 'Updating visual style',
+        timeoutMs: 15000,
+        maxRetries: 2
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update');
-      }
 
       queryClient.setQueryData(['project', id], (oldData: any) => ({
         ...oldData,
         project: { ...oldData.project, visual_style: tempVisualStyle.trim() || null }
       }));
       setEditingVisualStyle(false);
-      
+
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ['project', id] });
       }, 100);
-      
+
       toast({
         title: "Visual style updated",
         description: "Image prompts will now use this aesthetic",
       });
     } catch (error: any) {
       console.error('Error updating visual style:', error);
+      const errorMsg = (error as ApiError).userMessage || error.message || 'Failed to update';
       toast({
         title: "Update failed",
-        description: error.message,
+        description: errorMsg,
         variant: "destructive",
       });
     }
@@ -253,18 +257,15 @@ const ProjectDetails = () => {
       return;
     }
     try {
-      const response = await fetch("/api/projects/update-characters", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          projectId: id,
-          characters: tempCharacters.filter(c => c.name.trim())
-        })
+      await api.post("/api/projects/update-characters", {
+        projectId: id,
+        characters: tempCharacters.filter(c => c.name.trim())
+      }, {
+        context: 'Updating characters',
+        timeoutMs: 15000,
+        maxRetries: 2
       });
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to update");
-      }
+
       queryClient.setQueryData(["project", id], (oldData: any) => ({
         ...oldData,
         project: { ...oldData.project, characters: tempCharacters.filter(c => c.name.trim()) }
@@ -279,11 +280,50 @@ const ProjectDetails = () => {
       });
     } catch (error: any) {
       console.error("Error updating characters:", error);
+      const errorMsg = (error as ApiError).userMessage || error.message || 'Failed to update';
       toast({
         title: "Update failed",
-        description: error.message,
+        description: errorMsg,
         variant: "destructive",
       });
+    }
+  };
+
+  const handleSaveVisualProfile = async (profile: VisualProfile) => {
+    if (!project || !id) return;
+
+    setIsSavingVisualProfile(true);
+    try {
+      await api.post('/api/visual-profile', {
+        projectId: id,
+        visualProfile: profile
+      }, {
+        context: 'Saving Visual Profile',
+        timeoutMs: 15000,
+        maxRetries: 2
+      });
+
+      queryClient.setQueryData(['project', id], (oldData: any) => ({
+        ...oldData,
+        project: { ...oldData.project, visual_profile: profile }
+      }));
+
+      queryClient.invalidateQueries({ queryKey: ['project', id] });
+
+      toast({
+        title: "Visual Profile saved",
+        description: "Your visual style settings have been updated"
+      });
+    } catch (error: any) {
+      console.error('Error saving Visual Profile:', error);
+      const errorMsg = (error as ApiError).userMessage || error.message || 'Failed to save';
+      toast({
+        title: "Save failed",
+        description: errorMsg,
+        variant: "destructive"
+      });
+    } finally {
+      setIsSavingVisualProfile(false);
     }
   };
 
@@ -302,38 +342,42 @@ const ProjectDetails = () => {
 
     toast({
       title: "Regenerating all scenes",
-      description: `Processing ${scenes.length} scenes...`,
+      description: `Processing ${scenes.length} scenes. Each scene may take up to 2 minutes...`,
     });
 
     for (const scene of scenes) {
+      // Show progress toast for each scene
+      toast({
+        title: `Analyzing scene ${scene.scene_number}`,
+        description: "This may take 1-2 minutes for complex scenes...",
+      });
+
       try {
-        const analyzeResponse = await fetch('/api/analyze-scene', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sceneText: scene.content,
-            sceneNumber: scene.scene_number,
-            totalScenes: scenes.length,
-            visualStyle: project?.visual_style || null,
-            characters: project?.characters || []
-          })
+        const analysisResult = await api.post('/api/analyze-scene', {
+          sceneText: scene.content,
+          sceneNumber: scene.scene_number,
+          totalScenes: scenes.length,
+          visualStyle: project?.visual_style || null,
+          visualProfile: project?.visual_profile || null,
+          characters: project?.characters || []
+        }, {
+          context: `Regenerating scene ${scene.scene_number}`,
+          timeoutMs: 150000, // 2.5 minutes for complex scenes with Visual Profile
+          maxRetries: 1 // Reduce retries since each attempt takes longer
         });
-        if (!analyzeResponse.ok) throw new Error('Analysis failed');
-        const analysisResult = await analyzeResponse.json();
-        
-        const saveResponse = await fetch('/api/projects/update-scene-analysis', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            projectId: id,
-            sceneNumber: scene.scene_number,
-            analysis: analysisResult.analysis || analysisResult
-          })
+
+        await api.post('/api/projects/update-scene-analysis', {
+          projectId: id,
+          sceneNumber: scene.scene_number,
+          analysis: analysisResult.analysis || analysisResult
+        }, {
+          context: `Saving scene ${scene.scene_number}`,
+          timeoutMs: 30000,
+          maxRetries: 2
         });
-        if (!saveResponse.ok) throw new Error('Save failed');
 
         successCount++;
-        
+
         toast({
           title: `Scene ${scene.scene_number} complete`,
           description: `${successCount} of ${scenes.length} scenes regenerated`,
@@ -364,68 +408,78 @@ const ProjectDetails = () => {
     );
   };
 
-  const handleReanalyzeScene = async (sceneId: string, sceneNumber: number, sceneContent: string) => {
+  const handleReanalyzeScene = async (sceneId: string, sceneNumber: number, sceneContent: string, customInstructions?: string) => {
     try {
       setReanalyzing(true);
       toast({
-        title: "Analyzing scene...",
+        title: customInstructions ? "Re-analyzing scene with custom instructions..." : "Analyzing scene...",
         description: `Generating structured analysis for Scene ${sceneNumber}`
       });
       console.log("[handleReanalyzeScene] Calling Railway analyze-scene API for scene", sceneNumber);
-      
-      const analyzeResponse = await fetch("/api/analyze-scene", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sceneText: sceneContent,
-          sceneNumber: sceneNumber,
-          totalScenes: project?.total_scenes || 1,
-          visualStyle: project?.visual_style || null,
-            characters: project?.characters || []
-        })
+
+      const analysisResult = await api.post("/api/analyze-scene", {
+        sceneText: sceneContent,
+        sceneNumber: sceneNumber,
+        totalScenes: project?.total_scenes || 1,
+        visualStyle: project?.visual_style || null,
+        visualProfile: project?.visual_profile || null,
+        characters: project?.characters || [],
+        customInstructions: customInstructions || undefined
+      }, {
+        context: `Analyzing scene ${sceneNumber}`,
+        timeoutMs: 150000, // 2.5 minutes for complex scenes with Visual Profile
+        maxRetries: 1 // Reduce retries since each attempt takes longer
       });
-      
-      if (!analyzeResponse.ok) {
-        const errorData = await analyzeResponse.json();
-        throw new Error(errorData.error || "Analysis failed");
-      }
-      
-      const analysisResult = await analyzeResponse.json();
+
       console.log("[handleReanalyzeScene] Analysis result:", analysisResult);
-      
-      const saveResponse = await fetch("/api/projects/update-scene-analysis", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          projectId: id,
-          sceneNumber: sceneNumber,
-          analysis: analysisResult.analysis || analysisResult
-        })
+
+      await api.post("/api/projects/update-scene-analysis", {
+        projectId: id,
+        sceneNumber: sceneNumber,
+        analysis: analysisResult.analysis || analysisResult
+      }, {
+        context: `Saving scene ${sceneNumber} analysis`,
+        timeoutMs: 30000,
+        maxRetries: 2
       });
-      
-      if (!saveResponse.ok) {
-        const errorData = await saveResponse.json();
-        throw new Error(errorData.error || "Failed to save analysis");
-      }
-      
+
       console.log("[handleReanalyzeScene] Analysis saved successfully for scene", sceneNumber);
-      
+
       await queryClient.invalidateQueries({ queryKey: ["project", id] });
-      
+
       toast({
         title: "Analysis complete!",
         description: `Scene ${sceneNumber} has been analyzed`
       });
     } catch (error: any) {
       console.error("[handleReanalyzeScene] Error:", error);
+      const errorMsg = (error as ApiError).userMessage || error.message || "Failed to generate analysis";
       toast({
         title: "Analysis failed",
-        description: error.message || "Failed to generate analysis",
+        description: errorMsg,
         variant: "destructive"
       });
     } finally {
       setReanalyzing(false);
     }
+  };
+
+  const handleTryAgain = (sceneId: string, sceneNumber: number, sceneContent: string) => {
+    setRetrySceneData({ id: sceneId, number: sceneNumber, content: sceneContent });
+    setShowRetryDialog(true);
+  };
+
+  const handleRetryWithInstructions = async (customInstructions: string) => {
+    if (!retrySceneData) return;
+
+    setShowRetryDialog(false);
+    await handleReanalyzeScene(
+      retrySceneData.id,
+      retrySceneData.number,
+      retrySceneData.content,
+      customInstructions
+    );
+    setRetrySceneData(null);
   };
 
   const isShotListItem = (shot: string | ShotListItem): shot is ShotListItem => {
@@ -469,19 +523,14 @@ const ProjectDetails = () => {
     if (!id) return;
     setIsSaving(true);
     try {
-      const response = await fetch('/api/projects/save-scene', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectId: id,
-          sceneUpdates: editedScenes
-        })
+      await api.post('/api/projects/save-scene', {
+        projectId: id,
+        sceneUpdates: editedScenes
+      }, {
+        context: 'Saving scene edits',
+        timeoutMs: 30000,
+        maxRetries: 2
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to save');
-      }
 
       toast({
         title: "Changes saved",
@@ -492,9 +541,10 @@ const ProjectDetails = () => {
       setIsEditMode(false);
       queryClient.invalidateQueries({ queryKey: ['project', id] });
     } catch (error: any) {
+      const errorMsg = (error as ApiError).userMessage || error.message || 'Failed to save';
       toast({
         title: "Save failed",
-        description: error.message,
+        description: errorMsg,
         variant: "destructive",
       });
     } finally {
@@ -509,22 +559,22 @@ const ProjectDetails = () => {
     );
     if (!confirmed) return;
     try {
-      const response = await fetch(`/api/projects/delete?projectId=${id}`, {
-        method: "DELETE",
+      await api.delete(`/api/projects/delete?projectId=${id}`, {
+        context: 'Deleting project',
+        timeoutMs: 15000,
+        maxRetries: 1
       });
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to delete");
-      }
+
       toast({
         title: "Project deleted",
         description: "Redirecting to dashboard...",
       });
       setTimeout(() => navigate("/"), 1000);
     } catch (error: any) {
+      const errorMsg = (error as ApiError).userMessage || error.message || 'Failed to delete';
       toast({
         title: "Delete failed",
-        description: error.message,
+        description: errorMsg,
         variant: "destructive",
       });
     }
@@ -642,19 +692,19 @@ const ProjectDetails = () => {
         currentSceneId={selectedSceneId}
         onSceneSelect={handleSceneSelect}
         onClose={() => setShowNavigator(false)}
-        isOpen={showNavigator && !isEditMode}
+        isOpen={showNavigator}
       />
 
       {/* Main Content */}
-      <div className={`flex-1 transition-all duration-300 ${showNavigator && !isTablet && !isEditMode ? "ml-[280px]" : "ml-0"}`}>
+      <div className={`flex-1 transition-all duration-300 ${showNavigator && !isTablet ? "ml-[280px]" : "ml-0"}`}>
         {/* Header */}
         <div className="bg-[#0a0a0a] border-b border-border p-4 sticky top-0 z-50">
           <div className="max-w-5xl mx-auto">
             <div className="flex justify-between items-start mb-3">
               <div className="flex gap-2 items-center">
-                {(!showNavigator || isEditMode) && (
-                  <Button 
-                    variant="ghost" 
+                {!showNavigator && (
+                  <Button
+                    variant="ghost"
                     size="icon"
                     onClick={() => setShowNavigator(true)}
                     className="mr-2"
@@ -912,6 +962,18 @@ const ProjectDetails = () => {
                       <RefreshCw className={`w-4 h-4 mr-1 ${reanalyzing ? 'animate-spin' : ''}`} />
                       {reanalyzing ? 'Analyzing...' : 'Re-analyze'}
                     </Button>
+                    {selectedAnalysis && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleTryAgain(selectedScene.id, selectedScene.scene_number, selectedScene.content)}
+                        disabled={reanalyzing}
+                        className="border-[#E50914]/50 text-[#E50914] hover:bg-[#E50914]/10"
+                      >
+                        <Sparkles className={`w-4 h-4 mr-1 ${reanalyzing ? 'animate-pulse' : ''}`} />
+                        Try Again
+                      </Button>
+                    )}
                     <div className="flex gap-1">
                       <Button
                         variant="outline"
@@ -939,13 +1001,14 @@ const ProjectDetails = () => {
               {/* Tabs */}
               <div className="p-4">
                 <Tabs defaultValue="script" className="w-full">
-                  <TabsList className="w-full grid grid-cols-6 mb-4">
+                  <TabsList className="w-full grid grid-cols-7 mb-4">
                     <TabsTrigger value="script">Script</TabsTrigger>
                     <TabsTrigger value="story">Story</TabsTrigger>
                     <TabsTrigger value="producing">Producing</TabsTrigger>
                     <TabsTrigger value="directing">Directing</TabsTrigger>
                     <TabsTrigger value="shots">Shots</TabsTrigger>
                     <TabsTrigger value="prompts">Prompts</TabsTrigger>
+                    <TabsTrigger value="visual-profile">Visual Profile</TabsTrigger>
                   </TabsList>
 
                   {/* Script Tab */}
@@ -1354,6 +1417,28 @@ const ProjectDetails = () => {
                                         {getShotRationale(shot) && (
                                           <p className="text-xs text-muted-foreground italic">{getShotRationale(shot)}</p>
                                         )}
+                                        {shot.image_prompt && (
+                                          <div className="mt-3 pt-3 border-t border-border/50">
+                                            <div className="flex items-center justify-between mb-1">
+                                              <span className="text-xs text-muted-foreground font-medium">AI Image Prompt {project?.visual_profile && <span className="text-primary">(with Visual Profile)</span>}</span>
+                                              <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                className="h-6 px-2 text-xs"
+                                                onClick={() => {
+                                                  navigator.clipboard.writeText(shot.image_prompt || '');
+                                                  toast({ title: "Image Prompt Copied!", description: "Paste into Flux, Midjourney, or any AI image generator" });
+                                                }}
+                                              >
+                                                <ImageIcon className="h-3 w-3 mr-1" />
+                                                Copy Prompt
+                                              </Button>
+                                            </div>
+                                            <p className="text-xs text-foreground/80 bg-background/50 rounded p-2 font-mono leading-relaxed">
+                                              {shot.image_prompt}
+                                            </p>
+                                          </div>
+                                        )}
                                       </>
                                     )}
                                   </div>
@@ -1394,42 +1479,74 @@ const ProjectDetails = () => {
                     ) : (
                       <div className="space-y-4">
                         <p className="text-sm text-muted-foreground">
-                          Click to copy prompts for Midjourney, DALL-E, or other AI image generators.
+                          {isEditMode ? 'Edit image prompts directly. Changes will be saved when you click Save Edits.' : 'Click to copy prompts for Midjourney, DALL-E, or other AI image generators.'}
                         </p>
                         {(editedScenes[selectedScene.id]?.shot_list || selectedAnalysis.shot_list).map((shot, idx) => {
                           if (!isShotListItem(shot)) return null;
-                          const prompts = generatePromptPair(normalizeShot(shot), selectedScene, selectedAnalysis, undefined, project?.visual_style);
+                          const currentShot = getCurrentShot(idx);
+                          const prompts = generatePromptPair(normalizeShot(currentShot || shot), selectedScene, selectedAnalysis, undefined, project?.visual_style);
                           return (
                             <div key={idx} className="bg-muted/30 rounded-lg border border-border p-4 space-y-3">
                               <div className="flex items-center justify-between">
                                 <span className="text-sm font-bold text-primary">
-                                  Shot {idx + 1}: {getShotType(shot)}
+                                  Shot {idx + 1}: {getShotType(currentShot || shot)}
                                 </span>
                               </div>
                               <div>
                                 <div className="flex items-center justify-between mb-2">
-                                  <span className="text-xs text-muted-foreground">Image Prompt (works with Midjourney, Grok, Runway, DALL-E, etc.)</span>
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="h-6 px-2 text-xs"
-                                    onClick={() => {
-                                      navigator.clipboard.writeText(prompts.previs);
-                                      toast({ title: "Prompt copied!" });
-                                    }}
-                                  >
-                                    Copy
-                                  </Button>
+                                  <span className="text-xs text-muted-foreground">
+                                    Image Prompt {project?.visual_profile && <span className="text-primary">(with Visual Profile)</span>}
+                                  </span>
+                                  {!isEditMode && (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-6 px-2 text-xs"
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(prompts.previs);
+                                        toast({ title: "Prompt copied!" });
+                                      }}
+                                    >
+                                      <ImageIcon className="h-3 w-3 mr-1" />
+                                      Copy
+                                    </Button>
+                                  )}
                                 </div>
-                                <p className="text-sm text-foreground bg-background rounded p-3 font-mono leading-relaxed">
-                                  {prompts.previs}
-                                </p>
+                                {isEditMode ? (
+                                  <Textarea
+                                    value={currentShot?.image_prompt || shot.image_prompt || prompts.previs}
+                                    onChange={(e) => handleShotEdit(idx, 'image_prompt', e.target.value)}
+                                    className="text-sm font-mono leading-relaxed min-h-[120px]"
+                                    placeholder="Enter image prompt for AI image generators..."
+                                  />
+                                ) : (
+                                  <p className="text-sm text-foreground bg-background rounded p-3 font-mono leading-relaxed">
+                                    {prompts.previs}
+                                  </p>
+                                )}
                               </div>
                             </div>
                           );
                         })}
                       </div>
                     )}
+                  </TabsContent>
+
+                  {/* Visual Profile Tab */}
+                  <TabsContent value="visual-profile" className="mt-0">
+                    <div className="bg-muted/30 border border-border rounded-lg p-6">
+                      <div className="mb-4">
+                        <h3 className="text-lg font-semibold text-foreground mb-1">Visual Profile</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Configure the visual aesthetic for all scenes in this project. These settings will be applied to all image prompts for consistent visual style.
+                        </p>
+                      </div>
+                      <VisualProfileEditor
+                        initialProfile={project?.visual_profile || undefined}
+                        onSave={handleSaveVisualProfile}
+                        isSaving={isSavingVisualProfile}
+                      />
+                    </div>
                   </TabsContent>
                 </Tabs>
               </div>
@@ -1453,6 +1570,15 @@ const ProjectDetails = () => {
         open={showExportModal}
         onOpenChange={setShowExportModal}
         onExport={handleExport}
+      />
+
+      {/* Retry Analysis Dialog */}
+      <RetryAnalysisDialog
+        open={showRetryDialog}
+        onOpenChange={setShowRetryDialog}
+        onRetry={handleRetryWithInstructions}
+        sceneNumber={retrySceneData?.number || 0}
+        isRetrying={reanalyzing}
       />
     </div>
   );

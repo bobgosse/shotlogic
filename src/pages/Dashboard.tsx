@@ -24,6 +24,7 @@ import {
   LogOut
 } from "lucide-react";
 import shotlogicLogo from "@/assets/shotlogic-logo-netflix.png";
+import { api, ApiError } from "@/utils/apiClient";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -109,12 +110,11 @@ const Dashboard = () => {
         return [];
       }
       console.log("[Dashboard] Fetching projects for user:", user.id);
-      const response = await fetch(`/api/projects/get-all?userId=${user.id}`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
+      const data = await api.get(`/api/projects/get-all?userId=${user.id}`, {
+        context: 'Loading projects',
+        timeoutMs: 30000,
+        maxRetries: 2
       });
-      if (!response.ok) throw new Error("Failed to fetch projects");
-      const data = await response.json();
       console.log("[Dashboard] Projects loaded:", data.projects?.length || 0);
       return data.projects || [];
     },
@@ -123,32 +123,33 @@ const Dashboard = () => {
 
   const deleteProjectMutation = useMutation({
     mutationFn: async (projectId: string) => {
-      const response = await fetch(`/api/projects/delete?projectId=${projectId}`, {
-        method: "DELETE",
-        headers: { 'Content-Type': 'application/json' },
+      return await api.delete(`/api/projects/delete?projectId=${projectId}`, {
+        context: 'Deleting project',
+        timeoutMs: 15000,
+        maxRetries: 1
       });
-      if (!response.ok) throw new Error("Failed to delete project");
-      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projects"] });
       toast({ title: "Project deleted", description: "Your project has been removed" });
       setDeleteProjectId(null);
     },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to delete project", variant: "destructive" });
+    onError: (error: any) => {
+      const errorMsg = (error as ApiError).userMessage || error.message || "Failed to delete project";
+      toast({ title: "Error", description: errorMsg, variant: "destructive" });
     },
   });
 
   const renameProjectMutation = useMutation({
     mutationFn: async ({ projectId, title }: { projectId: string; title: string }) => {
-      const response = await fetch(`/api/projects/update?projectId=${projectId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title }),
-      });
-      if (!response.ok) throw new Error("Failed to rename project");
-      return response.json();
+      return await api.post(`/api/projects/update?projectId=${projectId}`,
+        { title },
+        {
+          context: 'Renaming project',
+          timeoutMs: 15000,
+          maxRetries: 2
+        }
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projects"] });
@@ -156,8 +157,9 @@ const Dashboard = () => {
       setRenameProject(null);
       setNewTitle("");
     },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to rename project", variant: "destructive" });
+    onError: (error: any) => {
+      const errorMsg = (error as ApiError).userMessage || error.message || "Failed to rename project";
+      toast({ title: "Error", description: errorMsg, variant: "destructive" });
     },
   });
 

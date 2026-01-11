@@ -8,12 +8,40 @@ export interface Scene {
 
 // Position-aware PDF text extraction using Y-coordinates
 export async function extractTextFromPDF(fileBuffer: Uint8Array): Promise<string> {
-  const pdf = await pdfjsLib.getDocument({ data: fileBuffer }).promise;
+  if (!fileBuffer || fileBuffer.length === 0) {
+    throw new Error('PDF_ERROR: Empty file buffer provided');
+  }
+
+  let pdf;
+  try {
+    pdf = await pdfjsLib.getDocument({ data: fileBuffer }).promise;
+  } catch (error) {
+    throw new Error(`PDF_ERROR: Failed to load PDF document - ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+
+  if (!pdf || pdf.numPages === 0) {
+    throw new Error('PDF_ERROR: PDF contains no pages');
+  }
+
   let fullText = '';
+  let totalTextItems = 0;
 
   for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
+    let page;
+    try {
+      page = await pdf.getPage(i);
+    } catch (error) {
+      console.warn(`PDF_WARNING: Failed to load page ${i}, skipping`);
+      continue;
+    }
+
     const textContent = await page.getTextContent();
+
+    // CRITICAL FIX: Validate that page has extractable text
+    if (!textContent.items || textContent.items.length === 0) {
+      console.warn(`PDF_WARNING: Page ${i} contains no extractable text items`);
+      continue;
+    }
 
     // SORT BY Y-POSITION (Top to Bottom) to fix "River of Text"
     const items = textContent.items.map((item: any) => ({
@@ -21,6 +49,8 @@ export async function extractTextFromPDF(fileBuffer: Uint8Array): Promise<string
       y: item.transform[5], // The vertical position
       x: item.transform[4]  // The horizontal position
     }));
+
+    totalTextItems += items.length;
 
     // Sort items: Higher Y (top of page) first. If Y is same, Lower X (left) first.
     items.sort((a, b) => (b.y - a.y) || (a.x - b.x));
@@ -39,7 +69,20 @@ export async function extractTextFromPDF(fileBuffer: Uint8Array): Promise<string
     fullText += pageText + '\n\n';
   }
 
-  return sanitizeScreenplayText(fullText);
+  // CRITICAL FIX: Ensure we extracted meaningful text
+  if (totalTextItems === 0) {
+    throw new Error('PDF_ERROR: PDF contains no extractable text. This may be a scanned image or encrypted PDF.');
+  }
+
+  const sanitized = sanitizeScreenplayText(fullText);
+
+  if (sanitized.trim().length < 100) {
+    throw new Error(`PDF_ERROR: Extracted text too short (${sanitized.length} chars). PDF may be corrupted or contain primarily images.`);
+  }
+
+  console.log(`PDF extraction successful: ${pdf.numPages} pages, ${totalTextItems} text items, ${sanitized.length} chars`);
+
+  return sanitized;
 }
 
 function cleanSpacedText(text: string): string {
@@ -95,32 +138,56 @@ function squeezeSpacedText(text: string): string {
 }
 
 function parseFDX(text: string): Scene[] {
+  // Validate FDX structure
+  if (!text.includes('<?xml') && !text.includes('<FinalDraft')) {
+    throw new Error('FDX_ERROR: Not a valid Final Draft XML file');
+  }
+
   const scenes: Scene[] = [];
-  
+
   // Extract all paragraph elements
   const paragraphMatches = text.matchAll(/<Paragraph Type="([^"]+)"[^>]*>(.*?)<\/Paragraph>/gs);
-  
+
   let currentScene: Scene | null = null;
   let lastSceneNumber = 0;
   let sceneContent: string[] = [];
+  let paragraphCount = 0;
+  let sceneHeadingCount = 0;
+  const seenSceneNumbers = new Set<number>();
 
   for (const match of paragraphMatches) {
+    paragraphCount++;
     const type = match[1];
     const content = stripXMLTags(match[2]);
-    
+
     if (!content || content.includes('TITLE CARD') || content.includes('Part one')) continue;
 
     if (type === 'Scene Heading') {
-      // Save previous scene
-      if (currentScene && sceneContent.length > 0) {
-        currentScene.content = sceneContent.join('\n');
-        scenes.push(currentScene);
+      sceneHeadingCount++;
+
+      // Save previous scene with validation
+      if (currentScene) {
+        const trimmedContent = sceneContent.join('\n').trim();
+
+        if (trimmedContent.length < 10) {
+          console.warn(`[FDX Scene ${currentScene.number}] Empty or insufficient content - skipping`);
+        } else {
+          currentScene.content = trimmedContent;
+          scenes.push(currentScene);
+        }
       }
 
       // Extract explicit scene number from header
       const numberMatch = content.match(/^(\d+)[\s\.\)]/);
       const explicitNumber = numberMatch ? parseInt(numberMatch[1]) : null;
       const sceneNumber = explicitNumber || lastSceneNumber + 1;
+
+      // Check for duplicate scene numbers
+      if (seenSceneNumbers.has(sceneNumber)) {
+        console.warn(`[FDX Scene ${sceneNumber}] Duplicate scene number detected`);
+      }
+      seenSceneNumbers.add(sceneNumber);
+
       lastSceneNumber = sceneNumber;
 
       currentScene = {
@@ -134,16 +201,46 @@ function parseFDX(text: string): Scene[] {
     }
   }
 
-  // Add last scene
-  if (currentScene && sceneContent.length > 0) {
-    currentScene.content = sceneContent.join('\n');
-    scenes.push(currentScene);
+  // Add last scene with validation
+  if (currentScene) {
+    const trimmedContent = sceneContent.join('\n').trim();
+
+    if (trimmedContent.length < 10) {
+      console.warn(`[FDX Scene ${currentScene.number}] Empty or insufficient content - skipping final scene`);
+    } else {
+      currentScene.content = trimmedContent;
+      scenes.push(currentScene);
+    }
   }
+
+  // CRITICAL FIX: Validate FDX parsing results
+  if (paragraphCount === 0) {
+    throw new Error('FDX_ERROR: No paragraph elements found in FDX file. File may be corrupted or use unsupported FDX version.');
+  }
+
+  if (sceneHeadingCount === 0) {
+    throw new Error('FDX_ERROR: No scene headings found in FDX file. Ensure scenes use "Scene Heading" paragraph type.');
+  }
+
+  if (scenes.length === 0) {
+    throw new Error(`FDX_ERROR: Found ${sceneHeadingCount} scene headings but no valid scenes with content. All scenes may be empty.`);
+  }
+
+  console.log(`FDX parsing successful: ${paragraphCount} paragraphs, ${sceneHeadingCount} headings, ${scenes.length} valid scenes`);
 
   return scenes;
 }
 
 export function parseScreenplay(text: string): Scene[] {
+  // Input validation
+  if (!text || typeof text !== 'string') {
+    throw new Error('PARSE_ERROR: Invalid input - screenplay text must be a non-empty string');
+  }
+
+  if (text.trim().length < 50) {
+    throw new Error('PARSE_ERROR: Screenplay text too short (minimum 50 characters required)');
+  }
+
   // Check if it's an FDX file (Final Draft XML)
   if (text.includes('<?xml') && text.includes('<FinalDraft')) {
     return parseFDX(text);
@@ -159,57 +256,105 @@ export function parseScreenplay(text: string): Scene[] {
 
   const scenes: Scene[] = [];
   const lines = text.split('\n');
-  
+
   let currentScene: Scene | null = null;
   let lastSceneNumber = 0;
   let i = 0;
+  const seenSceneNumbers = new Set<number>();
 
   // Skip title page
   while (i < lines.length) {
     const line = lines[i].trim();
-    
-    if (line.toUpperCase().includes('SCRIPT TITLE') || 
+
+    if (line.toUpperCase().includes('SCRIPT TITLE') ||
         line.toUpperCase().includes('WRITTEN BY') ||
         line.toUpperCase().includes('BY:') ||
         (!line.match(/^(\d+[\s\.\)])?(INT\.|EXT\.|INT\/EXT\.|[A-Z]+)/) && i < 20)) {
       i++;
       continue;
     }
-    
+
     if (line.match(/^(\d+[\s\.\)])?(INT\.|EXT\.|INT\/EXT\.)/i) || line.match(/^(\d+)[\s\.\)]\s*[A-Z]/)) {
       break;
     }
-    
+
     i++;
   }
 
   // Parse scenes
+  let sceneHeaderCount = 0;
+
   while (i < lines.length) {
     const line = lines[i].trim();
-    
-    // STRICT HEADER DETECTION: Match headers at start of line (now that newlines are reconstructed)
+
+    // ENHANCED HEADER DETECTION: More forgiving pattern matching
+    // Supports: "INT.", "INT:", "INT,", "INT LOCATION", "I/E", "LOCATION - INT"
     // Auto-increment fallback ensures we never skip scenes even if explicit numbers are missing
-    
-    const headerMatch = line.match(/^\s*(?:(\d+)\s+)?(INT\.|EXT\.|LATER|EST\.|I\/E\.)(.*)$/i);
-    
+
+    // Try multiple patterns in order of specificity
+    let headerMatch = line.match(/^\s*(?:(\d+)\s+)?(INT\.|EXT\.|INT\/EXT\.|EXT\/INT\.|I\/E\.|LATER|EST\.)(.*)$/i);
+
+    if (!headerMatch) {
+      // Try with colon separator: "INT: LOCATION"
+      headerMatch = line.match(/^\s*(?:(\d+)\s+)?(INT|EXT|I\/E)\s*:\s*(.*)$/i);
+    }
+
+    if (!headerMatch) {
+      // Try with comma separator: "INT, LOCATION"
+      headerMatch = line.match(/^\s*(?:(\d+)\s+)?(INT|EXT|I\/E)\s*,\s*(.*)$/i);
+    }
+
+    if (!headerMatch) {
+      // Try just INT/EXT with space: "INT LOCATION"
+      headerMatch = line.match(/^\s*(?:(\d+)\s+)?(INT|EXT|I\/E)\s+(.+)$/i);
+    }
+
+    if (!headerMatch) {
+      // Try location-first format: "LOCATION - INT"
+      const locationFirstMatch = line.match(/^\s*(?:(\d+)\s+)?(.+?)\s*[-–—]\s*(INT|EXT|I\/E)\s*(.*)$/i);
+      if (locationFirstMatch) {
+        // Reformat to standard: number, keyword, rest
+        headerMatch = [
+          locationFirstMatch[0],
+          locationFirstMatch[1], // number
+          locationFirstMatch[3], // INT/EXT
+          locationFirstMatch[2] + (locationFirstMatch[4] ? ' ' + locationFirstMatch[4] : '') // location + rest
+        ] as RegExpMatchArray;
+      }
+    }
+
     if (headerMatch) {
-      // This is a scene header - create a hard break
-      if (currentScene && currentScene.content.trim()) {
-        scenes.push(currentScene);
+      sceneHeaderCount++;
+
+      // This is a scene header - save previous scene with validation
+      if (currentScene) {
+        const trimmedContent = currentScene.content.trim();
+
+        if (trimmedContent.length < 10) {
+          console.warn(`[Scene ${currentScene.number}] Empty or insufficient content (${trimmedContent.length} chars) - skipping`);
+        } else {
+          scenes.push(currentScene);
+        }
       }
 
       // Extract the keyword and rest of line
       const leadingNumber = headerMatch[1]; // e.g., "30" from "30 INT. ROOM"
       const keyword = headerMatch[2];        // e.g., "INT."
       const restOfLine = headerMatch[3] || ''; // e.g., "CLASSROOM - DAY 1 1" or "8 8 RICHARD"
-      
+
       // Extract the first number found in restOfLine (handles "DAY 1 1" and "LATER 8 8 RICHARD")
       const firstNumberMatch = restOfLine.match(/(\d+)/);
       const explicitSceneNumber = firstNumberMatch ? parseInt(firstNumberMatch[1]) : null;
-      
+
       // Determine final scene number: use trailing number, then leading number, then auto-increment
       const sceneNumber = explicitSceneNumber || (leadingNumber ? parseInt(leadingNumber) : lastSceneNumber + 1);
-      
+
+      // Check for duplicate scene numbers
+      if (seenSceneNumbers.has(sceneNumber)) {
+        console.warn(`[Scene ${sceneNumber}] Duplicate scene number detected`);
+      }
+      seenSceneNumbers.add(sceneNumber);
+
       // Clean the header for display: remove trailing "1 1" patterns and standalone trailing numbers
       let cleanedHeader = `${keyword} ${restOfLine}`.trim();
       cleanedHeader = cleanedHeader.replace(/\s+\d+\s+\d+\s*$/, ''); // Remove "DAY 1 1" -> "DAY"
@@ -231,9 +376,27 @@ export function parseScreenplay(text: string): Scene[] {
     i++;
   }
 
-  if (currentScene && currentScene.content.trim()) {
-    scenes.push(currentScene);
+  // Save final scene with validation
+  if (currentScene) {
+    const trimmedContent = currentScene.content.trim();
+
+    if (trimmedContent.length < 10) {
+      console.warn(`[Scene ${currentScene.number}] Empty or insufficient content (${trimmedContent.length} chars) - skipping final scene`);
+    } else {
+      scenes.push(currentScene);
+    }
   }
+
+  // CRITICAL FIX: Validate parsing results
+  if (sceneHeaderCount === 0) {
+    throw new Error('PARSE_ERROR: No scene headers detected. Ensure screenplay uses proper scene headers (INT./EXT. LOCATION - TIME)');
+  }
+
+  if (scenes.length === 0) {
+    throw new Error(`PARSE_ERROR: Found ${sceneHeaderCount} scene headers but no valid scenes with content. All scenes may be empty or too short.`);
+  }
+
+  console.log(`Text parsing successful: ${sceneHeaderCount} headers detected, ${scenes.length} valid scenes`);
 
   return scenes;
 }
