@@ -196,7 +196,7 @@ export default async function handler(
     }
     console.log(`📊 [${invocationId}] Characters: ${characters.join(', ')}`)
 
-    const userPrompt = `You are a professional 1st AD and script supervisor creating a shot list for Scene ${sceneNumber} of ${totalScenes}.
+    const userPrompt = `You are a professional 1st AD creating a shot list for Scene ${sceneNumber} of ${totalScenes}.
 
 <scene_text>
 ${sceneText}
@@ -208,528 +208,158 @@ ${characters.join(', ')}
 ${characterDefinitions ? `<character_physical_descriptions>
 USE THESE EXACT PHYSICAL DESCRIPTIONS IN ALL IMAGE_PROMPTS:
 ${characterDefinitions}
-(Wardrobe should be inferred from scene context - swimming=swimsuit, formal=period suit, bedroom=nightgown, etc.)
+(Wardrobe inferred from context: swimming=swimsuit, office=business attire, bedroom=nightclothes)
 </character_physical_descriptions>` : ""}
 ${customInstructions ? `<custom_user_instructions>
-IMPORTANT: The user has provided specific guidance for this analysis. Incorporate these instructions throughout your analysis:
 ${customInstructions}
 </custom_user_instructions>` : ""}
 ${visualProfile ? `<visual_profile>
-CRITICAL - PROJECT-LEVEL VISUAL IDENTITY:
-This project has an established Visual Profile that MUST be applied to ALL image_prompts for visual continuity across scenes.
+PROJECT VISUAL PROFILE (apply to ALL image_prompts):
+COLOR: ${visualProfile.color_palette_hex.slice(0, 3).join(', ')} | Accent: ${visualProfile.accent_colors_hex.slice(0, 2).join(', ')} | Temp: ${visualProfile.color_temperature}
+LIGHTING: ${visualProfile.lighting_style.key_light_direction} key, ${visualProfile.lighting_style.temperature.replace(/_/g, ' ')}, ${visualProfile.lighting_style.shadow_hardness} shadows, ${visualProfile.lighting_style.contrast_ratio.replace(/_/g, ' ')}
+CAMERA: ${visualProfile.aspect_ratio} aspect, ${visualProfile.lens_character.replace(/_/g, ' ')} lens, ${visualProfile.film_stock_look.replace(/_/g, ' ')} look
+POST: ${visualProfile.post_processing.grain_level} grain, ${visualProfile.post_processing.color_grade_style.replace(/_/g, ' ')} grade, ${visualProfile.post_processing.contrast}
+COMPOSITION: ${visualProfile.composition_principles.symmetry_preference.replace(/_/g, ' ')}, ${visualProfile.composition_principles.headroom} headroom, ${visualProfile.composition_principles.depth_of_field} DoF
+${visualProfile.inspiration_notes ? `VISION: ${visualProfile.inspiration_notes}` : ''}
 
-COLOR PALETTE:
-Primary Colors (hex): ${visualProfile.color_palette_hex.join(', ')}
-Accent Colors (hex): ${visualProfile.accent_colors_hex.join(', ')}
-Color Temperature: ${visualProfile.color_temperature}
-
-LIGHTING STYLE:
-Key Light Direction: ${visualProfile.lighting_style.key_light_direction}
-Temperature: ${visualProfile.lighting_style.temperature.replace(/_/g, ' ')}
-Shadow Hardness: ${visualProfile.lighting_style.shadow_hardness}
-Contrast Ratio: ${visualProfile.lighting_style.contrast_ratio.replace(/_/g, ' ')}
-
-CAMERA & LENS:
-Aspect Ratio: ${visualProfile.aspect_ratio}
-Lens Character: ${visualProfile.lens_character.replace(/_/g, ' ')}
-Film Stock/Sensor Look: ${visualProfile.film_stock_look.replace(/_/g, ' ')}
-
-POST-PROCESSING:
-Grain Level: ${visualProfile.post_processing.grain_level}
-Color Grade Style: ${visualProfile.post_processing.color_grade_style.replace(/_/g, ' ')}
-Contrast: ${visualProfile.post_processing.contrast.replace(/_/g, ' ')}
-Vignette: ${visualProfile.post_processing.vignette}
-
-COMPOSITION PRINCIPLES:
-Symmetry Preference: ${visualProfile.composition_principles.symmetry_preference.replace(/_/g, ' ')}
-Headroom: ${visualProfile.composition_principles.headroom}
-Depth of Field: ${visualProfile.composition_principles.depth_of_field}
-${visualProfile.inspiration_notes ? `\nDIRECTOR'S VISION: ${visualProfile.inspiration_notes}` : ''}
-
-IMAGE PROMPT FORMAT WITH VISUAL PROFILE:
-Every image_prompt MUST include these Visual Profile elements in this order:
-1. [scene_setting from directing_vision.scene_setting - SAME for all shots in scene]
-2. [shot type and camera angle]
-3. [subject and blocking - character positions with spatial relationships]
-4. [action context - what motivated this moment]
-5. [CHARACTER descriptions with exact physical details - CONSISTENT across all shots]
-6. LIGHTING: [apply lighting_style from profile - ${visualProfile.lighting_style.key_light_direction} key, ${visualProfile.lighting_style.temperature}, ${visualProfile.lighting_style.shadow_hardness} shadows]
-7. COLOR: [reference color_palette_hex - ${visualProfile.color_palette_hex.slice(0, 3).join(', ')}]
-8. CAMERA: [${visualProfile.lens_character} lens, ${visualProfile.film_stock_look} look]
-9. POST: [${visualProfile.post_processing.grain_level} grain, ${visualProfile.post_processing.color_grade_style} grade]
-10. COMPOSITION: [apply composition_principles based on shot's dramatic function]
-
-Example format:
-"Dimly lit office interior, medium shot from low angle, JOHN (40s, salt-pepper hair, exhausted) sitting LEFT at desk reviewing papers, SARAH (35s, sharp features, determined) standing RIGHT 4 feet away in doorway watching him, tension between them as he realizes she knows his secret, LIGHTING: side key light from window (${visualProfile.lighting_style.temperature}), ${visualProfile.lighting_style.shadow_hardness} shadows creating ${visualProfile.lighting_style.contrast_ratio}, COLOR PALETTE: ${visualProfile.color_palette_hex.slice(0, 3).join(', ')}, CAMERA: ${visualProfile.lens_character} lens, ${visualProfile.film_stock_look} sensor look, POST: ${visualProfile.post_processing.grain_level} film grain, ${visualProfile.post_processing.color_grade_style} color grade, ${visualProfile.post_processing.contrast}, COMPOSITION: off-balance framing for tension, ${visualProfile.composition_principles.headroom} headroom, ${visualProfile.composition_principles.depth_of_field} depth of field, cinematic lighting --ar ${visualProfile.aspect_ratio}"
-
-CRITICAL: DO NOT deviate from the Visual Profile. Maintain consistent visual language across all shots.
+IMAGE_PROMPT FORMAT:
+[scene_setting - SAME for all shots], [shot type], [CHARACTER (exact physical description from above) doing specific action], [spatial positions: LEFT/RIGHT/FOREGROUND/BACKGROUND], LIGHTING: [apply profile], COLOR: [hex codes from profile], CAMERA: [lens + film look], POST: [grain + grade] --ar ${visualProfile.aspect_ratio}
 </visual_profile>` : ""}
-<instructions>
-CRITICAL - VISUAL CONTINUITY ACROSS ALL SHOTS:
-ALL shots in this scene are part of ONE continuous scene. They MUST feel like they're from the same location, same moment in time, with the same characters:
-- Use the EXACT SAME scene_setting description in every image_prompt (e.g., "dimly lit office" appears in all 15 shots)
-- Use the EXACT SAME character physical descriptions every time that character appears (copy-paste "JOHN (40s, salt-pepper hair, exhausted, grey suit)" into Shots 1, 3, 5, 7...)
-- Maintain consistent lighting throughout (if Shot 1 has "single desk lamp", all shots have "single desk lamp")
-- Track character positions shot-to-shot (if JOHN moves to window in Shot 4, he's at window in Shot 5+)
-- Reference previous shots for continuity: "continuing from Shot 2", "closer on SARAH from previous wide", "reverse angle on doorway from Shot 3"
 
-Think of this as a single 2-minute scene being broken into shots, NOT 15 isolated image prompts.
+<core_rules>
+VISUAL CONTINUITY:
+- Use IDENTICAL scene_setting in every image_prompt ("dimly lit office" in all shots)
+- Copy-paste exact character descriptions ("JOHN (40s, salt-pepper hair, exhausted, grey suit)")
+- Maintain consistent lighting (if Shot 1 has "desk lamp", all shots have "desk lamp")
+- Track positions shot-to-shot (if JOHN moves to window in Shot 4, he's there in Shot 5+)
 
-CRITICAL - STORY-FIRST SHOT GENERATION:
-Complete the story_analysis section FIRST, then use it to generate shots. Every shot must serve a story element.
+STORY-DRIVEN SHOTS:
+- Complete story_analysis FIRST
+- Shot count from story needs: simple scene=3-5 shots, dialogue with turn=8-12, complex conflict=15-25
+- Every shot serves: THE CORE, THE TURN, STAKES, or OWNERSHIP from story_analysis
+- Hitchcock's Rule: shot size = story importance (close-up what matters NOW)
 
-SHOT COUNT - BASED ON STORY NEEDS, NOT COVERAGE:
-- Determine shot count from story_analysis findings:
-  * THE CORE: What story purpose MUST be accomplished? Minimum shots needed to deliver it.
-  * THE TURN: When does the pivot happen? Build shots toward it, emphasize it visually, show consequences.
-  * OWNERSHIP: Which character drives the scene? They get more shots, more POV angles.
-  * STAKES: What's at risk? Shots must visualize the tension/threat/opportunity.
-- Examples:
-  * Simple core ("establish setting") = 3-5 shots
-  * Dialogue with turn ("negotiation that shifts power") = 8-12 shots building to turn
-  * Complex multi-character conflict = 15-25 shots to track all POVs and turns
-- NEVER generate shots just for "coverage" - every shot serves story
+SHOT_TYPE VALUES (choose ONE):
+ESTABLISHING | WIDE | MEDIUM_WIDE | MEDIUM | MEDIUM_CLOSE | CLOSE_UP | EXTREME_CLOSE | TWO_SHOT | GROUP_SHOT | OVER_SHOULDER | POV | INSERT | REVEAL
 
-SHOT_TYPE FIELD - CRITICAL FORMAT:
-Each shot MUST have a single, specific shot_type value. NEVER use slash notation (e.g. "WIDE/MEDIUM") or descriptive phrases.
-VALID VALUES (choose ONE per shot):
-- ESTABLISHING: Opens scene, shows full environment/geography
-- WIDE: Full body + environment, characters small in frame
-- MEDIUM_WIDE: 3/4 body shot, character visible head to knees
-- MEDIUM: Waist up, balances character and environment
-- MEDIUM_CLOSE: Chest up, emphasis on face and upper body
-- CLOSE_UP: Head and shoulders, intimate emotional detail
-- EXTREME_CLOSE: Eyes, mouth, hands - intense detail on specific feature
-- TWO_SHOT: Two characters in frame, shows relationship/dynamic
-- GROUP_SHOT: Three or more characters, ensemble moments
-- OVER_SHOULDER: From behind one character looking at another, conversation flow
-- POV: Camera is character's eyes, subjective viewpoint
-- INSERT: Detail shot of object (letter, phone, weapon, clue)
-- REVEAL: Camera movement or reframing that unveils new information
+CHARACTER NAMES:
+- ALWAYS use CHARACTER NAMES in CAPS, NEVER pronouns
+- ✓ "LEO walks to window" ✗ "He walks to window"
+- Every character appears in at least 2 shots: ${characters.map(c => c).join(', ')}
+</core_rules>
 
-EXAMPLES:
-✓ "shot_type": "CLOSE_UP"
-✓ "shot_type": "TWO_SHOT"
-✓ "shot_type": "MEDIUM"
-✗ "shot_type": "WIDE/MEDIUM" (WRONG - pick ONE)
-✗ "shot_type": "Close-up on face" (WRONG - use exact value from list)
-
-HITCHCOCK'S RULE - SHOT SIZE = STORY IMPORTANCE:
-"The size of an object in the frame should be proportional to its importance in the story at that moment."
-- If something MATTERS (clue, threat, emotional trigger, key prop), give it a CLOSE-UP or foreground dominance
-- If something doesn't matter yet, keep it smaller, backgrounded, or visually de-emphasized
-- A key, knife, letter, photograph, glass of milk: BIG and unmistakable when story-critical
-- Apply this to characters too: the character with power/focus in the moment gets the tighter shot
-
-ABSOLUTE RULE - CHARACTER NAMES, NEVER PRONOUNS:
-- EVERY shot description MUST name the character by NAME in CAPS
-- ✓ "CLOSE-UP: LEO - his jaw tightens as he processes the insult"
-- ✓ "TWO-SHOT: VIRGINIA and HUBER - exchanging a knowing glance"
-- ✗ NEVER write "He turns away" - write "LEO turns away"
-- ✗ NEVER write "She reaches for it" - write "VIRGINIA reaches for the letter"
-- ✗ NEVER write "They embrace" - write "LEO and MARIA embrace"
-
-SUBJECT FIELD - Must name the character(s) in CAPS:
-- ✓ "LEO - emerging from water, toweling off"
-- ✓ "HUBER and ROSALIND - watching Leo from the dock"
-- ✓ "INSERT: THE LETTER - Virginia's handwriting visible"
-- ✗ NEVER write "Two figures" or "Focus on legs" without naming WHO
-
-COVERAGE FIELD - Must quote specific dialogue or describe exact action:
-- ✓ "LEO: 'Seven.' - his counter-offer"
-- ✓ "Leo looks down at his bare feet, then at their expensive shoes"
-- ✗ NEVER write vague descriptions like "The negotiation" or "emotional moment"
-
-RATIONALE FIELD - Explain WHY this shot, using Hitchcock's principle:
-- ✓ "Close-up on the knife NOW because Leo has just noticed it - it becomes his way out"
-- ✓ "Wide shot here to diminish Virginia's power as Leo walks away"
-- ✗ NEVER write "Captures the dynamic" or "Sets the mood"
-
-IMAGE_PROMPT FIELD (CRITICAL - THIS IS WHAT MIDJOURNEY SEES):
-SCENE-LEVEL CONTEXT (MUST be consistent across ALL shots):
-- Start EVERY image_prompt with the SAME scene_setting (from directing_vision.scene_setting): "dimly lit office", "sun-drenched beach", "cramped car interior"
-- Use IDENTICAL character descriptions every time: "VIRGINIA (frail 16-year-old girl in wheelchair)" in Shot 1, Shot 3, Shot 7...
-- Maintain consistent wardrobe inferred from scene: swimming = swimwear, office = business attire, bedroom = nightclothes
-- Keep lighting consistent: "single desk lamp", "harsh overhead fluorescents", "golden hour sunlight through window"
-
-SHOT-SPECIFIC ACTION:
-- Describe the SPECIFIC ACTION happening in this shot, not static positions
-- BAD: "VIRGINIA in wheelchair by window, EDMUND at fireplace"
-- GOOD: "Victorian drawing room (established Shot 1), ROSALIND (stern 40s woman in black dress - from Shot 1) pins VIRGINIA (frail 16-year-old girl in wheelchair wearing white nightgown - from Shot 1)'s legs under blanket while VIRGINIA stares longingly at book on nearby table, EDMUND (50s, stern patriarch in waistcoat - from Shot 1) ignores them checking pocket watch by fireplace, single oil lamp lighting (consistent with Shot 1)"
-- Include: WHO is doing WHAT to WHOM, facial expressions, body language
-- Every prompt must answer: "What is the character DOING in this moment?"
-- Reference shot continuity when relevant: "continuing from Shot 2", "closer on VIRGINIA from previous wide"
-EVERY CHARACTER in the scene must appear BY NAME in at least 2 shots:
-EVERY CHARACTER in the scene must appear BY NAME in at least 2 shots:
-${characters.map(c => `- ${c}`).join('\n')}
-</instructions>
-
-Return ONLY a JSON object with this structure:
+Return ONLY valid JSON with this structure:
 
 {
   "story_analysis": {
-    "synopsis": "2-3 sentence summary of what happens in this scene - the concrete actions and events",
-    "the_core": "ONE sentence - what MUST this scene accomplish or the film fails. The distilled emotional/dramatic/thematic essence. What's the non-negotiable reason this scene exists?",
-    "the_turn": "IDENTIFY THE EXACT PIVOT POINT in THIS scene: Quote the specific LINE OF DIALOGUE or describe the specific ACTION that changes everything. Format: 'When [CHARACTER] says/does [specific quote or action], the scene shifts from [before state] to [after state].' If no clear turn exists, write: 'No dramatic turn - scene maintains consistent [describe the consistent state] throughout.'",
+    "synopsis": "2-3 sentences - what happens",
+    "the_core": "ONE sentence - what MUST this scene accomplish. Format: Scene exists to [concrete purpose]",
+    "the_turn": "Quote the LINE or ACTION that pivots the scene. Format: When CHARACTER says/does [specific], scene shifts from [before] to [after]. If no turn: No dramatic turn.",
     "subtext": {
-      "what_they_say_vs_want": "FOR EACH SPEAKING CHARACTER in THIS scene, analyze the gap between dialogue and desire. Format: 'CHARACTER says [paraphrase their dialogue topic] but WANTS [their actual goal/need]'. If dialogue matches intent perfectly, write: 'CHARACTER speaks directly - no subtext'. Example: 'JOHN talks about the weather but WANTS to avoid discussing the divorce.' Be specific to THIS scene's dialogue.",
-      "power_dynamic": "ANALYZE THE POWER BALANCE in THIS scene: Opening dynamic - who has power at scene start and why? (physical threat, emotional leverage, information, authority, moral high ground). Power shifts - does the balance change? When? Why? Closing dynamic - who has power at scene end? Format: '[CHARACTER A] has power initially through [source], but loses it when [turning point], ending with [CHARACTER B] in control via [new source]' OR '[CHARACTER] maintains power throughout via [source] - no challenge to their position.'",
-      "emotional_turn": "IDENTIFY THE EMOTIONAL JOURNEY of THIS scene: What emotion/state does the scene open with? What specific moment triggers the emotional shift? (quote line of dialogue or describe action). What emotion/state does the scene close with? Format: 'Opens: [emotion]. Turns at: [specific trigger with quote/action]. Closes: [emotion].' If no emotional shift: 'Maintains consistent [emotion/state] throughout - mood piece without turn.'",
-      "revelation_or_realization": "WHAT CHANGES IN UNDERSTANDING in THIS scene? Does a character learn something new? Does the AUDIENCE learn something the characters don't? Is information revealed, withheld, or discovered? Format: '[CHARACTER/AUDIENCE] learns/realizes [specific new information] when [specific moment].' If no revelation: 'No new information revealed - scene develops known situation.'"
+      "what_they_say_vs_want": "For each speaking character: CHARACTER says [topic] but WANTS [actual goal]",
+      "power_dynamic": "Who has power initially? Does it shift? Format: CHARACTER has power via [source], shifts when [moment]",
+      "emotional_turn": "Opens: [emotion]. Turns at: [trigger]. Closes: [emotion]",
+      "revelation_or_realization": "CHARACTER/AUDIENCE learns [what] when [moment]. If none: No new information"
     },
     "conflict": {
-      "type": [
-        "IDENTIFY CONFLICT TYPE (can be multiple):",
-        "- NEGOTIATION (characters bargaining, trading, compromising)",
-        "- SEDUCTION (one character trying to attract/persuade/manipulate another)",
-        "- CONFRONTATION (direct opposition, argument, fight)",
-        "- INTERROGATION (one character extracting information from another)",
-        "- CONFESSION (character revealing truth/feelings)",
-        "- AVOIDANCE (characters trying NOT to engage with topic/each other)",
-        "- COMPETITION (characters vying for same goal/resource)",
-        "- POWER STRUGGLE (characters fighting for dominance/control)",
-        "- INTERNAL (character struggling with self, no interpersonal conflict)",
-        "Format: List all that apply with brief explanation"
-      ],
-      "what_characters_want": [
-        "FOR EACH MAJOR CHARACTER:",
-        "Format: '[CHARACTER] wants [specific goal] from [other character/situation]'",
-        "Examples:",
-        "- 'JOHN wants SARAH to admit she lied about the money'",
-        "- 'DETECTIVE wants SUSPECT to confess or make a mistake'",
-        "- 'MARIA wants to leave the conversation without crying'",
-        "Be SPECIFIC - not 'wants respect' but 'wants boss to acknowledge her contribution to the project'"
-      ],
-      "obstacles": [
-        "WHAT BLOCKS EACH CHARACTER FROM GETTING WHAT THEY WANT?",
-        "Format: '[CHARACTER] is blocked by [specific obstacle]'",
-        "Obstacles can be:",
-        "- Another character's opposing goal",
-        "- Character's own fear/limitation/secret",
-        "- External circumstance (time pressure, location, witnesses present)",
-        "- Information gap (doesn't know crucial fact)",
-        "- Power imbalance (can't speak freely, physically constrained)"
-      ],
-      "tactics": [
-        "HOW DOES EACH CHARACTER TRY TO GET WHAT THEY WANT?",
-        "Format: '[CHARACTER] uses [specific tactic]: [example from scene]'",
-        "Tactics include:",
-        "- Charm/seduction ('uses flirtation when discussing the promotion')",
-        "- Intimidation/threat ('raises voice, moves into personal space')",
-        "- Logic/argument ('presents evidence methodically')",
-        "- Emotional appeal ('brings up their shared history, childhood')",
-        "- Deflection/evasion ('changes subject whenever money is mentioned')",
-        "- Silence/withdrawal ('refuses to engage, creating discomfort')",
-        "- Deception/lying ('claims to have been home all night')"
-      ],
-      "winner": [
-        "WHO ACHIEVES THEIR GOAL BY SCENE END?",
-        "Format: '[CHARACTER] wins - gets [what they wanted] / [CHARACTER] loses - fails to get [what they wanted]'",
-        "Or: 'Stalemate - neither character achieves goal' / 'Mutual victory - both get what they need' / 'Pyrrhic victory - [CHARACTER] gets goal but at cost of [what they lose]'",
-        "Be specific about what was won/lost"
-      ]
+      "type": "List all: NEGOTIATION | SEDUCTION | CONFRONTATION | INTERROGATION | CONFESSION | AVOIDANCE | COMPETITION | POWER_STRUGGLE | INTERNAL",
+      "what_characters_want": ["CHARACTER wants [specific goal] from [other/situation]"],
+      "obstacles": ["CHARACTER blocked by [specific obstacle]"],
+      "tactics": ["CHARACTER uses [tactic]: [example from scene]"],
+      "winner": "CHARACTER wins/loses [what]. Or: Stalemate/Mutual victory/Pyrrhic victory"
     },
-    "what_changes": "BEGINNING vs END - WHAT'S DIFFERENT in THIS scene? Compare the scene's opening state to its closing state. Consider: Relationship status ('Opening: CHARACTER A and CHARACTER B are allies. Closing: enemies'), Information ('Opening: Characters believe X. Closing: Now know Y'), Situation ('Opening: trapped. Closing: escaped'), Character state ('Opening: CHARACTER is confident. Closing: defeated'). If nothing changes: 'Static scene - situation and relationships unchanged, scene explores/deepens existing [describe what state].' Be specific to THIS scene.",
-    "the_times": "EXTRACT HISTORICAL/CULTURAL CONTEXT from THIS scene: Identify the time period (if period piece), laws/customs referenced, social norms shown, cultural details that inform character behavior. If contemporary/timeless, write: 'Contemporary setting - no specific historical context.' If period-specific, describe what a modern audience would NOT automatically understand about this world/era based on details in the scene.",
-    "imagery_and_tone": "DESCRIBE THE VISUAL AND EMOTIONAL TONE for THIS scene based on its content: What visual motifs should be emphasized? (darkness/light, confined/open, warm/cold colors). What's the emotional temperature? (tense, intimate, hostile, melancholic, playful, etc.). What should cinematography emphasize to support the subtext identified above? Be specific to the scene's dramatic content, not generic.",
-    "pitfalls": "LIST 2-4 CREATIVE RISKS TO AVOID specific to THIS scene's content: Examples: 'Cliché - avoid melodramatic music on CHARACTER's tears, let silence do the work', 'Tonal mistake - resist urge to cut tension with humor when CHARACTER confesses', 'On-the-nose - don't have CHARACTER verbalize realization, show it through behavior', 'Empty spectacle - fight choreography must serve character arc not just look cool'. Be SPECIFIC to what happens in THIS scene.",
-    "stakes": "IDENTIFY WHAT'S AT RISK in THIS SPECIFIC SCENE (not the whole film): What could CHARACTER lose if they fail in this moment? What are they fighting for right now? Be concrete and specific to this scene's conflict. Examples: 'CHARACTER risks losing wife's trust if lie is discovered', 'CHARACTER's freedom - if DETECTIVE finds evidence, arrest is imminent', 'CHARACTER's dignity - public humiliation if secret revealed', 'CHARACTER's life - literal survival against threat'. Make it specific to THIS scene's situation.",
-    "ownership": "Who drives this scene and why? Which character's actions/choices/wants are the engine? Format: '[CHARACTER] drives the scene by [their action/goal] - other characters react to their agenda'",
-    "key_props": "Props that carry MEANING beyond function - objects that symbolize, represent, or trigger emotion. Format: '[PROP]: represents/symbolizes [meaning]'. Example: 'Wedding ring (he keeps touching it): guilt about affair', 'Empty whiskey bottle: his spiral into addiction'"
+    "what_changes": "Beginning vs End. Relationship/Information/Situation/Character state. If static: Static scene.",
+    "the_times": "Period/cultural context or Contemporary setting",
+    "imagery_and_tone": "Visual motifs, emotional temperature, cinematography emphasis",
+    "pitfalls": ["2-4 creative risks to avoid specific to this scene"],
+    "stakes": "What CHARACTER risks losing if they fail in THIS scene",
+    "ownership": "CHARACTER drives scene by [action/goal] - others react",
+    "key_props": ["PROP: symbolizes [meaning]"]
   },
   "producing_logistics": {
-    "resource_impact": "Low/Medium/High - assess based on: number of locations, cast size, special effects, technical complexity",
-    "red_flags": [
-      "CRITICAL: List EVERY budget concern found in scene text:",
-      "- Crowds/extras (more than 5 background actors)",
-      "- Stunts or dangerous action (falls, fights, car chases, weapons)",
-      "- Period elements (historical costumes, vintage cars, old technology)",
-      "- Complex setups (underwater, aerial, crane shots, Steadicam)",
-      "- Animals or children (additional handlers/supervision required)",
-      "- VFX/CGI requirements (supernatural, impossible physics, environment alterations)",
-      "- Weather dependencies (rain, snow, fog, specific lighting)",
-      "- Specialized equipment (helicopters, boats, motorcycles, medical equipment)",
-      "- Destruction/mess (breaking props, food, liquids, fire, explosions)",
-      "- Multiple locations in one scene",
-      "- Night exterior shooting (crew overtime)",
-      "- Crowd control or public location challenges"
-    ],
-    "departments_affected": [
-      "List ALL departments that need prep based on scene:",
-      "Camera (always), Grip/Electric (always), Sound (always)",
-      "Art Department (if any props/set dressing mentioned)",
-      "Wardrobe (if specific clothing described)",
-      "Makeup/Hair (if blood, aging, period style needed)",
-      "Special Effects (practical: fire, smoke, squibs, rain, wind)",
-      "Visual Effects (digital: removal, enhancement, impossible elements)",
-      "Stunts (any physical danger or choreographed action)",
-      "Transportation (if vehicles driven/featured)",
-      "Props (EVERY object characters touch or interact with)",
-      "Location (scouting/permits if specific place described)"
-    ],
+    "resource_impact": "Low | Medium | High",
+    "red_flags": ["List budget concerns: crowds, stunts, period, complex setups, animals, VFX, weather, equipment, destruction, locations, night, public"],
+    "departments_affected": ["Camera, Grip/Electric, Sound, Art, Wardrobe, Makeup, SFX, VFX, Stunts, Props, Location"],
     "locations": {
-      "primary": "EXTRACT FROM SCENE HEADER: The main location (e.g., 'Kitchen', 'City Street', 'Car Interior')",
-      "setting": "CLASSIFY: residential/commercial/industrial/exterior/vehicle/public space/institutional",
-      "timeOfDay": "EXTRACT FROM HEADER: DAY or NIGHT (affects crew rates and equipment)",
-      "intExt": "EXTRACT FROM HEADER: INT or EXT (affects weather dependencies)",
-      "additional_locations": [
-        "READ CAREFULLY: List ANY other locations mentioned or implied in action lines",
-        "Example: 'He glances at the pool outside' = add 'Pool area' to list",
-        "Example: 'Sound of traffic from street below' = note 'Street proximity required'",
-        "Example: 'Bathroom door visible' = bathroom must be practical or suggested"
-      ],
-      "location_requirements": "SPECIFIC NEEDS: windows with view? running water? working lights? soundproofing? specific architecture?"
+      "primary": "Main location from header",
+      "setting": "residential/commercial/industrial/exterior/vehicle/public/institutional",
+      "timeOfDay": "DAY | NIGHT",
+      "intExt": "INT | EXT",
+      "additional_locations": ["Other mentioned locations"],
+      "location_requirements": "Windows? Running water? Specific needs?"
     },
     "cast": {
-      "principal": [
-        "PARSE SCENE TEXT: List characters with DIALOGUE (speaking roles with names)",
-        "These are characters central to the story with speaking lines"
-      ],
-      "speaking": [
-        "SAME as principal - characters who speak in this scene",
-        "Include one-line roles: 'WAITER: Here's your coffee'"
-      ],
-      "silent": [
-        "PARSE ACTION LINES: Characters described doing things but NOT speaking",
-        "Example: 'A GUARD watches from doorway' = add GUARD to silent",
-        "Example: 'PEDESTRIANS hurry past' = add to extras, not silent",
-        "Silent = named or featured non-speaking characters"
-      ],
-      "extras": {
-        "count": "PARSE ACTION LINES: Count background people mentioned (restaurant diners, office workers, crowd, pedestrians, traffic)",
-        "description": "EXTRACT: What they're doing ('dining', 'walking past', 'office workers at desks', 'students in hallway')",
-        "casting_notes": "Any specific types needed? ('businesspeople', 'families', 'teenagers', 'period-appropriate', 'ethnically diverse')"
-      }
+      "principal": ["Characters with dialogue"],
+      "speaking": ["Same as principal"],
+      "silent": ["Named non-speaking"],
+      "extras": {"count": "Number", "description": "What doing", "casting_notes": "Types needed"}
     },
-    "key_props": [
-      "READ EVERY ACTION LINE: List EVERY physical object mentioned that characters:",
-      "1. Touch or handle (phone, gun, drink, keys, bag, pen, paper)",
-      "2. Interact with (door, chair, table, bed, vehicle controls)",
-      "3. Consume (food, drinks, cigarettes, medicine)",
-      "4. Refer to in dialogue ('Where's the file?' = FILE is a prop)",
-      "5. That affects story (weapon, document, technology, tools)",
-      "Format: 'Phone (iPhone, character uses to call)', 'Knife (kitchen knife, picks up from counter)', 'Whiskey glass (half-empty, sets down hard)'",
-      "Be EXHAUSTIVE - missing props halt production"
-    ],
-    "vehicles": [
-      "PARSE TEXT: ANY vehicle mentioned, shown, or used:",
-      "- Driven by characters (car, motorcycle, bicycle, boat)",
-      "- Stationary but featured (parked car they lean on)",
-      "- Background traffic (note: 'background traffic')",
-      "- Heard but not seen (note: 'off-screen car sounds')",
-      "Specify: make/model if mentioned, condition (new/old/damaged), how used (picture car/stunt car/background)"
-    ],
+    "key_props": ["Object (description, how used)"],
+    "vehicles": ["Vehicle (make/model, condition, usage)"],
     "sfx": {
-      "practical": [
-        "SCAN FOR: Physical effects that happen on-set IN CAMERA:",
-        "- Fire, smoke, fog, haze, steam",
-        "- Rain, wind, snow (artificial weather)",
-        "- Squibs (bullet hits, blood effects)",
-        "- Breaking glass, destruction, crashes",
-        "- Sparks, electrical effects",
-        "- Practical puppets or animatronics",
-        "Format: 'Rain (heavy, exterior, 10-minute setup)', 'Squib (chest hit, blood)'"
-      ],
-      "vfx": [
-        "SCAN FOR: Impossible or enhanced elements added digitally IN POST:",
-        "- Removal (wires, rigs, modern elements from period scenes)",
-        "- Enhancement (bigger explosion, more crowd, wider vista)",
-        "- Impossible physics (flying, supernatural, sci-fi)",
-        "- Environment changes (different sky, adding buildings, time of day change)",
-        "- Creatures or characters that don't exist practically",
-        "- Screen replacements (computer monitors, TV screens, phone screens with content)",
-        "Format: 'Remove safety wires', 'Add muzzle flash', 'Replace phone screen with text message', 'Enhance fire size'"
-      ],
-      "stunts": [
-        "SCAN FOR: ANY action requiring stunt coordinator or risking injury:",
-        "- Falls (any height, even tripping)",
-        "- Fights (punches, wrestling, weapon combat)",
-        "- Vehicle action (car chase, crash, motorcycle, boats)",
-        "- Weapon discharge (guns, even blanks need armorer)",
-        "- Heights (climbing, rooftop, ladder work)",
-        "- Water (underwater, diving, water surface action)",
-        "- Fire proximity (walking through flames, fire contact)",
-        "- High-speed movement (running through traffic, parkour)",
-        "Format: 'Fight choreography (1 min, punch/kick exchange)', 'Fall (down stairs, 8 steps)', 'Driving (high speed, city streets)'"
-      ]
+      "practical": ["On-set effects: fire, rain, squibs, etc."],
+      "vfx": ["Post effects: removal, enhancement, impossible"],
+      "stunts": ["Coordinator needed for: falls, fights, vehicles, weapons, heights, water, fire"]
     },
     "wardrobe": {
-      "principal": [
-        "PARSE FOR EACH PRINCIPAL CHARACTER:",
-        "- Specific clothing mentioned? ('in a tuxedo', 'wearing hospital gown', 'still in pajamas')",
-        "- Clothing condition? ('torn shirt', 'bloodstained', 'soaking wet')",
-        "- Period requirements? (1920s suit, Victorian dress, 80s fashion)",
-        "- Continuity needs? (same outfit as previous scene, or change noted)",
-        "- Practical requirements? (pockets for props, tearaway for stunt, shoes for running)",
-        "Format: 'JOHN: Business suit (navy, must have interior pocket for gun), dress shoes', 'SARAH: Hospital gown (paper, will be torn in struggle), barefoot'"
-      ],
-      "notes": "Changes during scene? Wardrobe malfunction? Multiples needed for stunts/effects? Specialty items (armor, uniforms, costumes)?"
+      "principal": ["CHARACTER: Clothing (details, condition, period, continuity)"],
+      "notes": "Changes? Multiples? Specialty?"
     },
     "makeup": {
-      "standard": [
-        "EVERY on-camera actor needs basic makeup - list all cast",
-        "Note special considerations: heavy sweat, rain, close-ups, period-accurate"
-      ],
-      "special": [
-        "PARSE TEXT FOR: Injuries, blood, bruises, aging, de-aging, prosthetics, tattoos (practical or cover), scars, special beauty looks, creature effects, body paint, period hair/makeup",
-        "Format: 'Blood (face/hands, increasing throughout scene)', 'Black eye (fresh, swollen)', 'Aging (40s to 80s)', '1960s hair/makeup (bouffant, heavy eyeliner)'"
-      ]
+      "standard": ["All cast + considerations"],
+      "special": ["Injuries, blood, aging, prosthetics, period"]
     },
     "scheduling": {
-      "constraints": "TIME-SENSITIVE ELEMENTS: Night shoot (premium crew rates), sunrise/sunset (narrow window), child actors (limited hours), animal work (handlers, limited takes), weather-dependent, season-specific, matching previous scene timing",
-      "notes": "PRODUCTION NOTES: Estimated setup time, number of shooting days needed, company moves (multiple locations), potential for overlapping prep, crew meal timing if long scene, special permits needed"
+      "constraints": "Night? Sunrise/sunset? Child/animal? Weather? Season?",
+      "notes": "Setup time, days, moves, prep, permits"
     }
   },
   "directing_vision": {
-    "scene_setting": "CRITICAL - SCENE-LEVEL ANCHOR FOR ALL SHOTS: Describe the physical environment that will be IDENTICAL across all image_prompts in this scene. Include: room/location type ('dimly lit home office', 'sun-drenched beach', 'cramped car interior'), key furniture/objects ('desk with papers', 'lifeguard tower', 'steering wheel'), lighting source ('single desk lamp', 'golden hour sunlight', 'dashboard glow'), time of day, atmosphere. This exact description MUST appear at the start of EVERY shot's image_prompt - it's the glue that makes Shot 1 and Shot 15 feel like the same scene. Example: 'Victorian drawing room with high windows, heavy curtains, oil paintings, single oil lamp on side table creating warm glow, late evening' - this would begin every image_prompt for all 12 shots in the scene.",
-    "visual_metaphor": [
-      "HOW DOES CAMERA LANGUAGE EXPRESS THE SCENE'S MEANING?",
-      "Not just 'covers the action' - what does the CAMERA DO to convey subtext?",
-      "Examples:",
-      "- 'Slowly push in on CHARACTER as walls of their lie close in - camera becomes pressure'",
-      "- 'Handheld, chaotic framing mirrors CHARACTER's loss of control'",
-      "- 'Static, symmetrical frames emphasize rigid formality and emotional distance'",
-      "- 'Low angles on ANTAGONIST, high angles on PROTAGONIST show power imbalance'",
-      "- 'Shoot through windows/barriers to visualize emotional separation'",
-      "- 'Tight single close-ups (no two-shots) emphasize characters talking AT not WITH each other'",
-      "Connect camera choices to emotional/thematic content"
-    ],
-    "editorial_intent": [
-      "WHAT'S THE PACING STRATEGY FOR THIS SCENE?",
-      "How should shots be cut together to control rhythm and emotion?",
-      "Examples:",
-      "- 'Quick cuts during argument escalation, then hold on long silence for impact'",
-      "- 'Linger on reactions longer than dialogue - what's unsaid matters more'",
-      "- 'Slow build: long takes early, then rapid cutting as tension peaks'",
-      "- 'Cross-cutting between CHARACTER A's lies and CHARACTER B's discovery'",
-      "- 'Single long take to create real-time anxiety, no escape for audience'",
-      "Specify: fast/slow cutting, hold lengths, when to cut vs when to stay"
-    ],
-    "shot_motivation": [
-      "WHY THIS SPECIFIC NUMBER OF SHOTS?",
-      "Justify shot count based on scene's dramatic needs:",
-      "Format: 'X shots because [reason tied to drama/emotion/information]'",
-      "Examples:",
-      "- '5 shots - minimal coverage for quiet, internal moment. More would dilute intimacy'",
-      "- '18 shots - full shot/reverse coverage for negotiation, tracking each argument beat'",
-      "- '25 shots - complex action with multiple characters, need geography and emotional beats'",
-      "- '3 shots - simple scene, ONE key moment, minimal cuts for contemplative mood'",
-      "NOT 'enough to cover the dialogue' - connect to DRAMATIC purpose"
-    ],
+    "scene_setting": "CRITICAL: Physical environment IDENTICAL in all image_prompts. room type + key objects + lighting source + time + atmosphere. Example: Victorian drawing room, heavy curtains, oil lamp, late evening",
+    "visual_metaphor": "How camera expresses meaning. Examples: Push in as lie closes in, Handheld mirrors loss of control, Low angles show power",
+    "editorial_intent": "Pacing strategy. Quick cuts? Linger on reactions? Slow build?",
+    "shot_motivation": "X shots because [dramatic reason]",
     "tone_and_mood": {
-      "opening": "Starting emotional state - what does the SCENE feel like when it begins? (tense, intimate, hostile, playful, melancholic, etc.)",
-      "shift": "Where/when does the mood change? Identify the MOMENT (line, action, realization) that shifts the emotional temperature",
-      "closing": "Ending emotional state - what does the scene feel like when it ends? How is this different from opening?",
-      "energy": "LOW/BUILDING/HIGH/DECLINING/VOLATILE - the scene's energy trajectory",
-      "visual_expression": "How should camera/lighting/framing SHOW this mood progression? Example: 'Opens warm/soft, hardens to cold/sharp as betrayal revealed'"
+      "opening": "Starting emotion",
+      "shift": "When/how mood changes",
+      "closing": "Ending emotion",
+      "energy": "LOW | BUILDING | HIGH | DECLINING | VOLATILE",
+      "visual_expression": "How camera/lighting show progression"
     },
     "visual_strategy": {
-      "approach": [
-        "CHOOSE VISUAL APPROACH BASED ON DRAMATIC INTENT:",
-        "- OBSERVATIONAL: Camera watches objectively, documentary feel, discovers with characters",
-        "- INTIMATE: Close, subjective, inside character's experience",
-        "- FORMAL: Composed, symmetrical, emphasizing control or rigidity",
-        "- KINETIC: Moving, handheld, energetic, chaotic",
-        "- IMPRESSIONISTIC: Subjective, distorted, emotional reality over literal",
-        "Explain WHY this approach serves the scene's meaning"
-      ],
-      "camera_personality": [
-        "WHAT IS THE CAMERA'S RELATIONSHIP TO CHARACTERS?",
-        "- OBSERVER: Neutral, watching from outside, objective POV",
-        "- ALIGNED: Subjective, seeing through character's eyes/experience",
-        "- OMNISCIENT: Knows more than characters, reveals what they don't see",
-        "- PARTICIPANT: In the space with them, reacting to action (handheld, reactive)",
-        "Format: 'Aligned with [CHARACTER] - we experience their [fear/confusion/discovery]' OR 'Omniscient - reveals [what CHARACTER doesn't know]'"
-      ],
-      "lighting_mood": "Describe lighting that supports emotional tone. Examples: 'Harsh overhead, deep shadows - noir interrogation feel', 'Soft window light, warm - false intimacy before betrayal', 'Practical sources only, naturalistic - grounded realism'"
+      "approach": "OBSERVATIONAL | INTIMATE | FORMAL | KINETIC | IMPRESSIONISTIC - why?",
+      "camera_personality": "OBSERVER | ALIGNED | OMNISCIENT | PARTICIPANT - format: Aligned with CHARACTER",
+      "lighting_mood": "Support tone. Examples: Harsh shadows, Soft window light, Practical sources"
     },
-    "character_motivations": [
-      "FOR EACH CHARACTER IN SCENE:",
-      {"character": "NAME (in caps)", "wants": "Specific goal in THIS scene", "obstacle": "What blocks them from getting it", "tactic": "How they try to overcome obstacle"},
-      "This directly informs shot choices - whose POV, when to show reactions, when character drives the shot"
-    ],
-    "key_moments": [
-      "IDENTIFY THE 3-5 MOST IMPORTANT BEATS THAT MUST BE CAPTURED:",
-      {"beat": "Specific line of dialogue OR action", "emphasis": "Shot type/size and WHY (e.g., 'Close-up to capture micro-expression of recognition')", "why": "What this moment MEANS for story/character arc"},
-      "These key moments should correspond to TURN, REVELATION, POWER SHIFT, or CHOICE from story_analysis",
-      "Example: {'beat': 'SARAH: I know about Rebecca', 'emphasis': 'Tight close-up on JOHN reaction - this is the turn', 'why': 'His lie is exposed, power shifts to SARAH'}"
-    ],
-    "performance_notes": [
-      "DIRECTION FOR EACH ACTOR - WHAT'S THEIR INTERNAL JOURNEY?",
-      "Format: 'CHARACTER: [emotional arc through scene] - [specific notes]'",
-      "Examples:",
-      "- 'JOHN: Confident → defensive → defeated. Keep responses minimal, swallow emotion until final breakdown'",
-      "- 'DETECTIVE: Neutral observer → predator. Stillness is weapon, let silence do work'",
-      "- 'MARIA: Performing calm while screaming inside. Every gesture is controlled, nothing spontaneous'",
-      "Connect to subtext from story_analysis - what they SHOW vs what they FEEL"
-    ],
+    "character_motivations": [{"character": "NAME", "wants": "Goal", "obstacle": "Block", "tactic": "Method"}],
+    "key_moments": [{"beat": "Dialogue/action", "emphasis": "Shot type/why", "why": "Story meaning"}],
+    "performance_notes": ["CHARACTER: Arc - notes"],
     "blocking": {
-      "geography": [
-        "HOW IS PHYSICAL SPACE USED TO EXPRESS RELATIONSHIP/POWER/EMOTION?",
-        "Examples:",
-        "- 'CHARACTER A behind desk (power position), CHARACTER B standing vulnerable in open space'",
-        "- 'Start together at table, CHARACTER B retreats to window as conflict grows - visualizing distance'",
-        "- 'CHARACTER circles CHARACTER B (predator/prey) while interrogating'",
-        "- 'Locked in tight bathroom - no escape, forced intimacy'",
-        "Physical positions should MEAN something about character state"
-      ],
-      "movement": [
-        "WHAT ARE THE KEY PHYSICAL MOVEMENTS AND WHAT DO THEY REVEAL?",
-        "Examples:",
-        "- 'CHARACTER A stands/towers over seated CHARACTER B when making threat - physicalize power'",
-        "- 'CHARACTER B turns away when lying - can't maintain eye contact'",
-        "- 'CHARACTER A invades personal space during seduction, CHARACTER B holds ground or retreats'",
-        "Movement should reveal tactic, emotion, or power shift"
-      ],
-      "eyelines": [
-        "WHO LOOKS AT WHOM? WHO LOOKS AWAY? WHEN?",
-        "Eye contact = connection, power, honesty. Lack of eye contact = evasion, shame, withdrawal",
-        "Examples:",
-        "- 'CHARACTER A can't hold gaze when questioned - tells before words do'",
-        "- 'CHARACTER B stares directly throughout, unflinching - dominance through eye contact'",
-        "- 'CHARACTER A looks to CHARACTER B for approval before answering - power dynamic'",
-        "Eyelines inform shot/reverse-shot pattern and when to break it"
-      ]
+      "geography": "How space expresses relationship/power",
+      "movement": "Key movements reveal what",
+      "eyelines": "Who looks at whom when"
     }
   },
   "shot_list": [
     {
       "shot_number": 1,
-      "shot_type": "ONE OF: WIDE | MEDIUM | MEDIUM_WIDE | MEDIUM_CLOSE | CLOSE_UP | EXTREME_CLOSE | INSERT | POV | REVEAL | TWO_SHOT | GROUP_SHOT | OVER_SHOULDER | ESTABLISHING - Choose the SINGLE value that best describes this specific shot",
-      "movement": "ONE OF: STATIC | PUSH_IN | PULL_OUT | DOLLY | PAN | TILT | HANDHELD | STEADICAM | CRANE | TRACKING - Choose the SINGLE value that describes camera movement",
-      "subject": "CHARACTER_NAME in CAPS - what they are doing (NEVER use he/she/they - ALWAYS the name)",
-      "action": "CHARACTER_NAME does specific action (use their NAME, not pronouns)",
-      "coverage": "CHARACTER_NAME: 'Dialogue line' OR CHARACTER_NAME performs specific action",
-      "duration": "Brief/Standard/Extended",
-      "visual": "Composition showing CHARACTER_NAME - describe their position/framing",
-      "serves_story_element": "REQUIRED - Which element from story_analysis does THIS shot serve? Must reference specific findings. Options: 'CORE: [how this shot delivers the scene's essential purpose]', 'TURN: [how this shot builds toward/captures/shows consequences of the pivot moment]', 'STAKES: [how this shot visualizes what's at risk]', 'OWNERSHIP: [how this shot reflects the driving character's POV/agenda]', 'SUBTEXT: [how this shot reveals gap between what's said and what's meant]'. Example: 'TURN: Captures JOHN's micro-expression when SARAH mentions the account - the moment he realizes she knows.' Every shot MUST explicitly connect to story_analysis findings.",
-      "narrative_purpose": "CRITICAL - What story information does THIS shot convey? Reference the specific story element it serves. Examples: 'Establishes JOHN's isolation (STAKES: his vulnerability if caught)', 'Reveals SARAH's lie through micro-expression (TURN: the moment truth emerges)', 'Shows DETECTIVE discovering evidence (CORE: scene exists to shift investigation)', 'Captures MARIA's growing discomfort (OWNERSHIP: her internal struggle drives scene)'. Be SPECIFIC about dramatic function tied to story_analysis.",
-      "pov_and_emotional_state": "WHOSE PERSPECTIVE OR EMOTION DOES THIS SHOT REPRESENT? Reference OWNERSHIP from story_analysis - the character who drives the scene should get more subjective POV shots. Format: 'Represents [CHARACTER]'s [emotional state/POV] (OWNERSHIP: [CHARACTER] drives scene, so favor their perspective)' OR 'Objective/neutral - audience observes both equally despite [CHARACTER]'s ownership'. Examples: 'Represents DETECTIVE's analytical observation - studying suspect for tells (OWNERSHIP: DETECTIVE drives interrogation)', 'Represents SARAH's subjective fear - feeling trapped (aligns with her emotional state from story_analysis)', 'Objective - despite JOHN's ownership of scene, this moment needs audience distance to see his manipulation'. Connect to story_analysis findings.",
-      "connection_to_sequence": [
-        "HOW DOES THIS SHOT CONNECT TO SHOTS BEFORE/AFTER?",
-        "For Shot 1: 'Opens scene by [establishing/revealing/contrasting previous scene]'",
-        "For middle shots: 'Follows Shot X by [tightening/widening/shifting POV/escalating]. Leads to Shot Y by [building tension/revealing new info/shifting power]'",
-        "For final shot: 'Concludes scene by [leaving CHARACTER in state/showing result/cutting on action]'",
-        "Consider:",
-        "- Shot progression: wide → medium → close (building intimacy/tension)",
-        "- POV shifts: from observer → character POV → reaction (action/reaction pattern)",
-        "- Emotional escalation: calm framing → handheld → extreme close-up (rising tension)",
-        "- Match cuts: similar composition but different meaning",
-        "Every shot should be a deliberate step in the scene's visual journey"
-      ],
-      "serves_dramatic_arc": "WHERE DOES THIS SHOT FALL IN THE SCENE'S DRAMATIC STRUCTURE? Label this shot's dramatic function based on story_analysis.the_turn: 'SETUP: Establishing normal state before the turn identified in story_analysis', 'ESCALATION: Building toward the turn [reference specific turn from story_analysis]', 'TURN: THE PIVOT - this shot captures [exact turn from story_analysis] - MUST be visually distinct (different size, movement, POV)', 'FALLOUT: Reaction to turn [reference turn], showing new reality', 'RESOLUTION: Scene's closing state after [reference turn]'. Example: If story_analysis.the_turn is 'When SARAH says I know about the money, JOHN realizes she's been investigating', then Shot 8 might be: 'TURN: Close-up on JOHN's face - captures the exact moment from story_analysis when he realizes SARAH knows. Visually distinct via push-in movement.' CRITICAL: Identify which shot number(s) capture the turn.",
-      "rationale": "WHY THIS SHOT SIZE/TYPE NOW? Connect to story_analysis findings using Hitchcock's principle (shot size = story importance). Reference IMAGERY_AND_TONE for framing/composition guidance. Examples: 'Close-up on JOHN because story_analysis.the_turn happens NOW - his realization IS the story at this moment. Imagery_and_tone calls for tight, claustrophobic framing to match his trapped feeling', 'Wide shot here because story_analysis.stakes show SARAH's vulnerability - geography emphasizes her isolation in the space', 'POV shot from DETECTIVE's perspective because story_analysis.ownership identifies him as scene driver', 'Insert on the letter because story_analysis.the_core requires audience to see the evidence that changes everything'. Tie shot choice explicitly to story_analysis elements, not generic coverage.",
-      "image_prompt": "CRITICAL - SCENE-LEVEL CONTEXT FOR VISUAL CONTINUITY:\n\nEVERY shot in this scene MUST share the SAME foundational context:\n1. SCENE SETTING (from directing_vision.scene_setting): Use IDENTICAL location description for all shots - 'dimly lit office', 'sun-drenched beach', 'cramped car interior'. This anchors all images to the same space.\n2. TIME OF DAY & LIGHTING: Establish once, maintain always - 'golden hour sunset', 'harsh midday sun', 'single desk lamp at night'. Lighting CANNOT change mid-scene.\n3. CHARACTER DESCRIPTIONS: Use EXACT SAME physical descriptions for each character across all shots:\n   - JOHN (40s, salt-pepper hair, exhausted, grey suit)\n   - SARAH (35s, sharp features, determined, red blazer)\n   These descriptions MUST be copy-pasted verbatim into every shot featuring that character.\n4. WARDROBE: Infer from scene context once, maintain throughout - swimming scene = swimwear, office = business attire, bedroom = nightclothes.\n5. EMOTIONAL ARC: Reference where we are in the scene's journey - 'opening tension before confrontation', 'mid-scene as revelation sinks in', 'closing aftermath of argument'.\n\nSHOT-TO-SHOT CONTINUITY:\n- Shot 1 establishes the baseline (location, characters present, their starting positions)\n- Shot 2+ MUST reference this baseline: 'continuing from establishing wide', 'closer on JOHN from previous two-shot', 'reverse angle on SARAH who was RIGHT background in Shot 3'\n- Track character movement: If JOHN walks to the window in Shot 4, he's AT the window in Shot 5, not back at his desk\n- Maintain spatial relationships: If SARAH is in doorway and JOHN at desk (8 feet apart), this geography persists unless someone moves\n\nFORMAT FOR EACH SHOT:\n[SCENE SETTING - identical for all shots], [SHOT TYPE], [BLOCKING: each character's position with LEFT/RIGHT/CENTER, FOREGROUND/BACKGROUND, distance apart], [ACTION CONTEXT: what's happening at this story beat], [CHARACTER 1: NAME + identical physical description + wardrobe + specific action], [CHARACTER 2 if present: NAME + identical physical description + wardrobe + spatial relationship to Character 1 + specific action], [LIGHTING: consistent with scene's established lighting], [CONTINUITY NOTE if relevant: 'continuing from Shot X where...', 'closer on same moment as Shot X', 'reverse angle showing CHARACTER who was background in Shot X']\n\nEXAMPLE for Shot 5 in a sequence:\n'Dimly lit home office with rain visible through window (established in Shot 1), medium close-up, JOHN (40s, salt-pepper hair, exhausted, grey suit - from Shot 1) sitting at desk LEFT reviewing papers with growing concern, SARAH (35s, sharp features, determined, red blazer - from Shot 1) standing in doorway RIGHT 8 feet away watching him (continuing spatial relationship from Shot 3), mid-scene as JOHN realizes SARAH knows his secret (emotional arc building to confrontation), LIGHTING: single desk lamp creates side key light (consistent with Shot 1 lighting), CONTINUITY: tighter framing on JOHN from previous wide shot showing both characters'\n\nCRITICAL: Copy-paste character descriptions, scene setting, and lighting from shot to shot. Only change framing, angle, and character actions/positions."
+      "shot_type": "ESTABLISHING | WIDE | MEDIUM_WIDE | MEDIUM | MEDIUM_CLOSE | CLOSE_UP | EXTREME_CLOSE | TWO_SHOT | GROUP_SHOT | OVER_SHOULDER | POV | INSERT | REVEAL",
+      "movement": "STATIC | PUSH_IN | PULL_OUT | DOLLY | PAN | TILT | HANDHELD | STEADICAM | CRANE | TRACKING",
+      "subject": "CHARACTER_NAME - what doing (NEVER pronouns)",
+      "action": "CHARACTER_NAME specific action",
+      "coverage": "CHARACTER: 'Dialogue' OR CHARACTER action",
+      "duration": "Brief | Standard | Extended",
+      "visual": "Composition + position + framing",
+      "serves_story_element": "CORE/TURN/STAKES/OWNERSHIP/SUBTEXT: how shot serves it",
+      "narrative_purpose": "What story info conveyed, reference story_analysis",
+      "pov_and_emotional_state": "Represents CHARACTER's [state/POV] or Objective",
+      "connection_to_sequence": "Shot 1: Opens by []. Middle: Follows X by [], leads to Y by []. Final: Concludes by []",
+      "serves_dramatic_arc": "SETUP | ESCALATION | TURN | FALLOUT | RESOLUTION - reference story_analysis.the_turn",
+      "rationale": "Why this size/type NOW, Hitchcock's principle, tie to story_analysis",
+      "image_prompt": "[SCENE SETTING - IDENTICAL all shots], [shot type], CHARACTER (exact physical description) [action], [LEFT/RIGHT/FOREGROUND/BACKGROUND positions], LIGHTING: [consistent], CONTINUITY: [reference previous if needed]"
     }
   ],
-  "shot_list_justification": [
-    "DOCUMENT SHOT COVERAGE AND DRAMATIC FLOW:",
-    "1. Character coverage: List each character and which shot numbers feature them BY NAME",
-    "2. Turn coverage: Identify which shot number(s) capture the scene's dramatic turn/pivot",
-    "3. POV breakdown: Note objective vs subjective shots and whose POV",
-    "4. Arc tracking: Verify shots progress through SETUP → ESCALATION → TURN → FALLOUT → RESOLUTION",
-    "Format: 'CHARACTER_NAME: Shots [1, 3, 5, 7]. Turn captured in Shot [X]. POV: [objective/CHARACTER's subjective view]. Arc: [setup shots 1-2, escalation 3-5, turn shot 6, fallout 7-8]'"
-  ]
+  "shot_list_justification": "Coverage: CHARACTER in Shots [numbers]. Turn in Shot [X]. POV: [objective/subjective]. Arc: [setup→escalation→turn→fallout→resolution]"
 }`
 
     console.log(`🤖 [${invocationId}] Calling Claude API...`)

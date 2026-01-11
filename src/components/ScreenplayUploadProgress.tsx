@@ -14,6 +14,13 @@ interface ScreenplayUploadProgressProps {
   currentScene?: number;
   totalScenes?: number;
   fileName?: string;
+  batchInfo?: {
+    start: number;
+    end: number;
+    number: number;
+    total: number;
+  };
+  estimatedTimeRemaining?: number; // in seconds
 }
 
 const STEPS: ProgressStep[] = [
@@ -43,7 +50,9 @@ export const ScreenplayUploadProgress: React.FC<ScreenplayUploadProgressProps> =
   currentStep,
   currentScene,
   totalScenes,
-  fileName
+  fileName,
+  batchInfo,
+  estimatedTimeRemaining
 }) => {
   const currentStepIndex = STEPS.findIndex(s => s.id === currentStep);
 
@@ -144,10 +153,21 @@ export const ScreenplayUploadProgress: React.FC<ScreenplayUploadProgressProps> =
       </div>
 
       {/* Scene progress for analyzing step */}
-      {currentStep === 'analyzing' && currentScene && totalScenes && (
-        <div className="text-center pt-2">
+      {currentStep === 'analyzing' && batchInfo && totalScenes && (
+        <div className="text-center pt-2 space-y-1">
+          <p className="text-sm font-medium text-white">
+            Processing Scenes {batchInfo.start}-{batchInfo.end} of {totalScenes}
+          </p>
           <p className="text-sm text-white/50">
-            Scene {currentScene} of {totalScenes} • {Math.round((currentScene / totalScenes) * 100)}% complete
+            Batch {batchInfo.number} of {batchInfo.total} • {Math.round(((batchInfo.number - 1) / batchInfo.total) * 100)}% complete
+          </p>
+          {estimatedTimeRemaining && estimatedTimeRemaining > 0 && (
+            <p className="text-xs text-white/40">
+              Estimated time remaining: {Math.ceil(estimatedTimeRemaining / 60)} min
+            </p>
+          )}
+          <p className="text-xs text-[#E50914] mt-1">
+            ⚡ Analyzing 2 scenes in parallel
           </p>
         </div>
       )}

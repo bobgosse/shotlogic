@@ -37,9 +37,11 @@ export default function Index() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [scenes, setScenes] = useState<AnalyzedScene[]>([]);
   const [currentSceneIndex, setCurrentSceneIndex] = useState(0);
+  const [currentBatch, setCurrentBatch] = useState({ start: 0, end: 0, number: 0, total: 0 });
   const [isSaving, setIsSaving] = useState(false);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
+  const [batchTimes, setBatchTimes] = useState<number[]>([]);
 
 
   // Timer effect for showing elapsed time during analysis
@@ -61,7 +63,7 @@ export default function Index() {
         totalScenes: totalScenes
       }, {
         context: `Analyzing scene ${scene.number}`,
-        timeoutMs: 90000, // 90 seconds for AI analysis
+        timeoutMs: 180000, // 180 seconds for AI analysis
         maxRetries: 2
       });
 
@@ -144,11 +146,22 @@ export default function Index() {
     setProjectId(newProjectId);
 
     const analyzedScenes: AnalyzedScene[] = [...initialScenes];
-    const BATCH_SIZE = 4;
+    const BATCH_SIZE = 2; // Reduced from 4 to 2 to stay under Railway's 120s timeout
+    const totalBatches = Math.ceil(parsedScenes.length / BATCH_SIZE);
+    const batchTimings: number[] = [];
 
     for (let batchStart = 0; batchStart < parsedScenes.length; batchStart += BATCH_SIZE) {
       const batchEnd = Math.min(batchStart + BATCH_SIZE, parsedScenes.length);
+      const batchNumber = Math.floor(batchStart / BATCH_SIZE) + 1;
       const batchIndices: number[] = [];
+
+      // Update batch info for UI
+      setCurrentBatch({
+        start: batchStart + 1,
+        end: batchEnd,
+        number: batchNumber,
+        total: totalBatches
+      });
 
       for (let i = batchStart; i < batchEnd; i++) {
         batchIndices.push(i);
@@ -157,11 +170,19 @@ export default function Index() {
       setScenes([...analyzedScenes]);
       setCurrentSceneIndex(batchStart + 1); // +1 for display (1-indexed)
 
+      // Track batch timing
+      const batchStartTime = Date.now();
+
       const batchPromises = batchIndices.map(i =>
         analyzeScene(analyzedScenes[i], parsedScenes.length)
       );
 
       const batchResults = await Promise.all(batchPromises);
+
+      // Record batch completion time
+      const batchDuration = (Date.now() - batchStartTime) / 1000; // seconds
+      batchTimings.push(batchDuration);
+      setBatchTimes([...batchTimings]);
 
       // Step 4: Generate breakdown (save results)
       setUploadStep('generating');
@@ -475,6 +496,11 @@ export default function Index() {
               currentScene={uploadStep === 'analyzing' ? currentSceneIndex : undefined}
               totalScenes={uploadStep === 'analyzing' ? scenes.length : undefined}
               fileName={fileInfo?.name}
+              batchInfo={uploadStep === 'analyzing' && currentBatch.total > 0 ? currentBatch : undefined}
+              estimatedTimeRemaining={uploadStep === 'analyzing' && batchTimes.length > 0
+                ? (batchTimes.reduce((a, b) => a + b, 0) / batchTimes.length) * (currentBatch.total - currentBatch.number)
+                : undefined
+              }
             />
           </div>
         )}
