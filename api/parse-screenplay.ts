@@ -127,13 +127,28 @@ async function parsePDF(buffer: Buffer): Promise<string> {
   }
 
   // Clean up and normalize
-  const normalized = fullText
+  let normalized = fullText
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n')
     .replace(/\n{4,}/g, '\n\n\n')
     .trim()
 
+  // CRITICAL FIX: Remove excessive spacing between characters
+  // Some PDFs extract with spaces between every letter: "E X T ." -> "EXT."
+  const totalChars = normalized.length
+  const spaceCount = (normalized.match(/\s/g) || []).length
+  const spacePercentage = spaceCount / totalChars
+
+  if (spacePercentage > 0.4) {
+    console.log(`[PDF] Detected spaced-out text (${(spacePercentage * 100).toFixed(1)}% spaces), normalizing...`)
+    // Collapse single spaces between letters/numbers: "I N T ." -> "INT."
+    normalized = normalized.replace(/([A-Za-z0-9])\s(?=[A-Za-z0-9])/g, '$1')
+    // Clean up remaining double spaces
+    normalized = normalized.replace(/  +/g, ' ')
+  }
+
   console.log(`[PDF] Success: ${numPages} pages, ${totalTextItems} text items, ${normalized.length} chars`)
+  console.log(`[PDF] First 1000 chars of extracted text:`, normalized.substring(0, 1000))
 
   return normalized
 }
