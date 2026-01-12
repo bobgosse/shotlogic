@@ -346,6 +346,7 @@ Return ONLY valid JSON with this structure:
         body: JSON.stringify({
           model: 'claude-sonnet-4-20250514',
           max_tokens: 8000,
+          system: 'You are a professional 1st AD and script breakdown expert. You MUST return ONLY valid JSON with the EXACT structure provided. Fill ALL fields with detailed, specific analysis. Never use placeholder text. Never skip fields. Follow the format precisely.',
           messages: [
             { role: 'user', content: userPrompt }
           ]
