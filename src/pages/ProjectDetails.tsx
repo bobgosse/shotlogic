@@ -1001,14 +1001,12 @@ const ProjectDetails = () => {
               {/* Tabs */}
               <div className="p-4">
                 <Tabs defaultValue="script" className="w-full">
-                  <TabsList className="w-full grid grid-cols-7 mb-4">
+                  <TabsList className="w-full grid grid-cols-5 mb-4">
                     <TabsTrigger value="script">Script</TabsTrigger>
                     <TabsTrigger value="story">Story</TabsTrigger>
                     <TabsTrigger value="producing">Producing</TabsTrigger>
                     <TabsTrigger value="directing">Directing</TabsTrigger>
                     <TabsTrigger value="shots">Shots</TabsTrigger>
-                    <TabsTrigger value="prompts">Prompts</TabsTrigger>
-                    <TabsTrigger value="visual-profile">Visual Profile</TabsTrigger>
                   </TabsList>
 
                   {/* Script Tab */}
@@ -1445,95 +1443,6 @@ const ProjectDetails = () => {
                         </div>
                       </>
                     )}
-                  </TabsContent>
-
-                  {/* Prompts Tab */}
-                  <TabsContent value="prompts" className="mt-0 space-y-4">
-                    {!selectedAnalysis?.shot_list || selectedAnalysis.shot_list.length === 0 ? (
-                      <div className="bg-gradient-to-r from-primary/10 to-netflix-red/10 border-2 border-primary/30 rounded-lg p-8 text-center">
-                        <ImageIcon className="w-12 h-12 text-primary mx-auto mb-4" />
-                        <h3 className="text-lg font-bold mb-2">No Prompts Yet</h3>
-                        <p className="text-sm text-muted-foreground mb-4">Generate analysis to get AI image prompts</p>
-                        <Button
-                          onClick={() => handleReanalyzeScene(selectedScene.id, selectedScene.scene_number, selectedScene.content)}
-                          disabled={reanalyzing}
-                          className="bg-netflix-red hover:bg-netflix-red/90"
-                        >
-                          <Sparkles className="w-4 h-4 mr-2" />
-                          Generate Analysis
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        <p className="text-sm text-muted-foreground">
-                          {isEditMode ? 'Edit image prompts directly. Changes will be saved when you click Save Edits.' : 'Click to copy prompts for Midjourney, DALL-E, or other AI image generators.'}
-                        </p>
-                        {(editedScenes[selectedScene.id]?.shot_list || selectedAnalysis.shot_list).map((shot, idx) => {
-                          if (!isShotListItem(shot)) return null;
-                          const currentShot = getCurrentShot(idx);
-                          const prompts = generatePromptPair(normalizeShot(currentShot || shot), selectedScene, selectedAnalysis, undefined, project?.visual_style);
-                          return (
-                            <div key={idx} className="bg-muted/30 rounded-lg border border-border p-4 space-y-3">
-                              <div className="flex items-center justify-between">
-                                <span className="text-sm font-bold text-primary">
-                                  Shot {idx + 1}: {getShotType(currentShot || shot)}
-                                </span>
-                              </div>
-                              <div>
-                                <div className="flex items-center justify-between mb-2">
-                                  <span className="text-xs text-muted-foreground">
-                                    Image Prompt {project?.visual_profile && <span className="text-primary">(with Visual Profile)</span>}
-                                  </span>
-                                  {!isEditMode && (
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      className="h-6 px-2 text-xs"
-                                      onClick={() => {
-                                        navigator.clipboard.writeText(prompts.previs);
-                                        toast({ title: "Prompt copied!" });
-                                      }}
-                                    >
-                                      <ImageIcon className="h-3 w-3 mr-1" />
-                                      Copy
-                                    </Button>
-                                  )}
-                                </div>
-                                {isEditMode ? (
-                                  <Textarea
-                                    value={currentShot?.image_prompt || shot.image_prompt || prompts.previs}
-                                    onChange={(e) => handleShotEdit(idx, 'image_prompt', e.target.value)}
-                                    className="text-sm font-mono leading-relaxed min-h-[120px]"
-                                    placeholder="Enter image prompt for AI image generators..."
-                                  />
-                                ) : (
-                                  <p className="text-sm text-foreground bg-background rounded p-3 font-mono leading-relaxed">
-                                    {prompts.previs}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </TabsContent>
-
-                  {/* Visual Profile Tab */}
-                  <TabsContent value="visual-profile" className="mt-0">
-                    <div className="bg-muted/30 border border-border rounded-lg p-6">
-                      <div className="mb-4">
-                        <h3 className="text-lg font-semibold text-foreground mb-1">Visual Profile</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Configure the visual aesthetic for all scenes in this project. These settings will be applied to all image prompts for consistent visual style.
-                        </p>
-                      </div>
-                      <VisualProfileEditor
-                        initialProfile={project?.visual_profile || undefined}
-                        onSave={handleSaveVisualProfile}
-                        isSaving={isSavingVisualProfile}
-                      />
-                    </div>
                   </TabsContent>
                 </Tabs>
               </div>
