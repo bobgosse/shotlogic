@@ -104,10 +104,12 @@ export default async function handler(
     }
 
     const requestBody = req.body as AnalyzeSceneRequest
-    const { sceneText, sceneNumber, totalScenes, customInstructions } = requestBody
+    const { sceneText, sceneNumber, totalScenes, visualStyle, visualProfile, characters: projectCharacters, customInstructions } = requestBody
 
     console.log(`📊 [${invocationId}] Scene: ${sceneNumber}/${totalScenes}`)
     console.log(`📊 [${invocationId}] Text length: ${sceneText?.length || 0} chars`)
+    console.log(`📊 [${invocationId}] Visual style: ${visualStyle ? 'YES' : 'NO'}`)
+    console.log(`📊 [${invocationId}] Visual profile: ${visualProfile ? 'YES' : 'NO'}`)
     console.log(`📊 [${invocationId}] Custom instructions: ${customInstructions ? 'YES' : 'NO'}`)
 
     // CRITICAL FIX: Detailed field validation
@@ -185,6 +187,13 @@ export default async function handler(
 
 
     // Build character definitions for prompt
+    let characterDefinitions = "";
+    if (projectCharacters && projectCharacters.length > 0) {
+      characterDefinitions = projectCharacters
+        .filter((c: any) => c.name && c.physical)
+        .map((c: any) => `- ${c.name}: ${c.physical}`)
+        .join("\n");
+    }
     console.log(`📊 [${invocationId}] Characters: ${characters.join(', ')}`)
 
     const userPrompt = `You are a professional 1st AD creating a shot list for Scene ${sceneNumber} of ${totalScenes}.
@@ -196,11 +205,34 @@ ${sceneText}
 <characters_in_scene>
 ${characters.join(', ')}
 </characters_in_scene>
+${characterDefinitions ? `<character_physical_descriptions>
+USE THESE EXACT PHYSICAL DESCRIPTIONS IN ALL IMAGE_PROMPTS:
+${characterDefinitions}
+(Wardrobe inferred from context: swimming=swimsuit, office=business attire, bedroom=nightclothes)
+</character_physical_descriptions>` : ""}
 ${customInstructions ? `<custom_user_instructions>
 ${customInstructions}
 </custom_user_instructions>` : ""}
+${visualProfile ? `<visual_profile>
+PROJECT VISUAL PROFILE (apply to ALL image_prompts):
+COLOR: ${visualProfile.color_palette_hex.slice(0, 3).join(', ')} | Accent: ${visualProfile.accent_colors_hex.slice(0, 2).join(', ')} | Temp: ${visualProfile.color_temperature}
+LIGHTING: ${visualProfile.lighting_style.key_light_direction} key, ${visualProfile.lighting_style.temperature.replace(/_/g, ' ')}, ${visualProfile.lighting_style.shadow_hardness} shadows, ${visualProfile.lighting_style.contrast_ratio.replace(/_/g, ' ')}
+CAMERA: ${visualProfile.aspect_ratio} aspect, ${visualProfile.lens_character.replace(/_/g, ' ')} lens, ${visualProfile.film_stock_look.replace(/_/g, ' ')} look
+POST: ${visualProfile.post_processing.grain_level} grain, ${visualProfile.post_processing.color_grade_style.replace(/_/g, ' ')} grade, ${visualProfile.post_processing.contrast}
+COMPOSITION: ${visualProfile.composition_principles.symmetry_preference.replace(/_/g, ' ')}, ${visualProfile.composition_principles.headroom} headroom, ${visualProfile.composition_principles.depth_of_field} DoF
+${visualProfile.inspiration_notes ? `VISION: ${visualProfile.inspiration_notes}` : ''}
+
+IMAGE_PROMPT FORMAT:
+[scene_setting - SAME for all shots], [shot type], [CHARACTER (exact physical description from above) doing specific action], [spatial positions: LEFT/RIGHT/FOREGROUND/BACKGROUND], LIGHTING: [apply profile], COLOR: [hex codes from profile], CAMERA: [lens + film look], POST: [grain + grade] --ar ${visualProfile.aspect_ratio}
+</visual_profile>` : ""}
 
 <core_rules>
+VISUAL CONTINUITY:
+- Use IDENTICAL scene_setting in every image_prompt ("dimly lit office" in all shots)
+- Copy-paste exact character descriptions ("JOHN (40s, salt-pepper hair, exhausted, grey suit)")
+- Maintain consistent lighting (if Shot 1 has "desk lamp", all shots have "desk lamp")
+- Track positions shot-to-shot (if JOHN moves to window in Shot 4, he's there in Shot 5+)
+
 STORY-DRIVEN SHOTS:
 - Complete story_analysis FIRST
 - Shot count from story needs: simple scene=3-5 shots, dialogue with turn=8-12, complex conflict=15-25
@@ -316,7 +348,7 @@ Return ONLY valid JSON with this structure:
       "action": "CHARACTER_NAME specific action",
       "coverage": "CHARACTER: 'Dialogue' OR CHARACTER action",
       "duration": "Brief | Standard | Extended",
-      "visual_description": "Brief composition note (20-30 words): framing, lighting source, spatial positions, key elements",
+      "visual": "Composition + position + framing",
       "serves_story_element": "CORE/TURN/STAKES/OWNERSHIP/SUBTEXT: how shot serves it",
       "narrative_purpose": "What story info conveyed, reference story_analysis",
       "pov_and_emotional_state": "Represents CHARACTER's [state/POV] or Objective",
