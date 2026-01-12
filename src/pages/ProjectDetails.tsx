@@ -55,7 +55,7 @@ interface ShotListItem {
   shot_type: string;
   visual: string;
   rationale: string;
-  image_prompt?: string;
+  visual_description?: string;
 }
 
 interface AnalysisData {
@@ -496,7 +496,7 @@ const ProjectDetails = () => {
     shot_type: shot.shot_type || shot.shotType || 'SHOT',
     visual: shot.visual || shot.visualDescription || '',
     rationale: shot.rationale || '',
-    image_prompt: shot.image_prompt || shot.aiImagePrompt || ''
+    visual_description: shot.visual_description || shot.visualDescription || ''
   });
 
   // Handle editing a shot in the current scene
@@ -1383,11 +1383,12 @@ const ProjectDetails = () => {
                                           />
                                         </div>
                                         <div>
-                                          <label className="text-xs text-muted-foreground">Image Prompt:</label>
+                                          <label className="text-xs text-muted-foreground">Visual Description:</label>
                                           <Textarea
-                                            value={getCurrentShot(idx)?.image_prompt || shot.image_prompt || ''}
-                                            onChange={(e) => handleShotEdit(idx, 'image_prompt', e.target.value)}
-                                            className="mt-1 text-sm font-mono min-h-[60px]"
+                                            value={getCurrentShot(idx)?.visual_description || shot.visual_description || ''}
+                                            onChange={(e) => handleShotEdit(idx, 'visual_description', e.target.value)}
+                                            className="mt-1 text-sm min-h-[60px]"
+                                            placeholder="Framing, lighting, spatial positions, key elements..."
                                           />
                                         </div>
                                       </>
@@ -1417,25 +1418,11 @@ const ProjectDetails = () => {
                                         {getShotRationale(shot) && (
                                           <p className="text-xs text-muted-foreground italic">{getShotRationale(shot)}</p>
                                         )}
-                                        {shot.image_prompt && (
+                                        {shot.visual_description && (
                                           <div className="mt-3 pt-3 border-t border-border/50">
-                                            <div className="flex items-center justify-between mb-1">
-                                              <span className="text-xs text-muted-foreground font-medium">AI Image Prompt {project?.visual_profile && <span className="text-primary">(with Visual Profile)</span>}</span>
-                                              <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                className="h-6 px-2 text-xs"
-                                                onClick={() => {
-                                                  navigator.clipboard.writeText(shot.image_prompt || '');
-                                                  toast({ title: "Image Prompt Copied!", description: "Paste into Flux, Midjourney, or any AI image generator" });
-                                                }}
-                                              >
-                                                <ImageIcon className="h-3 w-3 mr-1" />
-                                                Copy Prompt
-                                              </Button>
-                                            </div>
-                                            <p className="text-xs text-foreground/80 bg-background/50 rounded p-2 font-mono leading-relaxed">
-                                              {shot.image_prompt}
+                                            <span className="text-xs text-muted-foreground font-medium">Visual Description</span>
+                                            <p className="text-xs text-foreground/80 mt-1">
+                                              {shot.visual_description}
                                             </p>
                                           </div>
                                         )}
