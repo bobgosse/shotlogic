@@ -60,11 +60,32 @@ interface ShotListItem {
 
 interface AnalysisData {
   story_analysis: {
-    stakes: string;
-    ownership: string;
-    breaking_point: string;
-    key_props: string;
+    stakes?: string;
+    ownership?: string;
+    breaking_point?: string;
+    key_props?: string | string[];
     synopsis?: string;
+    the_core?: string;
+    the_turn?: string;
+    the_times?: string;
+    imagery_and_tone?: string;
+    tone?: string;
+    what_changes?: string;
+    pitfalls?: string[];
+    subtext?: {
+      what_they_say_vs_want?: string;
+      power_dynamic?: string;
+      emotional_turn?: string;
+      revelation_or_realization?: string;
+    };
+    conflict?: {
+      type?: string;
+      what_characters_want?: string[];
+      obstacles?: string[];
+      tactics?: string[];
+      winner?: string;
+      description?: string;
+    };
   };
   producing_logistics: {
     red_flags: string[];
@@ -1279,22 +1300,60 @@ const ProjectDetails = () => {
                           </div>
                         </div>
 
-                        {/* Subtext */}
+                        {/* Subtext - from story_analysis */}
                         <div className="space-y-2">
                           <h3 className="text-sm font-semibold text-primary flex items-center gap-2">💭 Subtext</h3>
-                          <p className="text-sm text-foreground bg-muted/30 rounded-lg p-3 italic">
-                            {selectedAnalysis.directing_vision?.subtext || 'No subtext analysis'}
-                          </p>
+                          <div className="bg-muted/30 rounded-lg p-3 text-sm space-y-2">
+                            {selectedAnalysis.story_analysis?.subtext ? (
+                              <>
+                                {selectedAnalysis.story_analysis.subtext.what_they_say_vs_want && (
+                                  <p><span className="text-muted-foreground">Say vs Want:</span> {selectedAnalysis.story_analysis.subtext.what_they_say_vs_want}</p>
+                                )}
+                                {selectedAnalysis.story_analysis.subtext.power_dynamic && (
+                                  <p><span className="text-muted-foreground">Power:</span> {selectedAnalysis.story_analysis.subtext.power_dynamic}</p>
+                                )}
+                                {selectedAnalysis.story_analysis.subtext.emotional_turn && (
+                                  <p><span className="text-muted-foreground">Emotional Arc:</span> {selectedAnalysis.story_analysis.subtext.emotional_turn}</p>
+                                )}
+                                {selectedAnalysis.story_analysis.subtext.revelation_or_realization && (
+                                  <p><span className="text-muted-foreground">Revelation:</span> {selectedAnalysis.story_analysis.subtext.revelation_or_realization}</p>
+                                )}
+                              </>
+                            ) : (
+                              <p className="italic text-muted-foreground">No subtext analysis</p>
+                            )}
+                          </div>
                         </div>
 
-                        {/* Conflict */}
+                        {/* Conflict - from story_analysis */}
                         <div className="space-y-2">
                           <h3 className="text-sm font-semibold text-primary flex items-center gap-2">⚔️ Conflict</h3>
-                          <div className="bg-muted/30 rounded-lg p-3 text-sm space-y-1">
-                            {selectedAnalysis.directing_vision?.conflict?.type && (
-                              <Badge variant="outline">{selectedAnalysis.directing_vision.conflict.type}</Badge>
+                          <div className="bg-muted/30 rounded-lg p-3 text-sm space-y-2">
+                            {selectedAnalysis.story_analysis?.conflict ? (
+                              <>
+                                {selectedAnalysis.story_analysis.conflict.type && (
+                                  <div className="flex flex-wrap gap-1 mb-2">
+                                    {selectedAnalysis.story_analysis.conflict.type.split('|').map((t: string, i: number) => (
+                                      <Badge key={i} variant="outline" className="text-xs">{t.trim()}</Badge>
+                                    ))}
+                                  </div>
+                                )}
+                                {(selectedAnalysis.story_analysis.conflict.what_characters_want?.length ?? 0) > 0 && (
+                                  <p><span className="text-muted-foreground">Wants:</span> {selectedAnalysis.story_analysis.conflict.what_characters_want!.join('; ')}</p>
+                                )}
+                                {(selectedAnalysis.story_analysis.conflict.obstacles?.length ?? 0) > 0 && (
+                                  <p><span className="text-muted-foreground">Obstacles:</span> {selectedAnalysis.story_analysis.conflict.obstacles!.join('; ')}</p>
+                                )}
+                                {(selectedAnalysis.story_analysis.conflict.tactics?.length ?? 0) > 0 && (
+                                  <p><span className="text-muted-foreground">Tactics:</span> {selectedAnalysis.story_analysis.conflict.tactics!.join('; ')}</p>
+                                )}
+                                {selectedAnalysis.story_analysis.conflict.winner && (
+                                  <p><span className="text-muted-foreground">Outcome:</span> {selectedAnalysis.story_analysis.conflict.winner}</p>
+                                )}
+                              </>
+                            ) : (
+                              <p className="italic text-muted-foreground">No conflict analysis</p>
                             )}
-                            <p>{selectedAnalysis.directing_vision?.conflict?.description || selectedAnalysis.directing_vision?.shot_motivation || 'No conflict analysis'}</p>
                           </div>
                         </div>
 
