@@ -1331,7 +1331,7 @@ const ProjectDetails = () => {
                           <div className="bg-muted/30 rounded-lg p-3 text-sm space-y-2">
                             {selectedAnalysis.story_analysis?.conflict ? (
                               <>
-                                {selectedAnalysis.story_analysis.conflict.type && (
+                                {selectedAnalysis.story_analysis.conflict.type && typeof selectedAnalysis.story_analysis.conflict.type === 'string' && (
                                   <div className="flex flex-wrap gap-1 mb-2">
                                     {selectedAnalysis.story_analysis.conflict.type.split('|').map((t: string, i: number) => (
                                       <Badge key={i} variant="outline" className="text-xs">{t.trim()}</Badge>
