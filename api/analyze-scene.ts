@@ -184,7 +184,7 @@ export default async function handler(
     const dialogueExchanges = dialogueMatches.length
     console.log(`📊 [${invocationId}] Characters: ${characters.join(', ')}`)
 
-    const userPrompt = `You are a professional 1st AD creating a shot list for Scene ${sceneNumber} of ${totalScenes}.
+    const userPrompt = `Analyze this screenplay scene and generate a complete shot list. Scene ${sceneNumber} of ${totalScenes}.
 
 <scene_text>
 ${sceneText}
@@ -197,132 +197,122 @@ ${customInstructions ? `<custom_user_instructions>
 ${customInstructions}
 </custom_user_instructions>` : ""}
 
-<core_rules>
-STORY-DRIVEN SHOTS:
-- Complete story_analysis FIRST
-- Shot count from story needs: simple scene=3-5 shots, dialogue with turn=8-12, complex conflict=15-25
-- Every shot serves: THE CORE, THE TURN, STAKES, or OWNERSHIP from story_analysis
-- Hitchcock's Rule: shot size = story importance (close-up what matters NOW)
+CRITICAL INSTRUCTIONS:
+1. NEVER echo back template text or placeholder descriptions
+2. EVERY field must contain SPECIFIC content from THIS scene
+3. If a field doesn't apply, write "N/A" - never copy the field description
+4. Use CHARACTER NAMES in CAPS, never pronouns
+5. Quote actual dialogue and describe actual actions from the scene
 
-SHOT_TYPE VALUES (choose ONE):
-ESTABLISHING | WIDE | MEDIUM_WIDE | MEDIUM | MEDIUM_CLOSE | CLOSE_UP | EXTREME_CLOSE | TWO_SHOT | GROUP_SHOT | OVER_SHOULDER | POV | INSERT | REVEAL
+SHOT_TYPE OPTIONS: ESTABLISHING | WIDE | MEDIUM_WIDE | MEDIUM | MEDIUM_CLOSE | CLOSE_UP | EXTREME_CLOSE | TWO_SHOT | GROUP_SHOT | OVER_SHOULDER | POV | INSERT | REVEAL
 
-CHARACTER NAMES:
-- ALWAYS use CHARACTER NAMES in CAPS, NEVER pronouns
-- ✓ "LEO walks to window" ✗ "He walks to window"
-- Every character appears in at least 2 shots: ${characters.map(c => c).join(', ')}
-</core_rules>
-
-Return ONLY valid JSON with this structure:
+Return ONLY valid JSON:
 
 {
   "story_analysis": {
-    "synopsis": "2-3 sentences - what happens",
-    "the_core": "ONE sentence - what MUST this scene accomplish. Format: Scene exists to [concrete purpose]",
-    "the_turn": "Quote the LINE or ACTION that pivots the scene. Format: When CHARACTER says/does [specific], scene shifts from [before] to [after]. If no turn: No dramatic turn.",
+    "synopsis": "[Write 2-3 sentences describing exactly what happens in this scene]",
+    "the_core": "[Complete this sentence: This scene exists to _____ (e.g., 'reveal Cameron's obsession with control')]",
+    "the_turn": "[Quote the exact line or describe the specific action where the scene pivots. If no turn exists, write 'No dramatic turn - scene maintains steady state']",
     "subtext": {
-      "what_they_say_vs_want": "For each speaking character: CHARACTER says [topic] but WANTS [actual goal]",
-      "power_dynamic": "Who has power initially? Does it shift? Format: CHARACTER has power via [source], shifts when [moment]",
-      "emotional_turn": "Opens: [emotion]. Turns at: [trigger]. Closes: [emotion]",
-      "revelation_or_realization": "CHARACTER/AUDIENCE learns [what] when [moment]. If none: No new information"
+      "what_they_say_vs_want": "[For each character with dialogue: NAME says X but wants Y. Be specific about the gap between surface and desire]",
+      "power_dynamic": "[Who controls this scene? Does power shift? NAME has power because ___, it shifts when ___]",
+      "emotional_turn": "[Starting emotion] → [Trigger that changes it] → [Ending emotion]",
+      "revelation_or_realization": "[What new information emerges? Who learns what? If nothing new: 'No new information revealed']"
     },
     "conflict": {
-      "type": "List all: NEGOTIATION | SEDUCTION | CONFRONTATION | INTERROGATION | CONFESSION | AVOIDANCE | COMPETITION | POWER_STRUGGLE | INTERNAL",
-      "what_characters_want": ["CHARACTER wants [specific goal] from [other/situation]"],
-      "obstacles": ["CHARACTER blocked by [specific obstacle]"],
-      "tactics": ["CHARACTER uses [tactic]: [example from scene]"],
-      "winner": "CHARACTER wins/loses [what]. Or: Stalemate/Mutual victory/Pyrrhic victory"
+      "type": "[Choose all that apply: NEGOTIATION, SEDUCTION, CONFRONTATION, INTERROGATION, CONFESSION, AVOIDANCE, COMPETITION, POWER_STRUGGLE, INTERNAL]",
+      "what_characters_want": ["[NAME wants SPECIFIC THING from PERSON/SITUATION]"],
+      "obstacles": ["[NAME is blocked by SPECIFIC OBSTACLE]"],
+      "tactics": ["[NAME uses TACTIC: quote or describe the specific moment]"],
+      "winner": "[Who gets what they want? NAME wins/loses WHAT. Or: Stalemate/Interrupted/Pyrrhic]"
     },
-    "what_changes": "Beginning vs End. Relationship/Information/Situation/Character state. If static: Static scene.",
-    "the_times": "Period/cultural context or Contemporary setting",
-    "imagery_and_tone": "Visual motifs, emotional temperature, cinematography emphasis",
-    "pitfalls": ["2-4 creative risks to avoid specific to this scene"],
-    "stakes": "What CHARACTER risks losing if they fail in THIS scene",
-    "ownership": "CHARACTER drives scene by [action/goal] - others react",
-    "key_props": ["PROP: symbolizes [meaning]"]
+    "what_changes": "[Compare start vs end: What's different about relationships, information, power, or situation?]",
+    "the_times": "[Is this contemporary? Period piece? What era/setting details matter?]",
+    "imagery_and_tone": "[What visual motifs appear? What's the emotional temperature? Dark/light, warm/cold, confined/open?]",
+    "pitfalls": ["[List 2-4 specific risks: overplaying emotion, missing subtext, pacing issues, etc.]"],
+    "stakes": "[What does NAME risk losing if they fail in THIS scene?]",
+    "ownership": "[NAME drives this scene by doing WHAT - others react to them]",
+    "key_props": ["[PROP NAME: what it symbolizes or how it's used dramatically]"]
   },
   "producing_logistics": {
-    "resource_impact": "Low | Medium | High",
-    "red_flags": ["List budget concerns: crowds, stunts, period, complex setups, animals, VFX, weather, equipment, destruction, locations, night, public"],
-    "departments_affected": ["Camera, Grip/Electric, Sound, Art, Wardrobe, Makeup, SFX, VFX, Stunts, Props, Location"],
+    "resource_impact": "[Low/Medium/High based on complexity]",
+    "red_flags": ["[List actual budget concerns from this scene: night shoot, crowds, stunts, VFX, etc.]"],
+    "departments_affected": ["[List departments needed: Camera, Sound, Art, Wardrobe, etc.]"],
     "locations": {
-      "primary": "Main location from header",
-      "setting": "residential/commercial/industrial/exterior/vehicle/public/institutional",
-      "timeOfDay": "DAY | NIGHT",
-      "intExt": "INT | EXT",
-      "additional_locations": ["Other mentioned locations"],
-      "location_requirements": "Windows? Running water? Specific needs?"
+      "primary": "[Extract from scene header - e.g., 'Cameron's Office']",
+      "setting": "[Type: office, bedroom, street, restaurant, etc.]",
+      "timeOfDay": "[DAY or NIGHT - from scene header]",
+      "intExt": "[INT or EXT - from scene header]",
+      "additional_locations": ["[Any other locations mentioned in scene]"],
+      "location_requirements": "[Specific needs: windows for natural light, running water, specific architecture, etc.]"
     },
     "cast": {
-      "principal": ["Characters with dialogue"],
-      "speaking": ["Same as principal"],
-      "silent": ["Named non-speaking"],
-      "extras": {"count": "Number", "description": "What doing", "casting_notes": "Types needed"}
+      "principal": ["[Characters with significant dialogue/action]"],
+      "speaking": ["[All characters with any dialogue]"],
+      "silent": ["[Named characters without dialogue]"],
+      "extras": {"count": "[Number needed]", "description": "[What they're doing]", "casting_notes": "[Types needed]"}
     },
-    "key_props": ["Object (description, how used)"],
-    "vehicles": ["Vehicle (make/model, condition, usage)"],
+    "key_props": ["[Every object characters interact with: phones, documents, weapons, food, etc.]"],
+    "vehicles": ["[Any vehicles mentioned or needed]"],
     "sfx": {
-      "practical": ["On-set effects: fire, rain, squibs, etc."],
-      "vfx": ["Post effects: removal, enhancement, impossible"],
-      "stunts": ["Coordinator needed for: falls, fights, vehicles, weapons, heights, water, fire"]
+      "practical": ["[On-set effects needed]"],
+      "vfx": ["[Post-production effects needed]"],
+      "stunts": ["[Any stunt coordinator needs]"]
     },
     "wardrobe": {
-      "principal": ["CHARACTER: Clothing (details, condition, period, continuity)"],
-      "notes": "Changes? Multiples? Specialty?"
+      "principal": ["[CHARACTER: describe their wardrobe needs]"],
+      "notes": "[Changes, multiples, special requirements]"
     },
     "makeup": {
-      "standard": ["All cast + considerations"],
-      "special": ["Injuries, blood, aging, prosthetics, period"]
+      "standard": ["[Regular makeup needs]"],
+      "special": ["[Blood, injuries, aging, prosthetics]"]
     },
     "scheduling": {
-      "constraints": "Night? Sunrise/sunset? Child/animal? Weather? Season?",
-      "notes": "Setup time, days, moves, prep, permits"
+      "constraints": "[Time-specific needs: magic hour, night, etc.]",
+      "notes": "[Estimated setup time, any special scheduling needs]"
     }
   },
   "directing_vision": {
-    "visual_metaphor": "How camera expresses meaning. Examples: Push in as lie closes in, Handheld mirrors loss of control, Low angles show power",
-    "editorial_intent": "Pacing strategy. Quick cuts? Linger on reactions? Slow build?",
-    "shot_motivation": "X shots because [dramatic reason]",
+    "visual_metaphor": "[How should camera movement express meaning in THIS scene? e.g., 'Push in on Cameron as his control slips']",
+    "editorial_intent": "[Pacing strategy: quick cuts during tension, long takes for intimacy, etc.]",
+    "shot_motivation": "[X shots because REASON - justify the shot count]",
     "tone_and_mood": {
-      "opening": "Starting emotion",
-      "shift": "When/how mood changes",
-      "closing": "Ending emotion",
-      "energy": "LOW | BUILDING | HIGH | DECLINING | VOLATILE",
-      "visual_expression": "How camera/lighting show progression"
+      "opening": "[Specific starting emotion for this scene]",
+      "shift": "[What triggers the mood change and how]",
+      "closing": "[Specific ending emotion]",
+      "energy": "[LOW/BUILDING/HIGH/DECLINING/VOLATILE]",
+      "visual_expression": "[How camera/lighting show the emotional progression]"
     },
     "visual_strategy": {
-      "approach": "OBSERVATIONAL | INTIMATE | FORMAL | KINETIC | IMPRESSIONISTIC - why?",
-      "camera_personality": "OBSERVER | ALIGNED | OMNISCIENT | PARTICIPANT - format: Aligned with CHARACTER",
-      "lighting_mood": "Support tone. Examples: Harsh shadows, Soft window light, Practical sources"
+      "approach": "[OBSERVATIONAL/INTIMATE/FORMAL/KINETIC - and WHY for this scene]",
+      "camera_personality": "[Whose POV does camera favor? e.g., 'Aligned with CAMERON - we share his anxiety']",
+      "lighting_mood": "[Specific lighting approach for this scene's tone]"
     },
-    "character_motivations": [{"character": "NAME", "wants": "Goal", "obstacle": "Block", "tactic": "Method"}],
-    "key_moments": [{"beat": "Dialogue/action", "emphasis": "Shot type/why", "why": "Story meaning"}],
-    "performance_notes": ["CHARACTER: Arc - notes"],
+    "character_motivations": [{"character": "[NAME]", "wants": "[specific goal]", "obstacle": "[what blocks them]", "tactic": "[how they try]"}],
+    "key_moments": [{"beat": "[Specific dialogue or action]", "emphasis": "[Shot type and why]", "why": "[Story significance]"}],
+    "performance_notes": ["[CHARACTER: specific acting notes for their arc in this scene]"],
     "blocking": {
-      "geography": "How space expresses relationship/power",
-      "movement": "Key movements reveal what",
-      "eyelines": "Who looks at whom when"
+      "geography": "[How character positions express relationships]",
+      "movement": "[Key movements and what they reveal]",
+      "eyelines": "[Who looks at whom at key moments]"
     }
   },
   "shot_list": [
     {
       "shot_number": 1,
-      "shot_type": "ESTABLISHING | WIDE | MEDIUM_WIDE | MEDIUM | MEDIUM_CLOSE | CLOSE_UP | EXTREME_CLOSE | TWO_SHOT | GROUP_SHOT | OVER_SHOULDER | POV | INSERT | REVEAL",
-      "movement": "STATIC | PUSH_IN | PULL_OUT | DOLLY | PAN | TILT | HANDHELD | STEADICAM | CRANE | TRACKING",
-      "subject": "CHARACTER_NAME - what doing (NEVER pronouns)",
-      "action": "CHARACTER_NAME specific action",
-      "coverage": "CHARACTER: 'Dialogue' OR CHARACTER action",
-      "duration": "Brief | Standard | Extended",
-      "visual": "Composition + position + framing",
-      "serves_story_element": "CORE/TURN/STAKES/OWNERSHIP/SUBTEXT: how shot serves it",
-      "narrative_purpose": "What story info conveyed, reference story_analysis",
-      "pov_and_emotional_state": "Represents CHARACTER's [state/POV] or Objective",
-      "connection_to_sequence": "Shot 1: Opens by []. Middle: Follows X by [], leads to Y by []. Final: Concludes by []",
-      "serves_dramatic_arc": "SETUP | ESCALATION | TURN | FALLOUT | RESOLUTION - reference story_analysis.the_turn",
-      "rationale": "Why this size/type NOW, Hitchcock's principle, tie to story_analysis"
+      "shot_type": "[Choose ONE from options above]",
+      "movement": "[STATIC/PUSH_IN/PULL_OUT/DOLLY/PAN/TILT/HANDHELD/STEADICAM/CRANE/TRACKING]",
+      "subject": "[CHARACTER NAME - what they're doing]",
+      "action": "[Specific action being captured]",
+      "coverage": "[What dialogue or action this covers]",
+      "duration": "[Brief/Standard/Extended]",
+      "visual": "[Composition: foreground, background, framing]",
+      "serves_story_element": "[Which story element: CORE/TURN/STAKES/OWNERSHIP/SUBTEXT and HOW]",
+      "narrative_purpose": "[What story information this shot conveys]",
+      "rationale": "[Why this shot size/type at this moment]"
     }
   ],
-  "shot_list_justification": "Coverage: CHARACTER in Shots [numbers]. Turn in Shot [X]. POV: [objective/subjective]. Arc: [setup→escalation→turn→fallout→resolution]"
+  "shot_list_justification": "[Explain coverage: which characters in which shots, where the turn is captured, overall arc]"
 }`
 
     console.log(`🤖 [${invocationId}] Calling Claude API...`)
@@ -346,7 +336,18 @@ Return ONLY valid JSON with this structure:
         body: JSON.stringify({
           model: 'claude-sonnet-4-20250514',
           max_tokens: 8000,
-          system: 'You are a professional 1st AD and script breakdown expert. You MUST return ONLY valid JSON with the EXACT structure provided. Fill ALL fields with detailed, specific analysis. Never use placeholder text. Never skip fields. Follow the format precisely.',
+          system: `You are a professional 1st AD and script breakdown expert analyzing a specific screenplay scene.
+
+CRITICAL RULES:
+1. Return ONLY valid JSON - no markdown, no explanation, just the JSON object
+2. EVERY field must contain SPECIFIC content extracted from or analyzing THIS scene
+3. NEVER echo back template text like "[Write 2-3 sentences...]" or placeholder descriptions
+4. NEVER return generic responses like "The pivot moment" or "Visual language" - always be SPECIFIC
+5. Parse the scene header for location (INT/EXT), location name, and time of day (DAY/NIGHT)
+6. List ALL characters who appear, ALL props mentioned, ALL locations referenced
+7. If a field truly doesn't apply, write "N/A" - but most fields WILL apply to any scene
+8. Quote actual dialogue when relevant, describe actual actions from the scene text
+9. For conflict/subtext analysis, identify SPECIFIC character desires and obstacles from THIS scene`,
           messages: [
             { role: 'user', content: userPrompt }
           ]
