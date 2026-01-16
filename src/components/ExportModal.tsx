@@ -3,11 +3,11 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, Grid, List, Loader2 } from "lucide-react";
+import { FileText, Grid, List, Loader2, BookOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type ExportType = "full-report" | "storyboard" | "shot-list";
-type UserRole = "director" | "cinematographer" | "editor" | null;
+type ExportType = "full-report" | "analysis-only" | "storyboard" | "shot-list";
+type UserRole = "director" | "cinematographer" | "editor" | "producer" | null;
 type PanelsPerPage = 4 | 6 | 9;
 
 interface ExportModalProps {
@@ -22,6 +22,13 @@ const exportOptions = [
     title: "Full Analysis Report",
     description: "Complete scene-by-scene breakdown with shot lists",
     icon: FileText,
+    format: "PDF",
+  },
+  {
+    id: "analysis-only" as ExportType,
+    title: "Analysis Only",
+    description: "Story, directing & producing notes without shot lists",
+    icon: BookOpen,
     format: "PDF",
   },
   {
@@ -44,6 +51,7 @@ const rolePresets: Record<string, ExportType> = {
   director: "full-report",
   cinematographer: "shot-list",
   editor: "full-report",
+  producer: "analysis-only",
 };
 
 const panelOptions = [
@@ -110,12 +118,13 @@ export const ExportModal = ({ open, onOpenChange, onExport }: ExportModalProps) 
               <SelectItem value="director">Director</SelectItem>
               <SelectItem value="cinematographer">Cinematographer / DP</SelectItem>
               <SelectItem value="editor">Editor</SelectItem>
+              <SelectItem value="producer">Producer / AD</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
         {/* Export Options Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 py-4">
           {exportOptions.map((option) => {
             const Icon = option.icon;
             const isSelected = selectedType === option.id;

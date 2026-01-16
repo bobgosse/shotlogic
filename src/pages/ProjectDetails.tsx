@@ -21,7 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Trash2, ArrowLeft, Film, Camera, Printer, Download, RefreshCw, FileText, Edit, Save, Menu, Sparkles, ImageIcon, Palette, X, Check, ChevronLeft, ChevronRight, Users } from "lucide-react";
 import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
-import { exportShotListPDF, exportShotListCSV, exportStoryboardPDF } from "@/utils/shotListExporter";
+import { exportShotListPDF, exportShotListCSV, exportStoryboardPDF, exportAnalysisOnlyPDF } from "@/utils/shotListExporter";
 import { generatePromptPair } from "@/utils/promptBuilder";
 import { generateStoryboardPDF } from "@/utils/storyboardPdfGenerator";
 import { requestNotificationPermission, notifyAnalysisComplete } from "@/utils/notifications";
@@ -609,13 +609,19 @@ const ProjectDetails = () => {
     setSelectedSceneId(sceneId);
   };
 
-  const handleExport = async (type: "full-report" | "storyboard" | "shot-list", options?: { panelsPerPage?: number }) => {
+  const handleExport = async (type: "full-report" | "analysis-only" | "storyboard" | "shot-list", options?: { panelsPerPage?: number }) => {
     try {
       if (type === "full-report") {
         exportShotListPDF(scenes, project?.title || "Untitled");
         toast({
           title: "Full report exported",
           description: "Your complete analysis report has been downloaded",
+        });
+      } else if (type === "analysis-only") {
+        exportAnalysisOnlyPDF(scenes, project?.title || "Untitled");
+        toast({
+          title: "Analysis exported",
+          description: "Story, directing & producing analysis has been downloaded",
         });
       } else if (type === "storyboard") {
         exportStoryboardPDF(scenes, project?.title || "Untitled", options?.panelsPerPage || 6);

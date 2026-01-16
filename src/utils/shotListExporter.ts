@@ -651,6 +651,615 @@ export const exportShotListPDF = async (scenes: Scene[], projectTitle: string) =
 };
 
 // ═══════════════════════════════════════════════════════════════
+// ANALYSIS ONLY PDF EXPORT (No Shot List)
+// ═══════════════════════════════════════════════════════════════
+export const exportAnalysisOnlyPDF = async (scenes: Scene[], projectTitle: string) => {
+  const pdf = new jsPDF();
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const margin = 15;
+  const maxWidth = pageWidth - margin * 2;
+  let yPosition = 20;
+
+  const checkPageBreak = (neededSpace: number) => {
+    if (yPosition + neededSpace > pageHeight - 20) {
+      pdf.addPage();
+      pdf.setFillColor(255, 255, 255);
+      pdf.rect(0, 0, pageWidth, pageHeight, 'F');
+      yPosition = 20;
+      return true;
+    }
+    return false;
+  };
+
+  // White background
+  pdf.setFillColor(255, 255, 255);
+  pdf.rect(0, 0, pageWidth, pageHeight, 'F');
+
+  // Title Page Header
+  pdf.setFontSize(20);
+  pdf.setFont("helvetica", "bold");
+  pdf.setTextColor(229, 9, 20); // Netflix red
+  pdf.text("SCENE ANALYSIS REPORT", pageWidth / 2, yPosition, { align: 'center' });
+  yPosition += 10;
+
+  pdf.setFontSize(14);
+  pdf.setFont("helvetica", "normal");
+  pdf.setTextColor(0, 0, 0);
+  pdf.text(projectTitle, pageWidth / 2, yPosition, { align: 'center' });
+  yPosition += 8;
+
+  pdf.setFontSize(10);
+  pdf.setTextColor(100, 100, 100);
+  pdf.text(`${scenes.length} Scenes • Story, Directing & Production Analysis`, pageWidth / 2, yPosition, { align: 'center' });
+  yPosition += 15;
+
+  // Divider
+  pdf.setDrawColor(200, 200, 200);
+  pdf.line(margin, yPosition, pageWidth - margin, yPosition);
+  yPosition += 15;
+
+  scenes.forEach((scene, sceneIndex) => {
+    const analysis = parseAnalysis(scene.analysis);
+    if (!analysis) return;
+
+    // Start each scene on new page (except first)
+    if (sceneIndex > 0) {
+      pdf.addPage();
+      pdf.setFillColor(255, 255, 255);
+      pdf.rect(0, 0, pageWidth, pageHeight, 'F');
+      yPosition = 20;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // SCENE HEADER
+    // ═══════════════════════════════════════════════════════════════
+    pdf.setFillColor(40, 40, 40);
+    pdf.rect(margin, yPosition - 5, maxWidth, 12, 'F');
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(11);
+    pdf.setTextColor(255, 255, 255);
+    pdf.text(`SCENE ${scene.scene_number}`, margin + 3, yPosition + 3);
+    yPosition += 12;
+
+    // Scene slug line
+    pdf.setFillColor(60, 60, 60);
+    pdf.rect(margin, yPosition - 3, maxWidth, 8, 'F');
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(9);
+    pdf.setTextColor(255, 255, 255);
+    const headerText = scene.header.substring(0, 100) + (scene.header.length > 100 ? '...' : '');
+    pdf.text(headerText, margin + 3, yPosition + 2);
+    yPosition += 12;
+
+    // ═══════════════════════════════════════════════════════════════
+    // STORY ANALYSIS SECTION
+    // ═══════════════════════════════════════════════════════════════
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(10);
+    pdf.setTextColor(229, 9, 20);
+    pdf.text("STORY ANALYSIS", margin, yPosition);
+    yPosition += 6;
+
+    pdf.setTextColor(0, 0, 0);
+    pdf.setFontSize(8);
+
+    const sa = analysis.story_analysis;
+
+    // The Core
+    if (sa?.the_core) {
+      pdf.setFont("helvetica", "bold");
+      pdf.text("The Core:", margin, yPosition);
+      pdf.setFont("helvetica", "normal");
+      const coreLines = pdf.splitTextToSize(sa.the_core, maxWidth - 5);
+      yPosition += 4;
+      pdf.text(coreLines, margin + 2, yPosition);
+      yPosition += coreLines.length * 3.5 + 4;
+      checkPageBreak(20);
+    }
+
+    // Synopsis
+    if (sa?.synopsis) {
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Synopsis:", margin, yPosition);
+      pdf.setFont("helvetica", "normal");
+      const synopsisLines = pdf.splitTextToSize(sa.synopsis, maxWidth - 5);
+      yPosition += 4;
+      pdf.text(synopsisLines, margin + 2, yPosition);
+      yPosition += synopsisLines.length * 3.5 + 4;
+      checkPageBreak(20);
+    }
+
+    // The Turn
+    if (sa?.the_turn) {
+      pdf.setFont("helvetica", "bold");
+      pdf.text("The Turn:", margin, yPosition);
+      pdf.setFont("helvetica", "normal");
+      const turnLines = pdf.splitTextToSize(sa.the_turn, maxWidth - 5);
+      yPosition += 4;
+      pdf.text(turnLines, margin + 2, yPosition);
+      yPosition += turnLines.length * 3.5 + 4;
+      checkPageBreak(20);
+    }
+
+    // Ownership
+    if (sa?.ownership) {
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Ownership:", margin, yPosition);
+      pdf.setFont("helvetica", "normal");
+      const ownershipLines = pdf.splitTextToSize(sa.ownership, maxWidth - 5);
+      yPosition += 4;
+      pdf.text(ownershipLines, margin + 2, yPosition);
+      yPosition += ownershipLines.length * 3.5 + 4;
+      checkPageBreak(20);
+    }
+
+    // The Times
+    if (sa?.the_times) {
+      pdf.setFont("helvetica", "bold");
+      pdf.text("The Times:", margin, yPosition);
+      pdf.setFont("helvetica", "normal");
+      const timesLines = pdf.splitTextToSize(sa.the_times, maxWidth - 5);
+      yPosition += 4;
+      pdf.text(timesLines, margin + 2, yPosition);
+      yPosition += timesLines.length * 3.5 + 4;
+      checkPageBreak(20);
+    }
+
+    // Imagery & Tone
+    if (sa?.imagery_and_tone || sa?.tone) {
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Imagery & Tone:", margin, yPosition);
+      pdf.setFont("helvetica", "normal");
+      const toneText = sa.imagery_and_tone || sa.tone || '';
+      const toneLines = pdf.splitTextToSize(toneText, maxWidth - 5);
+      yPosition += 4;
+      pdf.text(toneLines, margin + 2, yPosition);
+      yPosition += toneLines.length * 3.5 + 4;
+      checkPageBreak(20);
+    }
+
+    // Stakes
+    if (sa?.stakes) {
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Stakes:", margin, yPosition);
+      pdf.setFont("helvetica", "normal");
+      const stakesLines = pdf.splitTextToSize(sa.stakes, maxWidth - 5);
+      yPosition += 4;
+      pdf.text(stakesLines, margin + 2, yPosition);
+      yPosition += stakesLines.length * 3.5 + 4;
+      checkPageBreak(20);
+    }
+
+    // Pitfalls
+    if (sa?.pitfalls && Array.isArray(sa.pitfalls) && sa.pitfalls.length > 0) {
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Pitfalls:", margin, yPosition);
+      pdf.setFont("helvetica", "normal");
+      yPosition += 4;
+      sa.pitfalls.forEach((pitfall: string) => {
+        checkPageBreak(10);
+        const pitfallLines = pdf.splitTextToSize(`• ${pitfall}`, maxWidth - 10);
+        pdf.text(pitfallLines, margin + 2, yPosition);
+        yPosition += pitfallLines.length * 3.5 + 2;
+      });
+      yPosition += 2;
+    }
+
+    // Subtext
+    if (sa?.subtext) {
+      checkPageBreak(25);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Subtext:", margin, yPosition);
+      pdf.setFont("helvetica", "normal");
+      yPosition += 4;
+
+      const subtext = sa.subtext as any;
+      if (subtext.what_they_say_vs_want) {
+        const lines = pdf.splitTextToSize(`Say vs Want: ${subtext.what_they_say_vs_want}`, maxWidth - 10);
+        pdf.text(lines, margin + 2, yPosition);
+        yPosition += lines.length * 3.5 + 2;
+      }
+      if (subtext.power_dynamic) {
+        const lines = pdf.splitTextToSize(`Power: ${subtext.power_dynamic}`, maxWidth - 10);
+        pdf.text(lines, margin + 2, yPosition);
+        yPosition += lines.length * 3.5 + 2;
+      }
+      if (subtext.emotional_turn) {
+        const lines = pdf.splitTextToSize(`Emotional Arc: ${subtext.emotional_turn}`, maxWidth - 10);
+        pdf.text(lines, margin + 2, yPosition);
+        yPosition += lines.length * 3.5 + 2;
+      }
+      if (subtext.revelation_or_realization) {
+        const lines = pdf.splitTextToSize(`Revelation: ${subtext.revelation_or_realization}`, maxWidth - 10);
+        pdf.text(lines, margin + 2, yPosition);
+        yPosition += lines.length * 3.5 + 2;
+      }
+      yPosition += 2;
+    }
+
+    // Conflict
+    if (sa?.conflict) {
+      checkPageBreak(25);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Conflict:", margin, yPosition);
+      pdf.setFont("helvetica", "normal");
+      yPosition += 4;
+
+      const conflict = sa.conflict as any;
+      if (conflict.type) {
+        const typeText = Array.isArray(conflict.type) ? conflict.type.join(', ') : conflict.type;
+        pdf.text(`Type: ${typeText}`, margin + 2, yPosition);
+        yPosition += 4;
+      }
+      if (conflict.what_characters_want?.length > 0) {
+        const lines = pdf.splitTextToSize(`Wants: ${conflict.what_characters_want.join('; ')}`, maxWidth - 10);
+        pdf.text(lines, margin + 2, yPosition);
+        yPosition += lines.length * 3.5 + 2;
+      }
+      if (conflict.obstacles?.length > 0) {
+        const lines = pdf.splitTextToSize(`Obstacles: ${conflict.obstacles.join('; ')}`, maxWidth - 10);
+        pdf.text(lines, margin + 2, yPosition);
+        yPosition += lines.length * 3.5 + 2;
+      }
+      if (conflict.tactics?.length > 0) {
+        const lines = pdf.splitTextToSize(`Tactics: ${conflict.tactics.join('; ')}`, maxWidth - 10);
+        pdf.text(lines, margin + 2, yPosition);
+        yPosition += lines.length * 3.5 + 2;
+      }
+      if (conflict.winner) {
+        const lines = pdf.splitTextToSize(`Outcome: ${conflict.winner}`, maxWidth - 10);
+        pdf.text(lines, margin + 2, yPosition);
+        yPosition += lines.length * 3.5 + 2;
+      }
+      yPosition += 2;
+    }
+
+    yPosition += 4;
+
+    // ═══════════════════════════════════════════════════════════════
+    // DIRECTING VISION SECTION
+    // ═══════════════════════════════════════════════════════════════
+    const dv = analysis.directing_vision;
+    if (dv) {
+      checkPageBreak(40);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(10);
+      pdf.setTextColor(229, 9, 20);
+      pdf.text("DIRECTING VISION", margin, yPosition);
+      yPosition += 6;
+      pdf.setTextColor(0, 0, 0);
+      pdf.setFontSize(8);
+
+      // Tone & Mood
+      if (dv.tone_and_mood) {
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Tone & Mood:", margin, yPosition);
+        pdf.setFont("helvetica", "normal");
+        yPosition += 4;
+        if (dv.tone_and_mood.opening) {
+          pdf.text(`Opens: ${dv.tone_and_mood.opening}`, margin + 2, yPosition);
+          yPosition += 4;
+        }
+        if (dv.tone_and_mood.shift) {
+          const shiftLines = pdf.splitTextToSize(`Shifts: ${dv.tone_and_mood.shift}`, maxWidth - 5);
+          pdf.text(shiftLines, margin + 2, yPosition);
+          yPosition += shiftLines.length * 3.5;
+        }
+        if (dv.tone_and_mood.closing) {
+          pdf.text(`Closes: ${dv.tone_and_mood.closing}`, margin + 2, yPosition);
+          yPosition += 4;
+        }
+        if (dv.tone_and_mood.energy) {
+          pdf.text(`Energy: ${dv.tone_and_mood.energy}`, margin + 2, yPosition);
+          yPosition += 4;
+        }
+        yPosition += 2;
+        checkPageBreak(20);
+      }
+
+      // Visual Strategy
+      if (dv.visual_strategy) {
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Visual Strategy:", margin, yPosition);
+        pdf.setFont("helvetica", "normal");
+        yPosition += 4;
+        if (dv.visual_strategy.approach) {
+          const lines = pdf.splitTextToSize(`Approach: ${dv.visual_strategy.approach}`, maxWidth - 5);
+          pdf.text(lines, margin + 2, yPosition);
+          yPosition += lines.length * 3.5;
+        }
+        if (dv.visual_strategy.camera_personality) {
+          const lines = pdf.splitTextToSize(`Camera: ${dv.visual_strategy.camera_personality}`, maxWidth - 5);
+          pdf.text(lines, margin + 2, yPosition);
+          yPosition += lines.length * 3.5;
+        }
+        if (dv.visual_strategy.lighting_mood) {
+          const lines = pdf.splitTextToSize(`Lighting: ${dv.visual_strategy.lighting_mood}`, maxWidth - 5);
+          pdf.text(lines, margin + 2, yPosition);
+          yPosition += lines.length * 3.5;
+        }
+        yPosition += 2;
+        checkPageBreak(20);
+      }
+
+      // Visual Metaphor
+      if (dv.visual_metaphor) {
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Visual Metaphor:", margin, yPosition);
+        pdf.setFont("helvetica", "normal");
+        const lines = pdf.splitTextToSize(dv.visual_metaphor, maxWidth - 5);
+        yPosition += 4;
+        pdf.text(lines, margin + 2, yPosition);
+        yPosition += lines.length * 3.5 + 4;
+        checkPageBreak(20);
+      }
+
+      // Editorial Intent
+      if (dv.editorial_intent) {
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Editorial Intent:", margin, yPosition);
+        pdf.setFont("helvetica", "normal");
+        const lines = pdf.splitTextToSize(dv.editorial_intent, maxWidth - 5);
+        yPosition += 4;
+        pdf.text(lines, margin + 2, yPosition);
+        yPosition += lines.length * 3.5 + 4;
+        checkPageBreak(20);
+      }
+
+      // Key Moments
+      if (dv.key_moments && dv.key_moments.length > 0) {
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Key Moments:", margin, yPosition);
+        pdf.setFont("helvetica", "normal");
+        yPosition += 4;
+        dv.key_moments.forEach((moment, idx) => {
+          checkPageBreak(15);
+          if (moment.beat) {
+            const beatLines = pdf.splitTextToSize(`${idx + 1}. ${moment.beat}`, maxWidth - 10);
+            pdf.text(beatLines, margin + 2, yPosition);
+            yPosition += beatLines.length * 3.5;
+          }
+          if (moment.emphasis) {
+            pdf.setTextColor(80, 80, 80);
+            const emphLines = pdf.splitTextToSize(`   Emphasis: ${moment.emphasis}`, maxWidth - 15);
+            pdf.text(emphLines, margin + 2, yPosition);
+            yPosition += emphLines.length * 3.5;
+          }
+          if (moment.why) {
+            const whyLines = pdf.splitTextToSize(`   Why: ${moment.why}`, maxWidth - 15);
+            pdf.text(whyLines, margin + 2, yPosition);
+            yPosition += whyLines.length * 3.5;
+            pdf.setTextColor(0, 0, 0);
+          }
+          yPosition += 2;
+        });
+        yPosition += 2;
+        checkPageBreak(20);
+      }
+
+      // Character Motivations
+      if (dv.character_motivations && dv.character_motivations.length > 0) {
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Character Motivations:", margin, yPosition);
+        pdf.setFont("helvetica", "normal");
+        yPosition += 4;
+        dv.character_motivations.forEach((char) => {
+          checkPageBreak(15);
+          if (char.character) {
+            pdf.setFont("helvetica", "bold");
+            pdf.text(char.character, margin + 2, yPosition);
+            pdf.setFont("helvetica", "normal");
+            yPosition += 4;
+          }
+          if (char.wants) {
+            pdf.text(`  Wants: ${char.wants}`, margin + 2, yPosition);
+            yPosition += 4;
+          }
+          if (char.obstacle) {
+            pdf.text(`  Obstacle: ${char.obstacle}`, margin + 2, yPosition);
+            yPosition += 4;
+          }
+          if (char.tactic) {
+            pdf.text(`  Tactic: ${char.tactic}`, margin + 2, yPosition);
+            yPosition += 4;
+          }
+          yPosition += 2;
+        });
+        checkPageBreak(20);
+      }
+
+      // Blocking
+      if (dv.blocking) {
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Blocking:", margin, yPosition);
+        pdf.setFont("helvetica", "normal");
+        yPosition += 4;
+        if (dv.blocking.geography) {
+          const geoLines = pdf.splitTextToSize(`Geography: ${dv.blocking.geography}`, maxWidth - 5);
+          pdf.text(geoLines, margin + 2, yPosition);
+          yPosition += geoLines.length * 3.5;
+        }
+        if (dv.blocking.movement) {
+          const moveLines = pdf.splitTextToSize(`Movement: ${dv.blocking.movement}`, maxWidth - 5);
+          pdf.text(moveLines, margin + 2, yPosition);
+          yPosition += moveLines.length * 3.5;
+        }
+        if (dv.blocking.eyelines) {
+          const eyeLines = pdf.splitTextToSize(`Eyelines: ${dv.blocking.eyelines}`, maxWidth - 5);
+          pdf.text(eyeLines, margin + 2, yPosition);
+          yPosition += eyeLines.length * 3.5;
+        }
+        yPosition += 2;
+        checkPageBreak(20);
+      }
+
+      // Performance Notes
+      if (dv.performance_notes) {
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Performance Notes:", margin, yPosition);
+        pdf.setFont("helvetica", "normal");
+        yPosition += 4;
+        const notes = Array.isArray(dv.performance_notes) ? dv.performance_notes : [dv.performance_notes];
+        notes.forEach((note) => {
+          checkPageBreak(10);
+          const noteLines = pdf.splitTextToSize(`• ${note}`, maxWidth - 10);
+          pdf.text(noteLines, margin + 2, yPosition);
+          yPosition += noteLines.length * 3.5 + 2;
+        });
+        yPosition += 2;
+      }
+
+      yPosition += 4;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // PRODUCING NOTES SECTION
+    // ═══════════════════════════════════════════════════════════════
+    const pl = analysis.producing_logistics;
+    const hasProducingNotes = pl && (
+      pl.locations?.primary ||
+      pl.cast?.principal?.length > 0 ||
+      pl.key_props?.length > 0 ||
+      pl.red_flags?.length > 0 ||
+      pl.resource_impact
+    );
+
+    if (hasProducingNotes) {
+      checkPageBreak(30);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(10);
+      pdf.setTextColor(229, 9, 20);
+      pdf.text("PRODUCING NOTES", margin, yPosition);
+      yPosition += 6;
+      pdf.setTextColor(0, 0, 0);
+      pdf.setFontSize(8);
+
+      // Location
+      if (pl?.locations) {
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Location:", margin, yPosition);
+        pdf.setFont("helvetica", "normal");
+        yPosition += 4;
+        if (pl.locations.primary) {
+          pdf.text(`Primary: ${pl.locations.primary}`, margin + 2, yPosition);
+          yPosition += 4;
+        }
+        if (pl.locations.setting) {
+          pdf.text(`Setting: ${pl.locations.setting}`, margin + 2, yPosition);
+          yPosition += 4;
+        }
+        if (pl.locations.intExt && pl.locations.timeOfDay) {
+          pdf.text(`${pl.locations.intExt} • ${pl.locations.timeOfDay}`, margin + 2, yPosition);
+          yPosition += 4;
+        }
+        yPosition += 2;
+      }
+
+      // Cast
+      if (pl?.cast) {
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Cast:", margin, yPosition);
+        pdf.setFont("helvetica", "normal");
+        yPosition += 4;
+        if (pl.cast.principal?.length > 0) {
+          const lines = pdf.splitTextToSize(`Principal: ${pl.cast.principal.join(", ")}`, maxWidth - 5);
+          pdf.text(lines, margin + 2, yPosition);
+          yPosition += lines.length * 3.5;
+        }
+        if (pl.cast.speaking?.length > 0) {
+          const lines = pdf.splitTextToSize(`Speaking: ${pl.cast.speaking.join(", ")}`, maxWidth - 5);
+          pdf.text(lines, margin + 2, yPosition);
+          yPosition += lines.length * 3.5;
+        }
+        if (pl.cast.silent?.length > 0) {
+          const lines = pdf.splitTextToSize(`Silent: ${pl.cast.silent.join(", ")}`, maxWidth - 5);
+          pdf.text(lines, margin + 2, yPosition);
+          yPosition += lines.length * 3.5;
+        }
+        if (pl.cast.extras?.count) {
+          pdf.text(`Extras: ${pl.cast.extras.count} - ${pl.cast.extras.description || ''}`, margin + 2, yPosition);
+          yPosition += 4;
+        }
+        yPosition += 2;
+      }
+
+      // Key Props
+      if (pl?.key_props?.length > 0) {
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Key Props:", margin, yPosition);
+        pdf.setFont("helvetica", "normal");
+        yPosition += 4;
+        const propsLines = pdf.splitTextToSize(pl.key_props.join(", "), maxWidth - 5);
+        pdf.text(propsLines, margin + 2, yPosition);
+        yPosition += propsLines.length * 3.5 + 2;
+      }
+
+      // Resource Impact
+      if (pl?.resource_impact) {
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Resource Impact:", margin, yPosition);
+        pdf.setFont("helvetica", "normal");
+        yPosition += 4;
+        const impactColor = pl.resource_impact === 'High' ? [200, 0, 0] :
+                           pl.resource_impact === 'Medium' ? [200, 150, 0] : [0, 150, 0];
+        pdf.setTextColor(impactColor[0], impactColor[1], impactColor[2]);
+        pdf.text(pl.resource_impact, margin + 2, yPosition);
+        pdf.setTextColor(0, 0, 0);
+        yPosition += 6;
+      }
+
+      // Budget Flags
+      if (pl?.red_flags?.length > 0) {
+        pdf.setFont("helvetica", "bold");
+        pdf.setTextColor(200, 0, 0);
+        pdf.text("Budget Flags:", margin, yPosition);
+        pdf.setFont("helvetica", "normal");
+        pdf.setTextColor(0, 0, 0);
+        yPosition += 4;
+        pl.red_flags.forEach(flag => {
+          checkPageBreak(10);
+          const flagLines = pdf.splitTextToSize(`⚠ ${flag}`, maxWidth - 10);
+          pdf.text(flagLines, margin + 2, yPosition);
+          yPosition += flagLines.length * 3.5 + 2;
+        });
+      }
+
+      // Departments
+      if (pl?.departments_affected?.length > 0) {
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Departments:", margin, yPosition);
+        pdf.setFont("helvetica", "normal");
+        yPosition += 4;
+        const deptLines = pdf.splitTextToSize(pl.departments_affected.join(", "), maxWidth - 5);
+        pdf.text(deptLines, margin + 2, yPosition);
+        yPosition += deptLines.length * 3.5 + 2;
+      }
+
+      yPosition += 4;
+    }
+
+    // NO SHOT LIST - That's the point of this export!
+  });
+
+  // Footer on all pages
+  const totalPages = pdf.internal.pages.length - 1;
+  for (let i = 1; i <= totalPages; i++) {
+    pdf.setPage(i);
+    pdf.setFontSize(8);
+    pdf.setTextColor(150, 150, 150);
+    pdf.text(
+      `Page ${i} of ${totalPages} • ${projectTitle} • ShotLogic Analysis`,
+      pageWidth / 2,
+      pageHeight - 8,
+      { align: 'center' }
+    );
+  }
+
+  pdf.save(`${projectTitle}-analysis.pdf`);
+};
+
+// ═══════════════════════════════════════════════════════════════
 // STORYBOARD PDF EXPORT
 // ═══════════════════════════════════════════════════════════════
 export const exportStoryboardPDF = async (scenes: Scene[], projectTitle: string, panelsPerPage: number = 6) => {
