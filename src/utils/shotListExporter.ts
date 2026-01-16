@@ -553,12 +553,21 @@ export const exportShotListPDF = async (scenes: Scene[], projectTitle: string) =
     // ═══════════════════════════════════════════════════════════════
     if (analysis.shot_list && analysis.shot_list.length > 0) {
       checkPageBreak(40);
-      
+
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(10);
       pdf.setTextColor(229, 9, 20);
       pdf.text(`SHOT LIST (${analysis.shot_list.length} shots)`, margin, yPosition);
       yPosition += 8;
+
+      // Column positions and widths (proportional layout)
+      // SHOT: 10%, TYPE: 12%, SUBJECT: 38%, RATIONALE: 40%
+      const colShot = margin + 2;
+      const colType = margin + 18;
+      const colSubject = margin + 40;
+      const colRationale = margin + 105;
+      const subjectWidth = 60;  // Width available for subject column
+      const rationaleWidth = maxWidth - 105;  // Remaining width for rationale
 
       // Table header
       pdf.setFillColor(50, 50, 50);
@@ -566,20 +575,36 @@ export const exportShotListPDF = async (scenes: Scene[], projectTitle: string) =
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(7);
       pdf.setTextColor(255, 255, 255);
-      pdf.text("SHOT", margin + 2, yPosition + 1);
-      pdf.text("TYPE", margin + 18, yPosition + 1);
-      pdf.text("SUBJECT/DESCRIPTION", margin + 45, yPosition + 1);
-      pdf.text("RATIONALE", margin + 120, yPosition + 1);
+      pdf.text("SHOT", colShot, yPosition + 1);
+      pdf.text("TYPE", colType, yPosition + 1);
+      pdf.text("SUBJECT/DESCRIPTION", colSubject, yPosition + 1);
+      pdf.text("RATIONALE", colRationale, yPosition + 1);
       yPosition += 7;
 
       // Shot rows
       analysis.shot_list.forEach((shot, shotIndex) => {
-        checkPageBreak(12);
+        // Get the text content
+        const shotType = shot.shot_type || 'WIDE';
+        const movement = shot.movement && shot.movement !== 'STATIC' ? `/${shot.movement}` : '';
+        const typeText = `${shotType}${movement}`;
+        const subjectText = shot.subject || shot.visual || shot.visualDescription || '';
+        const rationaleText = shot.rationale || '';
+
+        // Wrap text to fit columns
+        const subjectLines = pdf.splitTextToSize(subjectText, subjectWidth);
+        const rationaleLines = pdf.splitTextToSize(rationaleText, rationaleWidth);
+
+        // Calculate row height based on longest content
+        const maxLines = Math.max(subjectLines.length, rationaleLines.length, 1);
+        const rowHeight = Math.max(9, maxLines * 3.5 + 4);
+
+        // Check if we need a page break
+        checkPageBreak(rowHeight + 2);
 
         // Alternating row colors
         if (shotIndex % 2 === 0) {
           pdf.setFillColor(245, 245, 245);
-          pdf.rect(margin, yPosition - 2, maxWidth, 9, 'F');
+          pdf.rect(margin, yPosition - 2, maxWidth, rowHeight, 'F');
         }
 
         pdf.setFont("helvetica", "normal");
@@ -588,24 +613,20 @@ export const exportShotListPDF = async (scenes: Scene[], projectTitle: string) =
 
         // Shot number
         pdf.setFont("helvetica", "bold");
-        pdf.text(`${scene.scene_number}.${shotIndex + 1}`, margin + 2, yPosition + 3);
+        pdf.text(`${scene.scene_number}.${shotIndex + 1}`, colShot, yPosition + 3);
 
         // Shot type
-        const shotType = shot.shot_type || 'WIDE';
-        const movement = shot.movement && shot.movement !== 'STATIC' ? `/${shot.movement}` : '';
         pdf.setFont("helvetica", "normal");
-        pdf.text(`${shotType}${movement}`.substring(0, 12), margin + 18, yPosition + 3);
+        pdf.text(typeText.substring(0, 18), colType, yPosition + 3);
 
-        // Subject/Description
-        const subjectText = (shot.subject || shot.visual || shot.visualDescription || '').substring(0, 50);
-        pdf.text(subjectText, margin + 45, yPosition + 3);
+        // Subject/Description (wrapped)
+        pdf.text(subjectLines, colSubject, yPosition + 3);
 
-        // Rationale
+        // Rationale (wrapped)
         pdf.setTextColor(80, 80, 80);
-        const rationaleText = (shot.rationale || '').substring(0, 30);
-        pdf.text(rationaleText, margin + 120, yPosition + 3);
+        pdf.text(rationaleLines, colRationale, yPosition + 3);
 
-        yPosition += 9;
+        yPosition += rowHeight;
       });
 
       yPosition += 6;
