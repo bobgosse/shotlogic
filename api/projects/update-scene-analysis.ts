@@ -4,6 +4,33 @@ import { VercelRequest, VercelResponse } from '@vercel/node'
 import { getDb } from '../lib/mongodb.js'
 import { ObjectId } from 'mongodb'
 
+// ╔═══════════════════════════════════════════════════════════════════════════╗
+// ║                    ⚠️  CRITICAL: DATA FORMAT LOCK  ⚠️                      ║
+// ╠═══════════════════════════════════════════════════════════════════════════╣
+// ║                                                                           ║
+// ║  Analysis MUST be stored as: JSON.stringify(analysisData)                 ║
+// ║                                                                           ║
+// ║  The format MUST be a JSON string containing:                             ║
+// ║  {                                                                        ║
+// ║    "story_analysis": { the_core, synopsis, the_turn, ownership, ... },    ║
+// ║    "producing_logistics": { locations, cast, key_props, ... },            ║
+// ║    "directing_vision": { subtext, conflict, tone_and_mood, ... },         ║
+// ║    "shot_list": [ { shot_number, shot_type, subject, ... }, ... ]         ║
+// ║  }                                                                        ║
+// ║                                                                           ║
+// ║  DO NOT:                                                                  ║
+// ║  - Store as nested object (analysis.data.narrativeAnalysis)               ║
+// ║  - Change field names without updating get-one.ts and frontend            ║
+// ║  - Add wrapper properties around the analysis                             ║
+// ║                                                                           ║
+// ║  Incident: Jan 17 2025 - "old format" detection bug caused all            ║
+// ║  new projects to show empty analysis. Root cause was format mismatch      ║
+// ║  between save-scene.ts and update-scene-analysis.ts                       ║
+// ║                                                                           ║
+// ║  Both endpoints MUST use identical format. See: save-scene.ts             ║
+// ║                                                                           ║
+// ╚═══════════════════════════════════════════════════════════════════════════╝
+
 const DEPLOY_TIMESTAMP = '2025-01-17T02:00:00Z_WITH_VERIFICATION'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
