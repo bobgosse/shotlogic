@@ -114,6 +114,10 @@ app.post("/api/projects/update-scene-analysis", async (req, res) => {
 app.get("/api/admin/analysis-health", async (req, res) => {
   await apiHandler(req, res, join(__dirname, "api/admin/analysis-health.ts"));
 });
+// Use app.all to accept any HTTP method (GET for browser testing, DELETE for proper usage)
+app.all("/api/admin/delete-project", async (req, res) => {
+  await apiHandler(req, res, join(__dirname, "api/admin/delete-project.ts"));
+});
 
 // Serve static files
 app.use(express.static(join(__dirname, 'dist')));

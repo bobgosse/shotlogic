@@ -1,6 +1,7 @@
 // api/admin/analysis-health.ts
 // Health check endpoint for monitoring analysis quality
-// Hit /api/admin/analysis-health to see status of recent projects
+// Hit /api/admin/analysis-health?key=YOUR_API_KEY to see status of recent projects
+// ADMIN ONLY: Requires ADMIN_API_KEY env var
 
 import { VercelRequest, VercelResponse } from '@vercel/node'
 import { getDb } from '../lib/mongodb.js'
@@ -8,22 +9,52 @@ import { getDb } from '../lib/mongodb.js'
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-API-Key')
 
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
+  // API key authentication
+  const apiKey = req.headers['x-api-key'] || req.query.key
+  const expectedKey = process.env.ADMIN_API_KEY
+
+  // If no key configured, endpoint is disabled for safety
+  if (!expectedKey) {
+    return res.status(503).json({
+      error: 'Admin endpoint not configured',
+      message: 'ADMIN_API_KEY environment variable is not set'
+    })
+  }
+
+  // Validate API key
+  if (apiKey !== expectedKey) {
+    return res.status(401).json({
+      error: 'Unauthorized',
+      message: 'Invalid or missing API key'
+    })
+  }
+
   try {
     const db = await getDb()
     const collection = db.collection('projects')
+
+    // Optional: filter by userId (pass ?userId=xxx to filter to one user's projects)
+    const userId = req.query.userId as string | undefined
 
     // Get projects from last 7 days
     // Check both createdAt and updatedAt since some projects may not have createdAt
     const oneWeekAgo = new Date()
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
 
+    // Build base query with optional userId filter
+    const baseQuery: any = {}
+    if (userId) {
+      baseQuery.userId = userId
+    }
+
     // First try to get recent projects by date, then fall back to all projects (limited)
     let recentProjects = await collection.find({
+      ...baseQuery,
       $or: [
         { createdAt: { $gte: oneWeekAgo } },
         { updatedAt: { $gte: oneWeekAgo } }
@@ -32,11 +63,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // If no projects found with date filter, get the most recent 20 projects
     if (recentProjects.length === 0) {
-      recentProjects = await collection.find({})
+      recentProjects = await collection.find(baseQuery)
         .sort({ _id: -1 }) // Sort by ObjectId descending (newest first)
         .limit(20)
         .toArray()
     }
+
+    // Also get distinct user count for admin info
+    const distinctUsers = await collection.distinct('userId')
 
     const issues: any[] = []
     let totalScenes = 0
@@ -111,7 +145,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         totalScenes,
         healthyScenes,
         issueCount: issues.length,
-        healthPercentage: `${healthPercentage}%`
+        healthPercentage: `${healthPercentage}%`,
+        distinctUserCount: distinctUsers.length,
+        filteredByUserId: userId || null
       },
       issues: issues.slice(0, 50), // Limit to first 50 issues
       checkedAt: new Date().toISOString()
