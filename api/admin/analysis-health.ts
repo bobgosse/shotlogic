@@ -18,12 +18,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const collection = db.collection('projects')
 
     // Get projects from last 7 days
+    // Check both createdAt and updatedAt since some projects may not have createdAt
     const oneWeekAgo = new Date()
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
 
-    const recentProjects = await collection.find({
-      createdAt: { $gte: oneWeekAgo }
+    // First try to get recent projects by date, then fall back to all projects (limited)
+    let recentProjects = await collection.find({
+      $or: [
+        { createdAt: { $gte: oneWeekAgo } },
+        { updatedAt: { $gte: oneWeekAgo } }
+      ]
     }).toArray()
+
+    // If no projects found with date filter, get the most recent 20 projects
+    if (recentProjects.length === 0) {
+      recentProjects = await collection.find({})
+        .sort({ _id: -1 }) // Sort by ObjectId descending (newest first)
+        .limit(20)
+        .toArray()
+    }
 
     const issues: any[] = []
     let totalScenes = 0
