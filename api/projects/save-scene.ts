@@ -6,7 +6,7 @@ import { VercelRequest, VercelResponse } from '@vercel/node'
 import { getDb } from '../lib/mongodb.js'
 import { ObjectId } from 'mongodb'
 
-const DEPLOY_TIMESTAMP = '2025-01-17T01:00:00Z_UNIFIED_STRING_FORMAT'
+const DEPLOY_TIMESTAMP = '2025-01-17T02:00:00Z_WITH_VERIFICATION'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const invocationId = `${Date.now()}_${Math.random().toString(36).substring(2, 11)}`
@@ -86,6 +86,68 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     )
 
     console.log(`✅ [${invocationId}] Updated ${result.modifiedCount} project(s)`)
+
+    // ═══════════════════════════════════════════════════════════════
+    // VERIFICATION: Fetch back and validate format
+    // ═══════════════════════════════════════════════════════════════
+    const verifyProject = await collection.findOne({ _id: objectId })
+    const savedScenes = verifyProject?.scenes || []
+
+    for (const sceneKey of Object.keys(sceneUpdates)) {
+      const sceneNum = parseInt(sceneKey.replace('scene-', ''))
+      const savedScene = savedScenes.find((s: any) => s.number === sceneNum)
+
+      if (!savedScene) {
+        console.error(`❌ [${invocationId}] VERIFICATION FAILED: Scene ${sceneNum} not found after save`)
+        continue
+      }
+
+      // Check format - must be a string
+      if (typeof savedScene.analysis !== 'string') {
+        console.error(`❌ [${invocationId}] VERIFICATION FAILED: Scene ${sceneNum} analysis is not a string`)
+        return res.status(500).json({
+          error: 'Format verification failed',
+          details: `Scene ${sceneNum} saved in wrong format`,
+          deployMarker: DEPLOY_TIMESTAMP
+        })
+      }
+
+      // Check content is valid JSON with expected structure
+      try {
+        const parsed = JSON.parse(savedScene.analysis)
+        const issues: string[] = []
+
+        if (!parsed.story_analysis?.the_turn || parsed.story_analysis.the_turn.length < 20) {
+          issues.push('the_turn empty or too short')
+        }
+        if (!parsed.story_analysis?.the_core || parsed.story_analysis.the_core.length < 20) {
+          issues.push('the_core empty or too short')
+        }
+        if (!parsed.producing_logistics?.locations) {
+          issues.push('locations missing')
+        }
+        if (!parsed.story_analysis?.subtext) {
+          issues.push('subtext missing')
+        }
+        if (!parsed.shot_list || parsed.shot_list.length === 0) {
+          issues.push('shot_list empty')
+        }
+
+        if (issues.length > 0) {
+          console.warn(`⚠️ [${invocationId}] VERIFICATION WARNING: Scene ${sceneNum} has incomplete data: ${issues.join(', ')}`)
+          // Don't fail - just warn. The analysis might legitimately have sparse data for short scenes.
+        } else {
+          console.log(`✅ [${invocationId}] VERIFICATION PASSED: Scene ${sceneNum} format and content OK`)
+        }
+      } catch (parseErr) {
+        console.error(`❌ [${invocationId}] VERIFICATION FAILED: Scene ${sceneNum} analysis is not valid JSON`)
+        return res.status(500).json({
+          error: 'Format verification failed',
+          details: `Scene ${sceneNum} analysis not parseable`,
+          deployMarker: DEPLOY_TIMESTAMP
+        })
+      }
+    }
 
     return res.status(200).json({
       success: true,
