@@ -6,13 +6,13 @@ import { VercelRequest, VercelResponse } from '@vercel/node'
 import { getDb } from '../lib/mongodb.js'
 import { ObjectId } from 'mongodb'
 
-const DEPLOY_TIMESTAMP = '2024-12-24T23:59:00Z_STRING_FORMAT_FIX'
+const DEPLOY_TIMESTAMP = '2025-01-17T03:00:00Z_WITH_FORMAT_GUARD'
 
 export default async function handler(
   req: VercelRequest,
   res: VercelResponse
 ) {
-  const invocationId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  const invocationId = `${Date.now()}_${Math.random().toString(36).substring(2, 11)}`
   const startTime = Date.now()
 
   console.log(`\n📂 [${invocationId}] ═══════════════════════════════`)
@@ -69,10 +69,69 @@ export default async function handler(
     const transformedScenes = (project.scenes || []).map((scene: any, index: number) => {
       const textLines = (scene.text || '').split('\n');
       const header = textLines[0] || `Scene ${scene.number || index + 1}`;
-      
+
+      // ═══════════════════════════════════════════════════════════════
+      // DEFENSIVE FORMAT GUARD - Convert old format to new on-the-fly
+      // This prevents any old-format data from breaking the frontend
+      // ═══════════════════════════════════════════════════════════════
+      if (scene.analysis && typeof scene.analysis === 'object' && !Array.isArray(scene.analysis)) {
+        console.warn(`⚠️ [${invocationId}] FORMAT GUARD: Scene ${scene.number || 'unknown'} has object analysis, converting to string`)
+
+        // Check if it's the old nested format
+        if (scene.analysis.data) {
+          console.warn(`   [${invocationId}] Detected old nested format (analysis.data), extracting...`)
+          // Try to extract what we can from old format
+          const oldData = scene.analysis.data
+          const converted = {
+            story_analysis: {
+              the_core: oldData.narrativeAnalysis?.stakes || '',
+              synopsis: oldData.narrativeAnalysis?.synopsis || '',
+              the_turn: oldData.narrativeAnalysis?.sceneTurn || '',
+              ownership: oldData.narrativeAnalysis?.centralConflict || '',
+              the_times: '',
+              imagery_and_tone: oldData.narrativeAnalysis?.emotionalTone || '',
+              stakes: oldData.narrativeAnalysis?.stakes || '',
+              pitfalls: []
+            },
+            producing_logistics: {
+              locations: oldData.producingAnalysis?.locations || {},
+              cast: oldData.producingAnalysis?.cast || {},
+              key_props: oldData.producingAnalysis?.keyProps || [],
+              red_flags: oldData.producingAnalysis?.budgetFlags || [],
+              departments_affected: [],
+              resource_impact: 'Unknown'
+            },
+            directing_vision: {
+              subtext: null,
+              conflict: oldData.directingAnalysis?.conflict || null,
+              tone_and_mood: oldData.directingAnalysis?.toneAndMood || null,
+              visual_strategy: oldData.directingAnalysis?.visualStrategy || null,
+              visual_metaphor: oldData.directingAnalysis?.visualStrategy?.approach || '',
+              key_moments: [],
+              blocking: oldData.directingAnalysis?.blockingIdeas || null
+            },
+            shot_list: (oldData.shotList || []).map((s: any, idx: number) => ({
+              shot_number: s.shotNumber || idx + 1,
+              shot_type: s.shotType || 'WIDE',
+              movement: s.movement || 'STATIC',
+              subject: s.visualDescription || '',
+              visual: s.visualDescription || '',
+              rationale: s.rationale || '',
+              serves_story_element: 'CORE'
+            }))
+          }
+          scene.analysis = JSON.stringify(converted)
+          console.log(`   [${invocationId}] Converted old format to string (${converted.shot_list.length} shots)`)
+        } else {
+          // It's an object but not the old nested format - just stringify it
+          console.warn(`   [${invocationId}] Object format without .data, stringifying directly`)
+          scene.analysis = JSON.stringify(scene.analysis)
+        }
+      }
+
       // CRITICAL FIX: Handle multiple analysis formats
       let analysisString: string | null = null;
-      
+
       if (scene.analysis) {
         // Case 1: Analysis is already a string (new format from Index.tsx)
         if (typeof scene.analysis === 'string') {
