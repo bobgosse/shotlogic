@@ -155,8 +155,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!parsed.producing_logistics?.locations) {
         issues.push('locations missing')
       }
+      // subtext and conflict are stored in story_analysis (from directing call)
       if (!parsed.story_analysis?.subtext) {
         issues.push('subtext missing')
+      }
+      if (!parsed.story_analysis?.conflict) {
+        issues.push('conflict missing')
       }
       if (!parsed.shot_list || parsed.shot_list.length === 0) {
         issues.push('shot_list empty')

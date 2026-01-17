@@ -71,11 +71,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               sceneIssues.push('locations missing')
             }
 
-            // Check directing fields
-            if (!parsed.directing_vision?.subtext) {
+            // Check subtext and conflict (stored in story_analysis, not directing_vision)
+            if (!parsed.story_analysis?.subtext) {
               sceneIssues.push('subtext missing')
             }
-            if (!parsed.directing_vision?.conflict) {
+            if (!parsed.story_analysis?.conflict) {
               sceneIssues.push('conflict missing')
             }
 
