@@ -544,6 +544,22 @@ If a scene genuinely lacks an element (like subtext in a purely action scene), e
     let analysis
     try {
       analysis = JSON.parse(jsonStr.trim())
+
+      // === RAW CLAUDE RESPONSE LOGGING ===
+      console.log(`\n=== RAW CLAUDE RESPONSE (Attempt ${retryCount + 1}) ===`)
+      console.log(`📊 story_analysis.synopsis: "${analysis?.story_analysis?.synopsis?.substring(0, 100) || 'MISSING'}"`)
+      console.log(`📊 story_analysis.the_core: "${analysis?.story_analysis?.the_core?.substring(0, 100) || 'MISSING'}"`)
+      console.log(`📊 story_analysis.the_turn: "${analysis?.story_analysis?.the_turn?.substring(0, 100) || 'MISSING'}"`)
+      console.log(`📊 story_analysis.stakes: "${analysis?.story_analysis?.stakes?.substring(0, 100) || 'MISSING'}"`)
+      console.log(`📊 story_analysis.ownership: "${analysis?.story_analysis?.ownership?.substring(0, 100) || 'MISSING'}"`)
+      console.log(`📊 story_analysis.imagery_and_tone: "${analysis?.story_analysis?.imagery_and_tone?.substring(0, 100) || 'MISSING'}"`)
+      console.log(`📊 story_analysis.subtext: ${analysis?.story_analysis?.subtext ? JSON.stringify(analysis.story_analysis.subtext).substring(0, 200) : 'MISSING'}`)
+      console.log(`📊 story_analysis.conflict: ${analysis?.story_analysis?.conflict ? JSON.stringify(analysis.story_analysis.conflict).substring(0, 200) : 'MISSING'}`)
+      console.log(`📊 directing_vision.visual_metaphor: "${analysis?.directing_vision?.visual_metaphor?.substring(0, 100) || 'MISSING'}"`)
+      console.log(`📊 directing_vision.tone_and_mood: ${analysis?.directing_vision?.tone_and_mood ? 'PRESENT' : 'MISSING'}`)
+      console.log(`📊 shot_list length: ${analysis?.shot_list?.length || 0}`)
+      console.log(`=== END RAW RESPONSE ===\n`)
+
     } catch (parseError) {
       console.error(`❌ [${invocationId}] JSON parse error:`, parseError)
       console.error(`Raw content preview: ${content.substring(0, 500)}`)
