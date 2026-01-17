@@ -110,6 +110,11 @@ app.post("/api/projects/update-scene-analysis", async (req, res) => {
   await apiHandler(req, res, join(__dirname, "api/projects/update-scene-analysis.ts"));
 });
 
+// Admin endpoints
+app.get("/api/admin/analysis-health", async (req, res) => {
+  await apiHandler(req, res, join(__dirname, "api/admin/analysis-health.ts"));
+});
+
 // Serve static files
 app.use(express.static(join(__dirname, 'dist')));
 
