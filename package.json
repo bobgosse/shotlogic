@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "start": "node server.mjs",
-    "clear-db": "tsx scripts/clear-all-projects.ts"
+    "clear-db": "tsx scripts/clear-all-projects.ts",
+    "test:analysis": "tsx scripts/test-analysis.ts"
   },
   "dependencies": {
     "@clerk/clerk-react": "^5.59.2",
