@@ -321,66 +321,135 @@ Return ONLY valid JSON:
     // CRITICAL FIX: Add timeout to prevent hanging
     // Increased to 120s for complex scenes with Visual Profile
     const API_TIMEOUT_MS = 120000 // 120 seconds
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS)
+    const MAX_RETRIES = 2
+
+    // Helper function to validate analysis completeness
+    const validateAnalysisCompleteness = (analysis: any): { isValid: boolean; emptyFields: string[] } => {
+      const emptyFields: string[] = []
+      const sa = analysis?.story_analysis
+      const dv = analysis?.directing_vision
+
+      // Check required story_analysis fields
+      if (!sa?.synopsis || sa.synopsis.trim().length < 30) emptyFields.push('synopsis')
+      if (!sa?.the_core || sa.the_core.trim().length < 20) emptyFields.push('the_core')
+      if (!sa?.the_turn || sa.the_turn.trim().length < 20 ||
+          sa.the_turn.includes('[') || sa.the_turn === 'The pivot moment') emptyFields.push('the_turn')
+      if (!sa?.stakes || sa.stakes.trim().length < 20) emptyFields.push('stakes')
+      if (!sa?.ownership || sa.ownership.trim().length < 15) emptyFields.push('ownership')
+      if (!sa?.imagery_and_tone || sa.imagery_and_tone.trim().length < 15) emptyFields.push('imagery_and_tone')
+
+      // Check subtext
+      if (!sa?.subtext || typeof sa.subtext !== 'object') {
+        emptyFields.push('subtext')
+      } else {
+        if (!sa.subtext.what_they_say_vs_want || sa.subtext.what_they_say_vs_want.trim().length < 15)
+          emptyFields.push('subtext.what_they_say_vs_want')
+        if (!sa.subtext.power_dynamic || sa.subtext.power_dynamic.trim().length < 15)
+          emptyFields.push('subtext.power_dynamic')
+      }
+
+      // Check conflict
+      if (!sa?.conflict || typeof sa.conflict !== 'object') {
+        emptyFields.push('conflict')
+      } else {
+        if (!sa.conflict.type || sa.conflict.type.trim().length < 3) emptyFields.push('conflict.type')
+        if (!Array.isArray(sa.conflict.what_characters_want) || sa.conflict.what_characters_want.length === 0)
+          emptyFields.push('conflict.what_characters_want')
+      }
+
+      // Check directing_vision
+      if (!dv?.visual_metaphor || dv.visual_metaphor.trim().length < 15) emptyFields.push('visual_metaphor')
+      if (!dv?.tone_and_mood || typeof dv.tone_and_mood !== 'object') emptyFields.push('tone_and_mood')
+
+      return { isValid: emptyFields.length <= 2, emptyFields }
+    }
 
     let anthropicResponse;
-    try {
-      anthropicResponse = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'x-api-key': anthropicKey,
-          'anthropic-version': '2023-06-01',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 8000,
-          system: `You are a professional 1st AD and script breakdown expert analyzing a specific screenplay scene.
+    let retryCount = 0
+    let lastEmptyFields: string[] = []
+    let analysis: any = null
+    let retryPromptAddition = ''
 
-CRITICAL RULES:
+    // Retry loop for empty field validation
+    while (retryCount <= MAX_RETRIES) {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS)
+
+      // Build prompt with retry addition if needed
+      const currentPrompt = retryCount > 0
+        ? `${userPrompt}\n\nCRITICAL RETRY NOTICE: Your previous response had empty or insufficient fields: ${lastEmptyFields.join(', ')}. This scene DOES have content to analyze. Provide SPECIFIC analysis for ALL fields, especially: ${lastEmptyFields.slice(0, 5).join(', ')}`
+        : userPrompt
+
+      console.log(`🔄 [${invocationId}] Attempt ${retryCount + 1}/${MAX_RETRIES + 1}...`)
+
+      try {
+        anthropicResponse = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'x-api-key': anthropicKey,
+            'anthropic-version': '2023-06-01',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 8000,
+            system: `You are a professional 1st AD and script breakdown expert analyzing a specific screenplay scene.
+
+CRITICAL RULES - VIOLATION WILL CAUSE REJECTION:
 1. Return ONLY valid JSON - no markdown, no explanation, just the JSON object
 2. EVERY field must contain SPECIFIC content extracted from or analyzing THIS scene
 3. NEVER echo back template text like "[Write 2-3 sentences...]" or placeholder descriptions
 4. NEVER return generic responses like "The pivot moment" or "Visual language" - always be SPECIFIC
 5. Parse the scene header for location (INT/EXT), location name, and time of day (DAY/NIGHT)
 6. List ALL characters who appear, ALL props mentioned, ALL locations referenced
-7. If a field truly doesn't apply, write "N/A" - but most fields WILL apply to any scene
+7. NEVER leave a field empty or with just "N/A" unless absolutely no content applies
 8. Quote actual dialogue when relevant, describe actual actions from the scene text
-9. For conflict/subtext analysis, identify SPECIFIC character desires and obstacles from THIS scene`,
-          messages: [
-            { role: 'user', content: userPrompt }
-          ]
-        }),
-        signal: controller.signal
-      })
-    } catch (fetchError: any) {
-      clearTimeout(timeoutId)
+9. For conflict/subtext analysis, identify SPECIFIC character desires and obstacles from THIS scene
 
-      if (fetchError.name === 'AbortError') {
-        console.error(`❌ [${invocationId}] Claude API timeout after ${API_TIMEOUT_MS}ms`)
-        return res.status(504).json({
-          error: 'API_TIMEOUT',
-          message: `Request to Claude API timed out after ${API_TIMEOUT_MS / 1000}s`,
-          userMessage: `Scene analysis timed out after 2 minutes. This scene may be very complex with detailed Visual Profile settings. Try analyzing again or breaking it into smaller scenes.`,
-          context: { sceneNumber, timeout: API_TIMEOUT_MS },
+MANDATORY FIELD REQUIREMENTS (responses shorter than these will be rejected):
+- synopsis: minimum 2 full sentences describing what happens
+- the_core: minimum 1 sentence starting with "This scene exists to..."
+- the_turn: minimum 1 sentence with a specific quote or action description
+- stakes: minimum 1 sentence identifying what characters risk losing
+- ownership: minimum 1 sentence naming WHO drives the scene and HOW
+- imagery_and_tone: minimum 1 sentence describing visual/emotional quality
+- subtext fields: each must be at least 15 words with specific character references
+- conflict fields: each array must have at least 1 specific entry
+
+If a scene genuinely lacks an element (like subtext in a purely action scene), explain WHAT IS PRESENT instead of saying "N/A".`,
+            messages: [
+              { role: 'user', content: currentPrompt }
+            ]
+          }),
+          signal: controller.signal
+        })
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId)
+
+        if (fetchError.name === 'AbortError') {
+          console.error(`❌ [${invocationId}] Claude API timeout after ${API_TIMEOUT_MS}ms`)
+          return res.status(504).json({
+            error: 'API_TIMEOUT',
+            message: `Request to Claude API timed out after ${API_TIMEOUT_MS / 1000}s`,
+            userMessage: `Scene analysis timed out after 2 minutes. This scene may be very complex with detailed Visual Profile settings. Try analyzing again or breaking it into smaller scenes.`,
+            context: { sceneNumber, timeout: API_TIMEOUT_MS },
+            deployMarker: DEPLOY_TIMESTAMP
+          })
+        }
+
+        console.error(`❌ [${invocationId}] Claude API fetch error:`, fetchError)
+        return res.status(500).json({
+          error: 'API_FETCH_ERROR',
+          message: fetchError.message || 'Failed to connect to Claude API',
+          userMessage: 'Unable to connect to analysis service. Please check your internet connection and try again.',
           deployMarker: DEPLOY_TIMESTAMP
         })
       }
 
-      console.error(`❌ [${invocationId}] Claude API fetch error:`, fetchError)
-      return res.status(500).json({
-        error: 'API_FETCH_ERROR',
-        message: fetchError.message || 'Failed to connect to Claude API',
-        userMessage: 'Unable to connect to analysis service. Please check your internet connection and try again.',
-        deployMarker: DEPLOY_TIMESTAMP
-      })
-    }
+      clearTimeout(timeoutId)
 
-    clearTimeout(timeoutId)
-
-    const duration = Date.now() - startTime
-    console.log(`⏱️  [${invocationId}] Claude responded in ${duration}ms`)
+      const duration = Date.now() - startTime
+      console.log(`⏱️  [${invocationId}] Claude responded in ${duration}ms`)
 
     if (!anthropicResponse.ok) {
       let errorText;
@@ -654,18 +723,33 @@ CRITICAL RULES:
       console.log(`   - first shot serves_story_element: "${shotList[0]?.serves_story_element?.substring(0, 60)}..."`)
     }
 
-    // FAIL IF CRITICAL ISSUES (but still return the partial analysis)
-    if (validationIssues.length >= 3) {
-      console.error(`❌ [${invocationId}] Too many critical validation issues (${validationIssues.length}). Analysis may be incomplete.`)
+    // Use the new validation function for completeness check
+    const completenessCheck = validateAnalysisCompleteness(analysis)
 
-      // Return analysis with validation metadata
+    // RETRY IF TOO MANY EMPTY FIELDS (and we haven't exceeded retries)
+    if (!completenessCheck.isValid && retryCount < MAX_RETRIES) {
+      console.warn(`⚠️  [${invocationId}] Analysis has ${completenessCheck.emptyFields.length} empty/insufficient fields. Retrying...`)
+      console.warn(`   Empty fields: ${completenessCheck.emptyFields.join(', ')}`)
+      lastEmptyFields = completenessCheck.emptyFields
+      retryCount++
+      continue // Go to next iteration of while loop
+    }
+
+    // FAIL IF CRITICAL ISSUES (but still return the partial analysis)
+    if (validationIssues.length >= 3 || !completenessCheck.isValid) {
+      console.error(`❌ [${invocationId}] Too many critical validation issues (${validationIssues.length}). Analysis may be incomplete.`)
+      console.error(`   Empty fields after ${retryCount + 1} attempts: ${completenessCheck.emptyFields.join(', ')}`)
+
+      // Return analysis with validation metadata and empty field info
       return res.status(200).json({
         analysis,
         validation: {
           quality: 'poor',
           issues: validationIssues,
           warnings: validationWarnings,
-          suggestion: 'Consider using "Try Again" with custom instructions to improve specific sections'
+          emptyFields: completenessCheck.emptyFields,
+          retriesAttempted: retryCount,
+          suggestion: 'Analysis has empty fields. Click "Re-analyze" to try again.'
         },
         deployMarker: DEPLOY_TIMESTAMP
       })
@@ -728,7 +812,8 @@ CRITICAL RULES:
       validation: {
         quality: 'good',
         issues: validationIssues,
-        warnings: validationWarnings
+        warnings: validationWarnings,
+        retriesAttempted: retryCount
       },
       meta: {
         sceneNumber,
@@ -742,6 +827,8 @@ CRITICAL RULES:
         warnings: missingSections.length > 0 ? [`Missing sections: ${missingSections.join(', ')}`] : undefined
       }
     })
+
+    } // End of while retry loop
 
   } catch (error) {
     console.error(`❌ [${invocationId}] Unexpected error:`, error)

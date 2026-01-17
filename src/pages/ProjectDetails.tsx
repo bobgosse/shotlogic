@@ -1094,42 +1094,62 @@ const ProjectDetails = () => {
                         <div className="space-y-2">
                           <h3 className="text-sm font-semibold text-primary flex items-center gap-2">⚡ The Turn</h3>
                           <div className="bg-accent/20 border border-accent/30 rounded-lg p-3">
-                            <p className="text-sm text-foreground">
-                              {selectedAnalysis.story_analysis?.the_turn || selectedAnalysis.story_analysis?.breaking_point || 'The pivot moment'}
-                            </p>
+                            {selectedAnalysis.story_analysis?.the_turn || selectedAnalysis.story_analysis?.breaking_point ? (
+                              <p className="text-sm text-foreground">
+                                {selectedAnalysis.story_analysis?.the_turn || selectedAnalysis.story_analysis?.breaking_point}
+                              </p>
+                            ) : (
+                              <p className="text-sm text-muted-foreground italic">Not analyzed - click Re-analyze</p>
+                            )}
                           </div>
                         </div>
 
                         {/* Ownership */}
                         <div className="space-y-2">
                           <h3 className="text-sm font-semibold text-primary flex items-center gap-2">👤 Ownership</h3>
-                          <p className="text-sm text-foreground bg-muted/30 rounded-lg p-3">
-                            {selectedAnalysis.story_analysis?.ownership || 'Who drives this scene?'}
-                          </p>
+                          <div className="bg-muted/30 rounded-lg p-3">
+                            {selectedAnalysis.story_analysis?.ownership ? (
+                              <p className="text-sm text-foreground">{selectedAnalysis.story_analysis.ownership}</p>
+                            ) : (
+                              <p className="text-sm text-muted-foreground italic">Not analyzed - click Re-analyze</p>
+                            )}
+                          </div>
                         </div>
 
                         {/* The Times */}
                         <div className="space-y-2">
                           <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🕰️ The Times</h3>
-                          <p className="text-sm text-foreground bg-muted/30 rounded-lg p-3">
-                            {selectedAnalysis.story_analysis?.the_times || 'Historical/cultural context'}
-                          </p>
+                          <div className="bg-muted/30 rounded-lg p-3">
+                            {selectedAnalysis.story_analysis?.the_times ? (
+                              <p className="text-sm text-foreground">{selectedAnalysis.story_analysis.the_times}</p>
+                            ) : (
+                              <p className="text-sm text-muted-foreground italic">Not analyzed - click Re-analyze</p>
+                            )}
+                          </div>
                         </div>
 
                         {/* Imagery & Tone */}
                         <div className="space-y-2">
                           <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🎨 Imagery & Tone</h3>
-                          <p className="text-sm text-foreground bg-muted/30 rounded-lg p-3">
-                            {selectedAnalysis.story_analysis?.imagery_and_tone || selectedAnalysis.story_analysis?.tone || 'Visual language'}
-                          </p>
+                          <div className="bg-muted/30 rounded-lg p-3">
+                            {selectedAnalysis.story_analysis?.imagery_and_tone || selectedAnalysis.story_analysis?.tone ? (
+                              <p className="text-sm text-foreground">{selectedAnalysis.story_analysis?.imagery_and_tone || selectedAnalysis.story_analysis?.tone}</p>
+                            ) : (
+                              <p className="text-sm text-muted-foreground italic">Not analyzed - click Re-analyze</p>
+                            )}
+                          </div>
                         </div>
 
                         {/* Stakes */}
                         <div className="space-y-2 md:col-span-2">
                           <h3 className="text-sm font-semibold text-primary flex items-center gap-2">⚔️ Stakes</h3>
-                          <p className="text-sm text-foreground leading-relaxed bg-muted/30 rounded-lg p-3">
-                            {selectedAnalysis.story_analysis?.stakes || 'What is at risk?'}
-                          </p>
+                          <div className="bg-muted/30 rounded-lg p-3">
+                            {selectedAnalysis.story_analysis?.stakes ? (
+                              <p className="text-sm text-foreground leading-relaxed">{selectedAnalysis.story_analysis.stakes}</p>
+                            ) : (
+                              <p className="text-sm text-muted-foreground italic">Not analyzed - click Re-analyze</p>
+                            )}
+                          </div>
                         </div>
 
                         {/* Pitfalls */}
@@ -1326,7 +1346,7 @@ const ProjectDetails = () => {
                                 )}
                               </>
                             ) : (
-                              <p className="italic text-muted-foreground">No subtext analysis</p>
+                              <p className="italic text-muted-foreground">Subtext not analyzed - click Re-analyze</p>
                             )}
                           </div>
                         </div>
@@ -1361,7 +1381,7 @@ const ProjectDetails = () => {
                                 )}
                               </>
                             ) : (
-                              <p className="italic text-muted-foreground">No conflict analysis</p>
+                              <p className="italic text-muted-foreground">Conflict not analyzed - click Re-analyze</p>
                             )}
                           </div>
                         </div>
