@@ -323,6 +323,14 @@ Return ONLY valid JSON:
     const API_TIMEOUT_MS = 120000 // 120 seconds
     const MAX_RETRIES = 2
 
+    // Helper function to safely convert any value to a trimmed string
+    // Handles arrays (like conflict.type can be ["NEGOTIATION", "POWER_STRUGGLE"])
+    const safeString = (val: any): string => {
+      if (typeof val === 'string') return val.trim()
+      if (Array.isArray(val)) return val.join(', ').trim()
+      return ''
+    }
+
     // Helper function to validate analysis completeness
     const validateAnalysisCompleteness = (analysis: any): { isValid: boolean; emptyFields: string[] } => {
       const emptyFields: string[] = []
@@ -330,21 +338,21 @@ Return ONLY valid JSON:
       const dv = analysis?.directing_vision
 
       // Check required story_analysis fields
-      if (!sa?.synopsis || sa.synopsis.trim().length < 30) emptyFields.push('synopsis')
-      if (!sa?.the_core || sa.the_core.trim().length < 20) emptyFields.push('the_core')
-      if (!sa?.the_turn || sa.the_turn.trim().length < 20 ||
-          sa.the_turn.includes('[') || sa.the_turn === 'The pivot moment') emptyFields.push('the_turn')
-      if (!sa?.stakes || sa.stakes.trim().length < 20) emptyFields.push('stakes')
-      if (!sa?.ownership || sa.ownership.trim().length < 15) emptyFields.push('ownership')
-      if (!sa?.imagery_and_tone || sa.imagery_and_tone.trim().length < 15) emptyFields.push('imagery_and_tone')
+      if (!sa?.synopsis || safeString(sa.synopsis).length < 30) emptyFields.push('synopsis')
+      if (!sa?.the_core || safeString(sa.the_core).length < 20) emptyFields.push('the_core')
+      if (!sa?.the_turn || safeString(sa.the_turn).length < 20 ||
+          safeString(sa.the_turn).includes('[') || safeString(sa.the_turn) === 'The pivot moment') emptyFields.push('the_turn')
+      if (!sa?.stakes || safeString(sa.stakes).length < 20) emptyFields.push('stakes')
+      if (!sa?.ownership || safeString(sa.ownership).length < 15) emptyFields.push('ownership')
+      if (!sa?.imagery_and_tone || safeString(sa.imagery_and_tone).length < 15) emptyFields.push('imagery_and_tone')
 
       // Check subtext
       if (!sa?.subtext || typeof sa.subtext !== 'object') {
         emptyFields.push('subtext')
       } else {
-        if (!sa.subtext.what_they_say_vs_want || sa.subtext.what_they_say_vs_want.trim().length < 15)
+        if (!sa.subtext.what_they_say_vs_want || safeString(sa.subtext.what_they_say_vs_want).length < 15)
           emptyFields.push('subtext.what_they_say_vs_want')
-        if (!sa.subtext.power_dynamic || sa.subtext.power_dynamic.trim().length < 15)
+        if (!sa.subtext.power_dynamic || safeString(sa.subtext.power_dynamic).length < 15)
           emptyFields.push('subtext.power_dynamic')
       }
 
@@ -352,13 +360,13 @@ Return ONLY valid JSON:
       if (!sa?.conflict || typeof sa.conflict !== 'object') {
         emptyFields.push('conflict')
       } else {
-        if (!sa.conflict.type || sa.conflict.type.trim().length < 3) emptyFields.push('conflict.type')
+        if (!sa.conflict.type || safeString(sa.conflict.type).length < 3) emptyFields.push('conflict.type')
         if (!Array.isArray(sa.conflict.what_characters_want) || sa.conflict.what_characters_want.length === 0)
           emptyFields.push('conflict.what_characters_want')
       }
 
       // Check directing_vision
-      if (!dv?.visual_metaphor || dv.visual_metaphor.trim().length < 15) emptyFields.push('visual_metaphor')
+      if (!dv?.visual_metaphor || safeString(dv.visual_metaphor).length < 15) emptyFields.push('visual_metaphor')
       if (!dv?.tone_and_mood || typeof dv.tone_and_mood !== 'object') emptyFields.push('tone_and_mood')
 
       return { isValid: emptyFields.length <= 2, emptyFields }
