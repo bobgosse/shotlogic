@@ -206,6 +206,10 @@ ${sceneText}
 ${characters.join(', ')}
 </characters>
 
+IMPORTANT: Scan the ENTIRE scene text for ALL character names mentioned anywhere — in dialogue headers, action lines, stage directions, and parentheticals. Characters who accompany others (caretakers, drivers, assistants, bodyguards, companions) often appear only in stage directions without speaking. These MUST be listed under "silent". The 1st AD needs to know every person who must be on set.
+
+Example: If the text says "Huber, Rosalind stand watching" but only Huber speaks, then Rosalind MUST appear in "silent" because she is named and physically present in the scene.
+
 Return ONLY this JSON (no markdown):
 {
   "locations": {
@@ -216,8 +220,8 @@ Return ONLY this JSON (no markdown):
   },
   "cast": {
     "principal": ["Main characters featured in this scene - characters central to the scene's action"],
-    "speaking": ["Characters with dialogue"],
-    "silent": ["Named characters present without dialogue - e.g. someone accompanying another character, observing, reacting, or mentioned in stage directions as being in the scene"],
+    "speaking": ["Characters with dialogue - check dialogue headers"],
+    "silent": ["Named characters present without dialogue - scan ALL action lines and stage directions for character names not found in dialogue headers. Include anyone accompanying, observing, reacting, or simply present in the scene"],
     "extras": "Description of any unnamed background people needed (e.g., 'bar patrons', 'pedestrians') or 'None'"
   },
   "key_props": ["Every object characters interact with"],
