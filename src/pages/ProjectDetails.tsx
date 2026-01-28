@@ -72,6 +72,15 @@ interface AnalysisData {
     tone?: string;
     what_changes?: string;
     pitfalls?: string[];
+    scene_obligation?: string;
+    the_one_thing?: string;
+    setup_payoff?: {
+      setups: string[];
+      payoffs: string[];
+    };
+    essential_exposition?: string;
+    if_this_scene_fails?: string;
+    alternative_readings?: string[];
     subtext?: {
       what_they_say_vs_want?: string;
       power_dynamic?: string;
@@ -1082,12 +1091,52 @@ const ProjectDetails = () => {
                           </div>
                         </div>
 
+                        {/* Scene Obligation - Prominent styling */}
+                        <div className="space-y-2 md:col-span-2">
+                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">📋 Scene Obligation</h3>
+                          <div className="bg-primary/5 border-l-4 border-primary rounded-r-lg p-4">
+                            {selectedAnalysis.story_analysis?.scene_obligation ? (
+                              <p className="text-sm text-foreground leading-relaxed font-medium">
+                                {selectedAnalysis.story_analysis.scene_obligation}
+                              </p>
+                            ) : (
+                              <p className="text-sm text-muted-foreground italic">Not analyzed - click Re-analyze to generate</p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* The One Thing - Highlighted box */}
+                        <div className="space-y-2 md:col-span-2">
+                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🔑 The One Thing</h3>
+                          <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
+                            {selectedAnalysis.story_analysis?.the_one_thing ? (
+                              <p className="text-sm text-foreground leading-relaxed font-medium">
+                                {selectedAnalysis.story_analysis.the_one_thing}
+                              </p>
+                            ) : (
+                              <p className="text-sm text-muted-foreground italic">Not analyzed - click Re-analyze to generate</p>
+                            )}
+                          </div>
+                        </div>
+
                         {/* Synopsis */}
                         <div className="space-y-2 md:col-span-2">
                           <h3 className="text-sm font-semibold text-primary flex items-center gap-2">📝 Synopsis</h3>
                           <p className="text-sm text-foreground leading-relaxed bg-muted/30 rounded-lg p-3">
                             {selectedAnalysis.story_analysis?.synopsis || 'No synopsis available'}
                           </p>
+                        </div>
+
+                        {/* Essential Exposition */}
+                        <div className="space-y-2 md:col-span-2">
+                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">💡 Essential Exposition</h3>
+                          <div className="bg-muted/30 rounded-lg p-3">
+                            {selectedAnalysis.story_analysis?.essential_exposition ? (
+                              <p className="text-sm text-foreground leading-relaxed">{selectedAnalysis.story_analysis.essential_exposition}</p>
+                            ) : (
+                              <p className="text-sm text-muted-foreground italic">None identified</p>
+                            )}
+                          </div>
                         </div>
 
                         {/* The Turn */}
@@ -1101,6 +1150,43 @@ const ProjectDetails = () => {
                             ) : (
                               <p className="text-sm text-muted-foreground italic">Not analyzed - click Re-analyze</p>
                             )}
+                          </div>
+                        </div>
+
+                        {/* Setup & Payoff */}
+                        <div className="space-y-2 md:col-span-2">
+                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🔗 Setup & Payoff</h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+                              <h4 className="text-xs font-semibold text-blue-400 uppercase tracking-wide mb-2">Setups</h4>
+                              {selectedAnalysis.story_analysis?.setup_payoff?.setups && selectedAnalysis.story_analysis.setup_payoff.setups.length > 0 ? (
+                                <ul className="space-y-1">
+                                  {selectedAnalysis.story_analysis.setup_payoff.setups.map((setup: string, idx: number) => (
+                                    <li key={idx} className="text-sm text-foreground flex items-start gap-2">
+                                      <span className="text-blue-400 mt-0.5">•</span>
+                                      <span>{setup}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <p className="text-sm text-muted-foreground italic">No setups identified</p>
+                              )}
+                            </div>
+                            <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
+                              <h4 className="text-xs font-semibold text-green-400 uppercase tracking-wide mb-2">Payoffs</h4>
+                              {selectedAnalysis.story_analysis?.setup_payoff?.payoffs && selectedAnalysis.story_analysis.setup_payoff.payoffs.length > 0 ? (
+                                <ul className="space-y-1">
+                                  {selectedAnalysis.story_analysis.setup_payoff.payoffs.map((payoff: string, idx: number) => (
+                                    <li key={idx} className="text-sm text-foreground flex items-start gap-2">
+                                      <span className="text-green-400 mt-0.5">•</span>
+                                      <span>{payoff}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <p className="text-sm text-muted-foreground italic">No payoffs identified</p>
+                              )}
+                            </div>
                           </div>
                         </div>
 
@@ -1152,6 +1238,18 @@ const ProjectDetails = () => {
                           </div>
                         </div>
 
+                        {/* If This Scene Fails */}
+                        <div className="space-y-2 md:col-span-2">
+                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">💥 If This Scene Fails</h3>
+                          <div className="bg-red-500/5 border border-red-500/20 rounded-lg p-3">
+                            {selectedAnalysis.story_analysis?.if_this_scene_fails ? (
+                              <p className="text-sm text-foreground leading-relaxed">{selectedAnalysis.story_analysis.if_this_scene_fails}</p>
+                            ) : (
+                              <p className="text-sm text-muted-foreground italic">Not analyzed - click Re-analyze to generate</p>
+                            )}
+                          </div>
+                        </div>
+
                         {/* Pitfalls */}
                         <div className="space-y-2 md:col-span-2">
                           <h3 className="text-sm font-semibold text-primary flex items-center gap-2">⚠️ Pitfalls</h3>
@@ -1163,6 +1261,26 @@ const ProjectDetails = () => {
                             ))}
                             {(!selectedAnalysis.story_analysis?.pitfalls || selectedAnalysis.story_analysis.pitfalls.length === 0) && (
                               <p className="text-sm text-muted-foreground italic">No pitfalls identified</p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Alternative Readings */}
+                        <div className="space-y-2 md:col-span-2">
+                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🎭 Alternative Readings</h3>
+                          <p className="text-xs text-muted-foreground -mt-1">Discussion points for the creative team</p>
+                          <div className="bg-purple-500/5 border border-purple-500/20 rounded-lg p-4">
+                            {selectedAnalysis.story_analysis?.alternative_readings && selectedAnalysis.story_analysis.alternative_readings.length > 0 ? (
+                              <ol className="space-y-2">
+                                {selectedAnalysis.story_analysis.alternative_readings.map((reading: string, idx: number) => (
+                                  <li key={idx} className="text-sm text-foreground flex items-start gap-3">
+                                    <span className="text-purple-400 font-semibold text-xs mt-0.5 shrink-0">{idx + 1}.</span>
+                                    <span className="leading-relaxed">{reading}</span>
+                                  </li>
+                                ))}
+                              </ol>
+                            ) : (
+                              <p className="text-sm text-muted-foreground italic">No alternative readings identified</p>
                             )}
                           </div>
                         </div>
