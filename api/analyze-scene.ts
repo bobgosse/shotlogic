@@ -190,9 +190,9 @@ async function analyzeProducing(
   invocationId: string
 ): Promise<{ success: boolean; data?: any; error?: string }> {
 
-  const systemPrompt = `You are a professional 1st AD doing a script breakdown. Extract production information from the scene. Return ONLY valid JSON.`
+  const systemPrompt = `You are a professional 1st AD, line producer, and UPM doing a comprehensive script breakdown. Extract production information, continuity details, scheduling considerations, and department-specific notes from the scene. Return ONLY valid JSON.`
 
-  const userPrompt = `Extract production logistics from this scene:
+  const userPrompt = `Extract comprehensive production logistics from this scene:
 
 <scene_header>
 ${sceneHeader}
@@ -223,7 +223,65 @@ Return ONLY this JSON (no markdown):
   "key_props": ["Every object characters interact with"],
   "red_flags": ["Budget concerns: night shoot, crowds, stunts, VFX, etc."],
   "departments_affected": ["Camera", "Sound", "Art", etc.],
-  "resource_impact": "Low or Medium or High"
+  "resource_impact": "Low or Medium or High",
+  "continuity": {
+    "carries_in": {
+      "costume": "Costume state entering this scene",
+      "props": "Props present from previous scene",
+      "makeup": "Makeup/hair state entering",
+      "time_logic": "When this occurs relative to previous scene",
+      "emotional_state": "Character emotional state entering"
+    },
+    "carries_out": {
+      "costume": "Costume state exiting",
+      "props": "Props state exiting",
+      "makeup": "Makeup/hair state exiting",
+      "time_logic": "Time relationship to next scene",
+      "emotional_state": "Character emotional state exiting"
+    }
+  },
+  "scene_complexity": {
+    "rating": "1-5 integer: 1=simple interior, 2=standard, 3=moderate technical needs, 4=complex/stunts/VFX, 5=major set piece",
+    "justification": "Brief explanation of complexity rating"
+  },
+  "estimated_screen_time": {
+    "pages": "Estimated page count as decimal (e.g., 1.5)",
+    "estimated_minutes": "Estimated screen time range (e.g., '1:30 - 2:00')",
+    "pacing_note": "Note about pacing affecting duration"
+  },
+  "scheduling_notes": {
+    "combinable_with": ["Scene numbers that could share setup/location"],
+    "must_schedule_before": ["Scenes requiring this scene first for continuity"],
+    "must_schedule_after": ["Scenes that must precede this one"],
+    "time_of_day_requirement": "Lighting or time-of-day needs",
+    "weather_dependency": "Weather requirements or concerns",
+    "actor_availability_note": "Scheduling notes about cast"
+  },
+  "sound_design": {
+    "production_sound_challenges": ["Recording challenges on set"],
+    "ambient_requirements": ["Background/atmosphere sounds needed"],
+    "silence_moments": ["Moments requiring clean silence"],
+    "sound_effects_needed": ["Sound effects for production or post"],
+    "music_notes": "Source music or playback needs"
+  },
+  "safety_specifics": {
+    "concerns": ["Safety concerns identified"],
+    "protocols_required": ["Specific safety protocols"],
+    "personnel_needed": ["Safety personnel required on set"],
+    "actor_prep_required": "Actor preparation or verification needs"
+  },
+  "department_specific_notes": {
+    "camera": "Camera department notes",
+    "sound": "Sound department notes",
+    "art": "Art department notes",
+    "costume": "Costume department notes",
+    "makeup": "Makeup/hair notes",
+    "props": "Props notes",
+    "vfx": "VFX notes or 'None required'",
+    "stunts": "Stunts notes or 'None required'",
+    "special_effects": "Practical FX notes or 'None required'",
+    "locations": "Location department notes"
+  }
 }`
 
   return callClaude(apiKey, systemPrompt, userPrompt, invocationId, 'PRODUCING_LOGISTICS')
@@ -472,13 +530,46 @@ export default async function handler(
         key_props: [],
         red_flags: [],
         departments_affected: ['Camera', 'Sound'],
-        resource_impact: 'Medium'
+        resource_impact: 'Medium',
+        continuity: { carries_in: { costume: '', props: '', makeup: '', time_logic: '', emotional_state: '' }, carries_out: { costume: '', props: '', makeup: '', time_logic: '', emotional_state: '' } },
+        scene_complexity: { rating: 0, justification: '' },
+        estimated_screen_time: { pages: 0, estimated_minutes: '', pacing_note: '' },
+        scheduling_notes: { combinable_with: [], must_schedule_before: [], must_schedule_after: [], time_of_day_requirement: '', weather_dependency: '', actor_availability_note: '' },
+        sound_design: { production_sound_challenges: [], ambient_requirements: [], silence_moments: [], sound_effects_needed: [], music_notes: '' },
+        safety_specifics: { concerns: [], protocols_required: [], personnel_needed: [], actor_prep_required: '' },
+        department_specific_notes: {}
       }
     }
 
     console.log(`✅ [${invocationId}] Producing logistics complete`)
     console.log(`   - Location: ${producingResult.data.locations?.primary}`)
     console.log(`   - Cast: ${producingResult.data.cast?.principal?.join(', ')}`)
+    console.log(`   - Scene complexity: ${producingResult.data.scene_complexity?.rating || 'missing'}/5`)
+    console.log(`   - Est. screen time: ${producingResult.data.estimated_screen_time?.estimated_minutes || 'missing'}`)
+    console.log(`   - Sound challenges: ${producingResult.data.sound_design?.production_sound_challenges?.length || 0}`)
+    console.log(`   - Safety concerns: ${producingResult.data.safety_specifics?.concerns?.length || 0}`)
+
+    // Normalize new producing fields with safe defaults if Claude omitted them
+    const emptyCarry = { costume: '', props: '', makeup: '', time_logic: '', emotional_state: '' }
+    if (!producingResult.data.continuity || typeof producingResult.data.continuity !== 'object') producingResult.data.continuity = { carries_in: { ...emptyCarry }, carries_out: { ...emptyCarry } }
+    if (!producingResult.data.continuity.carries_in) producingResult.data.continuity.carries_in = { ...emptyCarry }
+    if (!producingResult.data.continuity.carries_out) producingResult.data.continuity.carries_out = { ...emptyCarry }
+    if (!producingResult.data.scene_complexity || typeof producingResult.data.scene_complexity !== 'object') producingResult.data.scene_complexity = { rating: 0, justification: '' }
+    if (!producingResult.data.estimated_screen_time || typeof producingResult.data.estimated_screen_time !== 'object') producingResult.data.estimated_screen_time = { pages: 0, estimated_minutes: '', pacing_note: '' }
+    if (!producingResult.data.scheduling_notes || typeof producingResult.data.scheduling_notes !== 'object') producingResult.data.scheduling_notes = { combinable_with: [], must_schedule_before: [], must_schedule_after: [], time_of_day_requirement: '', weather_dependency: '', actor_availability_note: '' }
+    if (!Array.isArray(producingResult.data.scheduling_notes.combinable_with)) producingResult.data.scheduling_notes.combinable_with = []
+    if (!Array.isArray(producingResult.data.scheduling_notes.must_schedule_before)) producingResult.data.scheduling_notes.must_schedule_before = []
+    if (!Array.isArray(producingResult.data.scheduling_notes.must_schedule_after)) producingResult.data.scheduling_notes.must_schedule_after = []
+    if (!producingResult.data.sound_design || typeof producingResult.data.sound_design !== 'object') producingResult.data.sound_design = { production_sound_challenges: [], ambient_requirements: [], silence_moments: [], sound_effects_needed: [], music_notes: '' }
+    if (!Array.isArray(producingResult.data.sound_design.production_sound_challenges)) producingResult.data.sound_design.production_sound_challenges = []
+    if (!Array.isArray(producingResult.data.sound_design.ambient_requirements)) producingResult.data.sound_design.ambient_requirements = []
+    if (!Array.isArray(producingResult.data.sound_design.silence_moments)) producingResult.data.sound_design.silence_moments = []
+    if (!Array.isArray(producingResult.data.sound_design.sound_effects_needed)) producingResult.data.sound_design.sound_effects_needed = []
+    if (!producingResult.data.safety_specifics || typeof producingResult.data.safety_specifics !== 'object') producingResult.data.safety_specifics = { concerns: [], protocols_required: [], personnel_needed: [], actor_prep_required: '' }
+    if (!Array.isArray(producingResult.data.safety_specifics.concerns)) producingResult.data.safety_specifics.concerns = []
+    if (!Array.isArray(producingResult.data.safety_specifics.protocols_required)) producingResult.data.safety_specifics.protocols_required = []
+    if (!Array.isArray(producingResult.data.safety_specifics.personnel_needed)) producingResult.data.safety_specifics.personnel_needed = []
+    if (!producingResult.data.department_specific_notes || typeof producingResult.data.department_specific_notes !== 'object') producingResult.data.department_specific_notes = {}
 
     // ═══════════════════════════════════════════════════════════════
     // CALL 3: Directing + Shot List (with story context)
@@ -588,6 +679,17 @@ export default async function handler(
     }
     if (!analysis.directing_vision.scene_rhythm?.tempo) {
       validationIssues.push('scene_rhythm.tempo is missing')
+    }
+    // Validate new producing logistics fields
+    const complexityRating = analysis.producing_logistics.scene_complexity?.rating
+    if (!complexityRating || complexityRating < 1 || complexityRating > 5) {
+      validationIssues.push('scene_complexity.rating is missing or not 1-5')
+    }
+    if (!analysis.producing_logistics.estimated_screen_time?.pages || analysis.producing_logistics.estimated_screen_time.pages <= 0) {
+      validationIssues.push('estimated_screen_time.pages is missing or zero')
+    }
+    if (!analysis.producing_logistics.continuity?.carries_in || !analysis.producing_logistics.continuity?.carries_out) {
+      validationIssues.push('continuity carries_in/carries_out is missing')
     }
 
     return res.status(200).json({
