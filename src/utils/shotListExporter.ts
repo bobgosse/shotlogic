@@ -570,7 +570,7 @@ if (dv) {
           }
           if (moment.why) {
             pdf.setTextColor(80, 80, 80);
-            const whyLines = pdf.splitTextToSize(`   → ${moment.why}`, maxWidth - 15);
+            const whyLines = pdf.splitTextToSize(`   > ${moment.why}`, maxWidth - 15);
             pdf.text(whyLines, margin + 2, yPosition);
             yPosition += whyLines.length * 3.5;
             pdf.setTextColor(0, 0, 0);
@@ -758,7 +758,7 @@ if (dv) {
         yPosition += 4;
         dv.what_not_to_do.forEach((item) => {
           checkPageBreak(10);
-          const itemLines = pdf.splitTextToSize(`✗ ${item}`, maxWidth - 10);
+          const itemLines = pdf.splitTextToSize(`X  ${item}`, maxWidth - 10);
           pdf.text(itemLines, margin + 2, yPosition);
           yPosition += itemLines.length * 3.5 + 2;
         });
@@ -883,8 +883,7 @@ if (dv) {
         pdf.text("Scene Complexity:", margin, yPosition);
         pdf.setFont("helvetica", "normal");
         yPosition += 4;
-        const dots = '●'.repeat(pl.scene_complexity.rating) + '○'.repeat(5 - pl.scene_complexity.rating);
-        pdf.text(`${dots} (${pl.scene_complexity.rating}/5)`, margin + 2, yPosition);
+        pdf.text(`${pl.scene_complexity.rating}/5`, margin + 2, yPosition);
         yPosition += 4;
         if (pl.scene_complexity.justification) {
           const justLines = pdf.splitTextToSize(pl.scene_complexity.justification, maxWidth - 5);
@@ -1054,7 +1053,7 @@ if (dv) {
         const ss = pl.safety_specifics;
         if (ss.concerns?.length > 0) {
           ss.concerns.forEach((c: string) => {
-            const cLines = pdf.splitTextToSize(`⚠ ${c}`, maxWidth - 10);
+            const cLines = pdf.splitTextToSize(`! ${c}`, maxWidth - 10);
             pdf.text(cLines, margin + 2, yPosition);
             yPosition += cLines.length * 3.5;
           });
