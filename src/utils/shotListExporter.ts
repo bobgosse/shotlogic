@@ -189,7 +189,8 @@ const parseAnalysis = (analysisString: string | null): AnalysisData | null => {
   }
 };
 
-export const exportShotListPDF = async (scenes: Scene[], projectTitle: string) => {
+export const exportShotListPDF = async (scenes: Scene[], projectTitle: string, options?: { includeShotList?: boolean }) => {
+  const includeShotList = options?.includeShotList !== false;
   const pdf = new jsPDF();
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
@@ -1103,7 +1104,7 @@ if (dv) {
     // ═══════════════════════════════════════════════════════════════
     // SHOT LIST TABLE
     // ═══════════════════════════════════════════════════════════════
-    if (analysis.shot_list && analysis.shot_list.length > 0) {
+    if (includeShotList && analysis.shot_list && analysis.shot_list.length > 0) {
       checkPageBreak(40);
       
       pdf.setFont("helvetica", "bold");
@@ -1178,7 +1179,14 @@ if (dv) {
     );
   }
 
-  pdf.save(`${projectTitle}-full-analysis.pdf`);
+  pdf.save(`${projectTitle}-${includeShotList ? 'full-analysis' : 'analysis-only'}.pdf`);
+};
+
+// ═══════════════════════════════════════════════════════════════
+// ANALYSIS-ONLY PDF EXPORT (no shot list table)
+// ═══════════════════════════════════════════════════════════════
+export const exportAnalysisOnlyPDF = async (scenes: Scene[], projectTitle: string) => {
+  return exportShotListPDF(scenes, projectTitle, { includeShotList: false });
 };
 
 // ═══════════════════════════════════════════════════════════════
