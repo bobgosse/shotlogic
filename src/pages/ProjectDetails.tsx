@@ -53,8 +53,11 @@ interface Project {
 
 interface ShotListItem {
   shot_type: string;
+  subject?: string;
   visual: string;
+  serves_story_element?: string;
   rationale: string;
+  editorial_note?: string;
   visual_description?: string;
 }
 
@@ -188,6 +191,7 @@ interface AnalysisData {
     }>;
   };
   shot_list?: Array<ShotListItem | string>;
+  shot_list_rationale?: string;
 }
 
 const ProjectDetails = () => {
@@ -577,17 +581,23 @@ const ProjectDetails = () => {
   const isShotListItem = (shot: string | ShotListItem): shot is ShotListItem => {
     return typeof shot === 'object' && shot !== null && ('shot_type' in shot || 'shotType' in shot || 'subject' in shot || 'action' in shot);
   };
-  
+
   // Helper to get shot properties (handles both snake_case and camelCase)
   const getShotType = (shot: any): string => shot.shot_type || shot.shotType || 'SHOT';
+  const getShotSubject = (shot: any): string => shot.subject || '';
   const getShotVisual = (shot: any): string => shot.visual || shot.visualDescription || '';
   const getShotRationale = (shot: any): string => shot.rationale || '';
-  
+  const getShotStoryElement = (shot: any): string => shot.serves_story_element || '';
+  const getShotEditorialNote = (shot: any): string => shot.editorial_note || '';
+
   // Normalize shot to snake_case for promptBuilder compatibility
   const normalizeShot = (shot: any): ShotListItem => ({
     shot_type: shot.shot_type || shot.shotType || 'SHOT',
+    subject: shot.subject || '',
     visual: shot.visual || shot.visualDescription || '',
+    serves_story_element: shot.serves_story_element || '',
     rationale: shot.rationale || '',
+    editorial_note: shot.editorial_note || '',
     visual_description: shot.visual_description || shot.visualDescription || ''
   });
 
@@ -1932,6 +1942,12 @@ const ProjectDetails = () => {
                             Storyboard PDF
                           </Button>
                         </div>
+                        {selectedAnalysis.shot_list_rationale && (
+                          <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                            <span className="text-xs font-semibold text-amber-600 uppercase tracking-wider">Shot Count Rationale</span>
+                            <p className="text-sm text-foreground/80 mt-1">{selectedAnalysis.shot_list_rationale}</p>
+                          </div>
+                        )}
                         <div className="space-y-3">
                           {(editedScenes[selectedScene.id]?.shot_list || selectedAnalysis.shot_list).map((shot, idx) => {
                             if (isShotListItem(shot)) {
@@ -1952,11 +1968,30 @@ const ProjectDetails = () => {
                                           />
                                         </div>
                                         <div>
+                                          <label className="text-xs text-muted-foreground">Subject:</label>
+                                          <Textarea
+                                            value={getCurrentShot(idx)?.subject || getShotSubject(shot)}
+                                            onChange={(e) => handleShotEdit(idx, 'subject', e.target.value)}
+                                            className="mt-1 text-sm min-h-[40px]"
+                                            placeholder="What/who is in frame and what action occurs"
+                                          />
+                                        </div>
+                                        <div>
                                           <label className="text-xs text-muted-foreground">Visual:</label>
                                           <Textarea
                                             value={getCurrentShot(idx)?.visual || getShotVisual(shot)}
                                             onChange={(e) => handleShotEdit(idx, 'visual', e.target.value)}
                                             className="mt-1 text-sm min-h-[60px]"
+                                            placeholder="Composition and camera notes for Director/DP"
+                                          />
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          <label className="text-xs text-muted-foreground w-20">Serves:</label>
+                                          <Input
+                                            value={getCurrentShot(idx)?.serves_story_element || getShotStoryElement(shot)}
+                                            onChange={(e) => handleShotEdit(idx, 'serves_story_element', e.target.value)}
+                                            className="h-8 text-sm uppercase"
+                                            placeholder="CORE | TURN | SUBTEXT | CONFLICT | STAKES | SETUP | PAYOFF"
                                           />
                                         </div>
                                         <div>
@@ -1965,24 +2000,32 @@ const ProjectDetails = () => {
                                             value={getCurrentShot(idx)?.rationale || getShotRationale(shot)}
                                             onChange={(e) => handleShotEdit(idx, 'rationale', e.target.value)}
                                             className="mt-1 text-sm min-h-[40px]"
+                                            placeholder="Why this shot is necessary"
                                           />
                                         </div>
                                         <div>
-                                          <label className="text-xs text-muted-foreground">Visual Description:</label>
+                                          <label className="text-xs text-muted-foreground">Editorial Note:</label>
                                           <Textarea
-                                            value={getCurrentShot(idx)?.visual_description || shot.visual_description || ''}
-                                            onChange={(e) => handleShotEdit(idx, 'visual_description', e.target.value)}
-                                            className="mt-1 text-sm min-h-[60px]"
-                                            placeholder="Framing, lighting, spatial positions, key elements..."
+                                            value={getCurrentShot(idx)?.editorial_note || getShotEditorialNote(shot)}
+                                            onChange={(e) => handleShotEdit(idx, 'editorial_note', e.target.value)}
+                                            className="mt-1 text-sm min-h-[40px]"
+                                            placeholder="How this shot connects to previous/next - the cut logic"
                                           />
                                         </div>
                                       </>
                                     ) : (
                                       <>
                                         <div className="flex items-center justify-between gap-2">
-                                          <span className="text-sm font-bold text-primary uppercase tracking-wide">
-                                            {getShotType(shot)}
-                                          </span>
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-sm font-bold text-primary uppercase tracking-wide">
+                                              {getShotType(shot)}
+                                            </span>
+                                            {getShotStoryElement(shot) && (
+                                              <span className="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
+                                                {getShotStoryElement(shot)}
+                                              </span>
+                                            )}
+                                          </div>
                                           <div className="flex gap-1">
                                             <Button
                                               size="sm"
@@ -1999,16 +2042,17 @@ const ProjectDetails = () => {
                                             </Button>
                                           </div>
                                         </div>
-                                        <p className="text-sm text-foreground leading-relaxed">{getShotVisual(shot)}</p>
+                                        {getShotSubject(shot) && (
+                                          <p className="text-sm font-medium text-foreground">{getShotSubject(shot)}</p>
+                                        )}
+                                        <p className="text-sm text-foreground/80 leading-relaxed">{getShotVisual(shot)}</p>
                                         {getShotRationale(shot) && (
                                           <p className="text-xs text-muted-foreground italic">{getShotRationale(shot)}</p>
                                         )}
-                                        {shot.visual_description && (
-                                          <div className="mt-3 pt-3 border-t border-border/50">
-                                            <span className="text-xs text-muted-foreground font-medium">Visual Description</span>
-                                            <p className="text-xs text-foreground/80 mt-1">
-                                              {shot.visual_description}
-                                            </p>
+                                        {getShotEditorialNote(shot) && (
+                                          <div className="mt-2 pt-2 border-t border-border/50">
+                                            <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Cut Logic</span>
+                                            <p className="text-xs text-foreground/70 mt-0.5">{getShotEditorialNote(shot)}</p>
                                           </div>
                                         )}
                                       </>
@@ -2022,7 +2066,7 @@ const ProjectDetails = () => {
                                   <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-sm">
                                     {idx + 1}
                                   </div>
-                                  <p className="text-sm text-foreground leading-relaxed flex-1">{typeof shot === "object" ? String(shot.subject || shot.action || "Shot data") : String(shot)}</p>
+                                  <p className="text-sm text-foreground leading-relaxed flex-1">{typeof shot === "object" ? String((shot as any).subject || (shot as any).action || "Shot data") : String(shot)}</p>
                                 </div>
                               );
                             }

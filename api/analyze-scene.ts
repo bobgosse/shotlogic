@@ -303,7 +303,18 @@ async function analyzeDirecting(
   invocationId: string
 ): Promise<{ success: boolean; data?: any; error?: string }> {
 
-  const systemPrompt = `You are a professional director, acting coach, and DP planning coverage for a scene. Use the provided story analysis to inform your shot choices and performance guidance. Every shot must serve a story purpose. Frame actor objectives as actable verbs, not emotions. Return ONLY valid JSON.`
+  const systemPrompt = `You are a professional director, acting coach, and DP planning coverage for a scene. Use the provided story analysis to inform your shot choices and performance guidance. Every shot must serve a story purpose. Frame actor objectives as actable verbs, not emotions.
+
+SHOT LIST PHILOSOPHY — STORY-DRIVEN, NOT COVERAGE-DRIVEN:
+- LESS IS MORE. Every shot must EARN its place by serving a specific story element (CORE, TURN, SUBTEXT, CONFLICT, STAKES, SETUP, PAYOFF).
+- Think like an EDITOR: What shots do I need to CUT THIS SCENE TOGETHER and tell the story? Not "what angles could we get?"
+- A 1-page dialogue scene needs 3-5 shots, not 8-12. If you can tell the story in fewer shots, DO IT.
+- Each shot must deliver story information that NO OTHER SHOT provides. If two shots serve the same purpose, CUT ONE.
+- The shot list is a STORYTELLING PLAN, not a coverage checklist.
+- Include editorial_note for each shot explaining the CUT LOGIC — how it connects to the previous/next shot.
+- When a scene exceeds 10 shots, you MUST include shot_list_rationale explaining WHY this scene genuinely requires more coverage.
+
+Return ONLY valid JSON.`
 
   const userPrompt = `Plan directing notes, performance guidance, and shot list for this scene:
 
@@ -320,6 +331,12 @@ THE CORE: ${storyAnalysis.the_core}
 THE TURN: ${storyAnalysis.the_turn}
 STAKES: ${storyAnalysis.stakes}
 OWNERSHIP: ${storyAnalysis.ownership}
+SCENE OBLIGATION: ${storyAnalysis.scene_obligation || 'Not specified'}
+THE ONE THING: ${storyAnalysis.the_one_thing || 'Not specified'}
+SUBTEXT: ${storyAnalysis.subtext?.what_they_say_vs_want || 'Not specified'}
+ESSENTIAL EXPOSITION: ${storyAnalysis.essential_exposition || 'Not specified'}
+SETUPS: ${(storyAnalysis.setup_payoff?.setups || []).join('; ') || 'None'}
+PAYOFFS: ${(storyAnalysis.setup_payoff?.payoffs || []).join('; ') || 'None'}
 </story_context>
 ${customInstructions ? `<director_notes>${customInstructions}</director_notes>` : ''}
 
@@ -381,16 +398,15 @@ Return ONLY this JSON (no markdown):
   "shot_list": [
     {
       "shot_number": 1,
-      "shot_type": "WIDE or MEDIUM or CLOSE_UP or etc.",
-      "movement": "STATIC or PUSH_IN or DOLLY or etc.",
-      "subject": "[CHARACTER NAME - what they're doing]",
-      "action": "[Specific action being captured]",
-      "duration": "Brief or Standard or Extended",
-      "visual": "[Composition notes]",
-      "serves_story_element": "[CORE/TURN/STAKES/OWNERSHIP - and HOW]",
-      "rationale": "[Why this shot at this moment]"
+      "shot_type": "WIDE | MEDIUM | CLOSE_UP | EXTREME_CLOSE_UP | TWO_SHOT | GROUP_SHOT | INSERT | POV | OVER_SHOULDER",
+      "subject": "What/who is in frame and what action occurs",
+      "visual": "Composition and camera notes for Director/DP",
+      "serves_story_element": "CORE | TURN | SUBTEXT | CONFLICT | STAKES | SETUP | PAYOFF",
+      "rationale": "Why this shot is NECESSARY - what story information does it deliver that no other shot provides?",
+      "editorial_note": "How this shot connects to previous/next shot - the cut logic"
     }
-  ]
+  ],
+  "shot_list_rationale": "ONLY include if shot_list has 10+ shots. Explain why this scene genuinely requires more coverage than typical. Empty string if under 10 shots."
 }`
 
   return callClaude(apiKey, systemPrompt, userPrompt, invocationId, 'DIRECTING_SHOTS')
@@ -643,7 +659,8 @@ export default async function handler(
         creative_questions: directingResult.data.creative_questions,
         performance_notes: directingResult.data.performance_notes
       },
-      shot_list: directingResult.data.shot_list || []
+      shot_list: directingResult.data.shot_list || [],
+      shot_list_rationale: directingResult.data.shot_list_rationale || ''
     }
 
     const totalDuration = Date.now() - startTime
@@ -663,6 +680,20 @@ export default async function handler(
     }
     if (!analysis.shot_list || analysis.shot_list.length === 0) {
       validationIssues.push('No shots generated')
+    }
+    // Validate story-driven shot list fields
+    if (analysis.shot_list && analysis.shot_list.length > 0) {
+      const shotsWithoutRationale = analysis.shot_list.filter((s: any) => !s.rationale || s.rationale.length < 10)
+      if (shotsWithoutRationale.length > 0) {
+        validationIssues.push(`${shotsWithoutRationale.length} shot(s) missing rationale`)
+      }
+      const shotsWithoutStoryElement = analysis.shot_list.filter((s: any) => !s.serves_story_element)
+      if (shotsWithoutStoryElement.length > 0) {
+        validationIssues.push(`${shotsWithoutStoryElement.length} shot(s) missing serves_story_element`)
+      }
+      if (analysis.shot_list.length >= 10 && (!analysis.shot_list_rationale || analysis.shot_list_rationale.length < 20)) {
+        validationIssues.push('Scene has 10+ shots but missing shot_list_rationale explanation')
+      }
     }
     // Validate new story analysis fields
     if (!analysis.story_analysis.scene_obligation || analysis.story_analysis.scene_obligation.length < 30) {

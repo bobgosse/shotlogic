@@ -3,12 +3,15 @@ import jsPDF from "jspdf";
 interface ShotListItem {
   shot_number?: number;
   shot_type: string;
-  movement?: string;
   subject?: string;
-  action?: string;
   visual?: string;
-  visualDescription?: string;
+  serves_story_element?: string;
   rationale: string;
+  editorial_note?: string;
+  // Legacy fields for backward compatibility with older analyses
+  movement?: string;
+  action?: string;
+  visualDescription?: string;
   editorial_intent?: string;
   duration?: string;
   image_prompt?: string;
@@ -178,6 +181,7 @@ interface AnalysisData {
     creative_questions?: string[];
   };
   shot_list?: ShotListItem[];
+  shot_list_rationale?: string;
 }
 
 const parseAnalysis = (analysisString: string | null): AnalysisData | null => {
@@ -1105,59 +1109,88 @@ if (dv) {
     // ═══════════════════════════════════════════════════════════════
     if (includeShotList && analysis.shot_list && analysis.shot_list.length > 0) {
       checkPageBreak(40);
-      
+
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(10);
       pdf.setTextColor(229, 9, 20);
       pdf.text(`SHOT LIST (${analysis.shot_list.length} shots)`, margin, yPosition);
       yPosition += 8;
 
-      // Table header
-      pdf.setFillColor(50, 50, 50);
-      pdf.rect(margin, yPosition - 3, maxWidth, 7, 'F');
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(7);
-      pdf.setTextColor(255, 255, 255);
-      pdf.text("SHOT", margin + 2, yPosition + 1);
-      pdf.text("TYPE", margin + 18, yPosition + 1);
-      pdf.text("SUBJECT/DESCRIPTION", margin + 45, yPosition + 1);
-      pdf.text("RATIONALE", margin + 120, yPosition + 1);
-      yPosition += 7;
+      // Shot List Rationale (for 10+ shot scenes)
+      if (analysis.shot_list_rationale) {
+        pdf.setFont("helvetica", "italic");
+        pdf.setFontSize(7);
+        pdf.setTextColor(150, 100, 0);
+        const rationaleLines = pdf.splitTextToSize(`Shot count rationale: ${analysis.shot_list_rationale}`, maxWidth - 5);
+        pdf.text(rationaleLines, margin + 2, yPosition);
+        yPosition += rationaleLines.length * 3.5 + 4;
+        pdf.setTextColor(0, 0, 0);
+      }
 
-      // Shot rows
+      // Shot cards (one per shot, story-driven layout)
       analysis.shot_list.forEach((shot, shotIndex) => {
-        checkPageBreak(12);
+        checkPageBreak(35);
 
-        // Alternating row colors
+        // Shot header bar
+        pdf.setFillColor(50, 50, 50);
+        pdf.rect(margin, yPosition - 3, maxWidth, 7, 'F');
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(7);
+        pdf.setTextColor(255, 255, 255);
+        const shotType = shot.shot_type || 'WIDE';
+        pdf.text(`${scene.scene_number}.${shotIndex + 1}  ${shotType}`, margin + 2, yPosition + 1);
+        if (shot.serves_story_element) {
+          pdf.text(`SERVES: ${shot.serves_story_element}`, margin + 80, yPosition + 1);
+        }
+        yPosition += 7;
+
+        // Alternating background
         if (shotIndex % 2 === 0) {
-          pdf.setFillColor(245, 245, 245);
-          pdf.rect(margin, yPosition - 2, maxWidth, 9, 'F');
+          pdf.setFillColor(248, 248, 248);
+        } else {
+          pdf.setFillColor(255, 255, 255);
         }
 
-        pdf.setFont("helvetica", "normal");
+        // Subject line
+        pdf.setFont("helvetica", "bold");
         pdf.setFontSize(7);
         pdf.setTextColor(0, 0, 0);
+        if (shot.subject) {
+          const subjectLines = pdf.splitTextToSize(shot.subject, maxWidth - 10);
+          pdf.text(subjectLines, margin + 2, yPosition + 2);
+          yPosition += subjectLines.length * 3.5 + 1;
+        }
 
-        // Shot number
-        pdf.setFont("helvetica", "bold");
-        pdf.text(`${scene.scene_number}.${shotIndex + 1}`, margin + 2, yPosition + 3);
-
-        // Shot type
-        const shotType = shot.shot_type || 'WIDE';
-        const movement = shot.movement && shot.movement !== 'STATIC' ? `/${shot.movement}` : '';
-        pdf.setFont("helvetica", "normal");
-        pdf.text(`${shotType}${movement}`.substring(0, 12), margin + 18, yPosition + 3);
-
-        // Subject/Description
-        const subjectText = (shot.subject || shot.visual || shot.visualDescription || '').substring(0, 50);
-        pdf.text(subjectText, margin + 45, yPosition + 3);
+        // Visual / composition notes
+        if (shot.visual || shot.visualDescription) {
+          pdf.setFont("helvetica", "normal");
+          pdf.setTextColor(60, 60, 60);
+          const visualLines = pdf.splitTextToSize(shot.visual || shot.visualDescription || '', maxWidth - 10);
+          pdf.text(visualLines, margin + 2, yPosition + 2);
+          yPosition += visualLines.length * 3.5 + 1;
+        }
 
         // Rationale
-        pdf.setTextColor(80, 80, 80);
-        const rationaleText = (shot.rationale || '').substring(0, 30);
-        pdf.text(rationaleText, margin + 120, yPosition + 3);
+        if (shot.rationale) {
+          pdf.setFont("helvetica", "italic");
+          pdf.setFontSize(6.5);
+          pdf.setTextColor(100, 100, 100);
+          const ratLines = pdf.splitTextToSize(`Why: ${shot.rationale}`, maxWidth - 10);
+          pdf.text(ratLines, margin + 2, yPosition + 2);
+          yPosition += ratLines.length * 3.5 + 1;
+        }
 
-        yPosition += 9;
+        // Editorial note (cut logic)
+        if (shot.editorial_note) {
+          pdf.setFont("helvetica", "normal");
+          pdf.setFontSize(6.5);
+          pdf.setTextColor(80, 80, 140);
+          const editLines = pdf.splitTextToSize(`Cut: ${shot.editorial_note}`, maxWidth - 10);
+          pdf.text(editLines, margin + 2, yPosition + 2);
+          yPosition += editLines.length * 3.5 + 1;
+        }
+
+        yPosition += 4;
       });
 
       yPosition += 6;
@@ -1298,7 +1331,7 @@ export const exportStoryboardPDF = async (scenes: Scene[], projectTitle: string)
 // ═══════════════════════════════════════════════════════════════
 export const exportShotListCSV = (scenes: Scene[], projectTitle: string) => {
   const rows: string[][] = [
-    ['Scene', 'Shot', 'Type', 'Movement', 'Subject', 'Coverage', 'Rationale', 'Duration', 'Image Prompt']
+    ['Scene', 'Shot', 'Type', 'Subject', 'Visual', 'Serves Story Element', 'Rationale', 'Editorial Note']
   ];
 
   scenes.forEach((scene) => {
@@ -1310,12 +1343,11 @@ export const exportShotListCSV = (scenes: Scene[], projectTitle: string) => {
         `Scene ${scene.scene_number}`,
         `${scene.scene_number}.${idx + 1}`,
         shot.shot_type || 'WIDE',
-        shot.movement || 'STATIC',
-        shot.subject || shot.visual || shot.visualDescription || '',
-        shot.coverage || '',
+        shot.subject || '',
+        shot.visual || shot.visualDescription || '',
+        shot.serves_story_element || '',
         shot.rationale || '',
-        shot.duration || 'Standard',
-        shot.image_prompt || shot.aiImagePrompt || ''
+        shot.editorial_note || ''
       ]);
     });
   });
