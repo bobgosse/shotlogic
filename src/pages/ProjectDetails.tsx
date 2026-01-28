@@ -121,9 +121,24 @@ interface AnalysisData {
     tone_and_mood?: any;
     visual_strategy?: any;
     key_moments?: any[];
-    performance_notes?: any;
+    blocking?: any;
     blocking_ideas?: any;
     visual_approach?: string;
+    actor_objectives?: Record<string, string>;
+    scene_rhythm?: {
+      tempo: string;
+      breaths: string;
+      acceleration_points: string;
+      holds: string;
+    };
+    what_not_to_do?: string[];
+    tone_reference?: string;
+    creative_questions?: string[];
+    performance_notes?: Record<string, {
+      physical_state: string;
+      emotional_undercurrent: string;
+      arc_in_scene: string;
+    }>;
   };
   shot_list?: Array<ShotListItem | string>;
 }
@@ -1430,6 +1445,44 @@ const ProjectDetails = () => {
                           </div>
                         </div>
 
+                        {/* Scene Rhythm */}
+                        <div className="space-y-2">
+                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🥁 Scene Rhythm</h3>
+                          {selectedAnalysis.directing_vision?.scene_rhythm?.tempo ? (
+                            <div className="bg-muted/30 rounded-lg p-3 text-sm space-y-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-muted-foreground">Tempo:</span>
+                                <span className="px-2 py-0.5 bg-primary/20 border border-primary/30 rounded-full text-xs font-semibold text-primary">
+                                  {selectedAnalysis.directing_vision.scene_rhythm.tempo}
+                                </span>
+                              </div>
+                              {selectedAnalysis.directing_vision.scene_rhythm.breaths && (
+                                <p><span className="text-muted-foreground">Breaths:</span> {selectedAnalysis.directing_vision.scene_rhythm.breaths}</p>
+                              )}
+                              {selectedAnalysis.directing_vision.scene_rhythm.acceleration_points && (
+                                <p><span className="text-muted-foreground">Accelerates:</span> {selectedAnalysis.directing_vision.scene_rhythm.acceleration_points}</p>
+                              )}
+                              {selectedAnalysis.directing_vision.scene_rhythm.holds && (
+                                <p><span className="text-muted-foreground">Holds:</span> {selectedAnalysis.directing_vision.scene_rhythm.holds}</p>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="bg-muted/30 rounded-lg p-3">
+                              <p className="text-sm text-muted-foreground italic">Not analyzed - click Re-analyze to generate</p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Tone Reference - only show if non-empty */}
+                        {selectedAnalysis.directing_vision?.tone_reference && (
+                          <div className="space-y-2 md:col-span-2">
+                            <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🎬 Tone Reference</h3>
+                            <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg p-3">
+                              <p className="text-sm text-foreground italic">"{selectedAnalysis.directing_vision.tone_reference}"</p>
+                            </div>
+                          </div>
+                        )}
+
                         {/* Visual Strategy */}
                         <div className="space-y-2">
                           <h3 className="text-sm font-semibold text-primary flex items-center gap-2">📷 Visual Strategy</h3>
@@ -1442,6 +1495,58 @@ const ProjectDetails = () => {
                               <p><span className="text-muted-foreground">Lighting:</span> {selectedAnalysis.directing_vision.visual_strategy.lightingMood}</p>
                             )}
                           </div>
+                        </div>
+
+                        {/* Actor Objectives */}
+                        <div className="space-y-2 md:col-span-2">
+                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🎭 Actor Objectives</h3>
+                          <p className="text-xs text-muted-foreground -mt-1">What each character is trying to DO — actable goals</p>
+                          {selectedAnalysis.directing_vision?.actor_objectives && Object.keys(selectedAnalysis.directing_vision.actor_objectives).length > 0 ? (
+                            <div className="space-y-2">
+                              {Object.entries(selectedAnalysis.directing_vision.actor_objectives).map(([character, objective]) => (
+                                <div key={character} className="bg-muted/30 rounded-lg p-3 text-sm flex items-start gap-3">
+                                  <span className="font-bold text-primary uppercase shrink-0">{character}:</span>
+                                  <span className="text-foreground">{objective as string}</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="bg-muted/30 rounded-lg p-3">
+                              <p className="text-sm text-muted-foreground italic">Not analyzed - click Re-analyze to generate</p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Performance Notes */}
+                        <div className="space-y-2 md:col-span-2">
+                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🎬 Performance Notes</h3>
+                          {selectedAnalysis.directing_vision?.performance_notes && Object.keys(selectedAnalysis.directing_vision.performance_notes).length > 0 ? (
+                            <div className="space-y-3">
+                              {Object.entries(selectedAnalysis.directing_vision.performance_notes).map(([character, notes]) => {
+                                const n = notes as { physical_state?: string; emotional_undercurrent?: string; arc_in_scene?: string };
+                                return (
+                                  <div key={character} className="bg-muted/30 border border-border rounded-lg p-3">
+                                    <h4 className="text-sm font-bold text-primary uppercase mb-2">{character}</h4>
+                                    <div className="text-sm space-y-1">
+                                      {n.physical_state && (
+                                        <p><span className="text-muted-foreground">Physical State:</span> {n.physical_state}</p>
+                                      )}
+                                      {n.emotional_undercurrent && (
+                                        <p><span className="text-muted-foreground">Undercurrent:</span> {n.emotional_undercurrent}</p>
+                                      )}
+                                      {n.arc_in_scene && (
+                                        <p><span className="text-muted-foreground">Arc:</span> {n.arc_in_scene}</p>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div className="bg-muted/30 rounded-lg p-3">
+                              <p className="text-sm text-muted-foreground italic">Not analyzed - click Re-analyze to generate</p>
+                            </div>
+                          )}
                         </div>
 
                         {/* Subtext - from story_analysis */}
@@ -1516,6 +1621,46 @@ const ProjectDetails = () => {
                             ))}
                             {(!selectedAnalysis.directing_vision?.key_moments || selectedAnalysis.directing_vision.key_moments.length === 0) &&
                               <p className="text-sm text-muted-foreground italic">No key moments identified</p>}
+                          </div>
+                        </div>
+
+                        {/* What NOT To Do */}
+                        <div className="space-y-2 md:col-span-2">
+                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🚫 What NOT To Do</h3>
+                          <p className="text-xs text-muted-foreground -mt-1">Common pitfalls to avoid</p>
+                          <div className="bg-red-500/5 border border-red-500/20 rounded-lg p-4">
+                            {selectedAnalysis.directing_vision?.what_not_to_do && selectedAnalysis.directing_vision.what_not_to_do.length > 0 ? (
+                              <ul className="space-y-2">
+                                {selectedAnalysis.directing_vision.what_not_to_do.map((item: string, idx: number) => (
+                                  <li key={idx} className="text-sm text-foreground flex items-start gap-2">
+                                    <span className="text-red-400 mt-0.5 shrink-0">⚠</span>
+                                    <span>{item}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="text-sm text-muted-foreground italic">Not analyzed - click Re-analyze to generate</p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Creative Questions */}
+                        <div className="space-y-2 md:col-span-2">
+                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">❓ Creative Questions</h3>
+                          <p className="text-xs text-muted-foreground -mt-1">Discuss before shooting</p>
+                          <div className="bg-purple-500/5 border border-purple-500/20 rounded-lg p-4">
+                            {selectedAnalysis.directing_vision?.creative_questions && selectedAnalysis.directing_vision.creative_questions.length > 0 ? (
+                              <ol className="space-y-2">
+                                {selectedAnalysis.directing_vision.creative_questions.map((question: string, idx: number) => (
+                                  <li key={idx} className="text-sm text-foreground flex items-start gap-3">
+                                    <span className="text-purple-400 font-semibold text-xs mt-0.5 shrink-0">{idx + 1}.</span>
+                                    <span className="leading-relaxed">{question}</span>
+                                  </li>
+                                ))}
+                              </ol>
+                            ) : (
+                              <p className="text-sm text-muted-foreground italic">Not analyzed - click Re-analyze to generate</p>
+                            )}
                           </div>
                         </div>
                       </div>
