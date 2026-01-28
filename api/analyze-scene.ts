@@ -363,6 +363,47 @@ CHECKLIST BEFORE FINALIZING SHOT LIST:
 6. Is this the most carefully covered moment in my shot list?
 If any answer is NO, revise the shot list before returning.
 
+COVERAGE EFFICIENCY — AVOID REDUNDANT SETUPS:
+
+Do NOT list consecutive shots of the same size on the same character unless you cut away and return.
+
+WRONG:
+- Shot 4: CLOSE_UP - Virginia listening
+- Shot 5: CLOSE_UP - Virginia speaking
+This is the same camera setup. If you are already in a close-up on Virginia, you STAY there. Do not list it twice.
+
+RIGHT:
+- Shot 4: CLOSE_UP - Virginia listening, then reciting poetry
+(One shot, continuous coverage of her in this setup)
+
+Or if you need to show something else between:
+- Shot 4: CLOSE_UP - Virginia listening
+- Shot 5: MEDIUM - Leo's dismissive posture
+- Shot 6: CLOSE_UP - Virginia reciting poetry (RETURN to her, motivated by the cut away)
+
+RULE: Each shot in the list should represent a DIFFERENT camera setup or angle. If the camera does not move or change size, it is the same shot covering continuous action.
+
+SIGNIFICANT REVEALS REQUIRE INSERT + REACTION:
+
+Beyond THE TURN, scenes often contain significant reveals — moments where a character shows or tells something deeply personal. These beats require proper coverage:
+1. THE REVEAL — What is being shown/said (often an INSERT for physical reveals)
+2. THE RECEPTION — How the other character receives it (REACTION shot)
+
+EXAMPLE — Virginia reveals her withered legs:
+Strong coverage:
+- Shot X: INSERT - Virginia's withered legs as blanket pulls away (The audience SEES what she is revealing)
+- Shot X+1: CLOSE_UP - Leo's face, eyes steady, not flinching (His reaction IS the story — acceptance, respect, connection formed)
+
+The INSERT makes the reveal concrete. The reaction shot lets the audience feel the connection.
+
+WHEN TO USE INSERT + REACTION:
+- Physical reveals (scars, disabilities, hidden objects)
+- Showing something personal (photos, letters, meaningful items)
+- Vulnerable confessions where the other character's response matters
+- Any moment where one character's revelation should affect another
+
+RULE: If a character reveals something significant and another character's response to that reveal matters to the story, you need BOTH the reveal shot AND the reaction shot. Do not try to capture both in a single wide or medium.
+
 Return ONLY valid JSON.`
 
   const userPrompt = `Plan directing notes, performance guidance, and shot list for this scene:
