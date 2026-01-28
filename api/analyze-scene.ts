@@ -241,9 +241,9 @@ async function analyzeDirecting(
   invocationId: string
 ): Promise<{ success: boolean; data?: any; error?: string }> {
 
-  const systemPrompt = `You are a professional director and DP planning coverage for a scene. Use the provided story analysis to inform your shot choices. Every shot must serve a story purpose. Return ONLY valid JSON.`
+  const systemPrompt = `You are a professional director, acting coach, and DP planning coverage for a scene. Use the provided story analysis to inform your shot choices and performance guidance. Every shot must serve a story purpose. Frame actor objectives as actable verbs, not emotions. Return ONLY valid JSON.`
 
-  const userPrompt = `Plan directing notes and shot list for this scene:
+  const userPrompt = `Plan directing notes, performance guidance, and shot list for this scene:
 
 <scene>
 ${sceneText}
@@ -296,6 +296,25 @@ Return ONLY this JSON (no markdown):
     "geography": "[How positions express relationships]",
     "movement": "[Key movements and what they reveal]",
     "eyelines": "[Who looks at whom at key moments]"
+  },
+  "actor_objectives": {
+    "CHARACTER_NAME": "What this character is trying to DO in this scene - frame as an actable objective, not an emotion. Use active verbs: trying to convince, trying to hide, trying to maintain, etc."
+  },
+  "scene_rhythm": {
+    "tempo": "Overall pacing - choose: SLOW_BUILD, STEADY, ACCELERATING, DECELERATING, STACCATO, or VARIABLE",
+    "breaths": "Identify the pauses - moments of silence or stillness that let beats land",
+    "acceleration_points": "Where does the scene speed up or intensify",
+    "holds": "Specific moments that need time to land before moving on"
+  },
+  "what_not_to_do": ["List 2-4 specific directing pitfalls to avoid - common misinterpretations that would undermine the scene"],
+  "tone_reference": "Optional: A specific film or scene reference that captures the intended tone. Empty string if none fits well.",
+  "creative_questions": ["List 2-4 interpretive questions the director should resolve before shooting - choices that affect performance and coverage"],
+  "performance_notes": {
+    "CHARACTER_NAME": {
+      "physical_state": "How emotion/tension manifests physically",
+      "emotional_undercurrent": "What's happening beneath the dialogue",
+      "arc_in_scene": "How this character changes from scene start to end"
+    }
   },
   "shot_list": [
     {
@@ -487,6 +506,22 @@ export default async function handler(
     console.log(`✅ [${invocationId}] Directing analysis complete`)
     console.log(`   - Shots: ${directingResult.data.shot_list?.length || 0}`)
     console.log(`   - Visual metaphor: "${directingResult.data.visual_metaphor?.substring(0, 60)}..."`)
+    console.log(`   - Actor objectives: ${Object.keys(directingResult.data.actor_objectives || {}).length} characters`)
+    console.log(`   - Scene rhythm tempo: ${directingResult.data.scene_rhythm?.tempo || 'missing'}`)
+    console.log(`   - What not to do: ${directingResult.data.what_not_to_do?.length || 0} items`)
+    console.log(`   - Creative questions: ${directingResult.data.creative_questions?.length || 0} items`)
+
+    // Normalize new directing fields with safe defaults if Claude omitted them
+    if (!directingResult.data.actor_objectives || typeof directingResult.data.actor_objectives !== 'object') directingResult.data.actor_objectives = {}
+    if (!directingResult.data.scene_rhythm || typeof directingResult.data.scene_rhythm !== 'object') directingResult.data.scene_rhythm = { tempo: '', breaths: '', acceleration_points: '', holds: '' }
+    if (!directingResult.data.scene_rhythm.tempo) directingResult.data.scene_rhythm.tempo = ''
+    if (!directingResult.data.scene_rhythm.breaths) directingResult.data.scene_rhythm.breaths = ''
+    if (!directingResult.data.scene_rhythm.acceleration_points) directingResult.data.scene_rhythm.acceleration_points = ''
+    if (!directingResult.data.scene_rhythm.holds) directingResult.data.scene_rhythm.holds = ''
+    if (!Array.isArray(directingResult.data.what_not_to_do)) directingResult.data.what_not_to_do = []
+    if (typeof directingResult.data.tone_reference !== 'string') directingResult.data.tone_reference = ''
+    if (!Array.isArray(directingResult.data.creative_questions)) directingResult.data.creative_questions = []
+    if (!directingResult.data.performance_notes || typeof directingResult.data.performance_notes !== 'object') directingResult.data.performance_notes = {}
 
     // ═══════════════════════════════════════════════════════════════
     // MERGE ALL RESULTS
@@ -505,7 +540,13 @@ export default async function handler(
         visual_metaphor: directingResult.data.visual_metaphor,
         editorial_intent: directingResult.data.editorial_intent,
         key_moments: directingResult.data.key_moments,
-        blocking: directingResult.data.blocking
+        blocking: directingResult.data.blocking,
+        actor_objectives: directingResult.data.actor_objectives,
+        scene_rhythm: directingResult.data.scene_rhythm,
+        what_not_to_do: directingResult.data.what_not_to_do,
+        tone_reference: directingResult.data.tone_reference,
+        creative_questions: directingResult.data.creative_questions,
+        performance_notes: directingResult.data.performance_notes
       },
       shot_list: directingResult.data.shot_list || []
     }
@@ -537,6 +578,16 @@ export default async function handler(
     }
     if (analysis.story_analysis.alternative_readings && !Array.isArray(analysis.story_analysis.alternative_readings)) {
       validationIssues.push('alternative_readings should be an array')
+    }
+    // Validate new directing vision fields
+    if (!Array.isArray(analysis.directing_vision.what_not_to_do) || analysis.directing_vision.what_not_to_do.length < 1) {
+      validationIssues.push('what_not_to_do is missing or empty (need at least 1 entry)')
+    }
+    if (!Array.isArray(analysis.directing_vision.creative_questions) || analysis.directing_vision.creative_questions.length < 1) {
+      validationIssues.push('creative_questions is missing or empty (need at least 1 entry)')
+    }
+    if (!analysis.directing_vision.scene_rhythm?.tempo) {
+      validationIssues.push('scene_rhythm.tempo is missing')
     }
 
     return res.status(200).json({
