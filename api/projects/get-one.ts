@@ -230,6 +230,18 @@ export default async function handler(
     const duration = Date.now() - startTime
     console.log(`⏱️  [${invocationId}] Total: ${duration}ms`)
 
+    // Determine project status from scene statuses
+    const completedCount = transformedScenes.filter((s: any) => s.status === 'COMPLETED').length
+    const errorCount = transformedScenes.filter((s: any) => s.status === 'ERROR').length
+    const analyzingCount = transformedScenes.filter((s: any) => s.status === 'ANALYZING').length
+    const pendingCount = transformedScenes.filter((s: any) => s.status === 'PENDING').length
+    const allDone = completedCount + errorCount === transformedScenes.length && analyzingCount === 0 && pendingCount === 0
+
+    // Use stored project status if still processing, otherwise derive from scenes
+    const projectStatus = allDone
+      ? 'COMPLETED'
+      : (project.status === 'processing' ? 'processing' : (analyzingCount > 0 || pendingCount > 0 ? 'processing' : 'COMPLETED'))
+
     return res.status(200).json({
       success: true,
       project: {
@@ -239,10 +251,11 @@ export default async function handler(
         name: project.name || 'Untitled Project',
         scenes: transformedScenes,
         total_scenes: transformedScenes.length,
-        current_scene: transformedScenes.length,
-        status: 'COMPLETED',
+        current_scene: completedCount,
+        status: projectStatus,
         visual_style: project.visual_style || null,
         characters: project.characters || [],
+        visual_profile: project.visual_profile || null,
         createdAt: project.createdAt,
         updatedAt: project.updatedAt
       },

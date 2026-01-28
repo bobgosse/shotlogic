@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { StoryboardDialog } from "@/components/StoryboardDialog";
 import { ExportModal } from "@/components/ExportModal";
-import { AnalysisProgressCard } from "@/components/AnalysisProgressCard";
+import { AnalysisProgressPanel } from "@/components/AnalysisProgressPanel";
 import { SceneNavigator } from "@/components/SceneNavigator";
 import { MobileSceneView } from "@/components/MobileSceneView";
 import { RetryAnalysisDialog } from "@/components/RetryAnalysisDialog";
@@ -1195,15 +1195,13 @@ const ProjectDetails = () => {
           </div>
         </div>
 
-        {/* Progress Card (when analyzing) */}
-        {(project.status === 'analyzing' || project.status === 'pending') && (
+        {/* Progress Panel (when analyzing) */}
+        {project.status !== 'COMPLETED' && scenes.length > 0 && (
           <div className="max-w-5xl mx-auto px-4 pt-4">
-            <AnalysisProgressCard
-              currentScene={project.current_scene}
-              totalScenes={project.total_scenes}
-              analysisStep={project.analysis_step || 'idle'}
+            <AnalysisProgressPanel
               scenes={scenes}
-              averageTimeMs={project.average_scene_time_ms || 0}
+              onSceneClick={(sceneId: string) => setSelectedSceneId(sceneId)}
+              currentSceneId={selectedSceneId}
             />
           </div>
         )}

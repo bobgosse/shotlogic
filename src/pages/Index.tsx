@@ -145,6 +145,10 @@ export default function Index() {
     }
     setProjectId(newProjectId);
 
+    // Navigate to project page immediately so user can watch progress
+    // and review scenes as they complete
+    navigate('/project/' + newProjectId);
+
     const analyzedScenes: AnalyzedScene[] = [...initialScenes];
     const BATCH_SIZE = 2; // Reduced from 4 to 2 to stay under Railway's 120s timeout
     const totalBatches = Math.ceil(parsedScenes.length / BATCH_SIZE);
@@ -184,12 +188,13 @@ export default function Index() {
       batchTimings.push(batchDuration);
       setBatchTimes([...batchTimings]);
 
-      // Step 4: Generate breakdown (save results)
+      // Save each scene individually as it completes (not batch)
       setUploadStep('generating');
 
       for (let j = 0; j < batchResults.length; j++) {
         const i = batchIndices[j];
         analyzedScenes[i] = batchResults[j];
+        // Save immediately so polling picks it up
         await saveSceneToDb(newProjectId, analyzedScenes[i]);
       }
 
@@ -201,13 +206,22 @@ export default function Index() {
       }
     }
 
+    // Mark project as completed in the database
+    try {
+      await api.post('/api/projects/save-scene', {
+        projectId: newProjectId,
+        sceneUpdates: {} // Empty updates, just triggers updatedAt
+      }, {
+        context: 'Finalizing project',
+        timeoutMs: 15000,
+        maxRetries: 1
+      });
+    } catch {
+      // Non-critical — the polling will still show completion
+    }
+
     setIsAnalyzing(false);
     setUploadStep('complete');
-
-    // Navigate after a brief moment to show completion
-    setTimeout(() => {
-      navigate('/project/' + newProjectId);
-    }, 500);
   };
 
   function processExtractedText(text: string): ParsedScene[] {

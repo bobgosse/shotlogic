@@ -180,10 +180,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
+    // Check if all scenes are now completed and update project status
+    const allScenesCompleted = savedScenes.every((s: any) =>
+      s.status === 'COMPLETED' || s.status === 'complete'
+    )
+    if (allScenesCompleted && savedScenes.length > 0) {
+      await collection.updateOne(
+        { _id: objectId },
+        { $set: { status: 'COMPLETED' } }
+      )
+      console.log(`✅ [${invocationId}] All scenes completed — project status set to COMPLETED`)
+    }
+
     return res.status(200).json({
       success: true,
       message: `Updated ${Object.keys(sceneUpdates).length} scene(s)`,
       modifiedCount: result.modifiedCount,
+      allScenesCompleted,
       deployMarker: DEPLOY_TIMESTAMP
     })
 
