@@ -111,19 +111,51 @@ interface AnalysisData {
     budget_flags?: string[];
     special_requirements?: string[];
     continuity?: {
-      carries_in: string[];
-      carries_out: string[];
-      watch_for: string;
+      carries_in: {
+        costume: string;
+        props: string;
+        makeup: string;
+        time_logic: string;
+        emotional_state: string;
+      };
+      carries_out: {
+        costume: string;
+        props: string;
+        makeup: string;
+        time_logic: string;
+        emotional_state: string;
+      };
     };
-    scene_complexity?: "Low" | "Medium" | "High" | "Very High";
-    estimated_screen_time?: string;
-    scheduling_notes?: string[];
+    scene_complexity?: {
+      rating: number;
+      justification: string;
+    };
+    estimated_screen_time?: {
+      pages: number;
+      estimated_minutes: string;
+      pacing_note: string;
+    };
+    scheduling_notes?: {
+      combinable_with: string[];
+      must_schedule_before: string[];
+      must_schedule_after: string[];
+      time_of_day_requirement: string;
+      weather_dependency: string;
+      actor_availability_note: string;
+    };
     sound_design?: {
-      ambient: string;
-      key_sounds: string[];
-      music_cue: string;
+      production_sound_challenges: string[];
+      ambient_requirements: string[];
+      silence_moments: string[];
+      sound_effects_needed: string[];
+      music_notes: string;
     };
-    safety_specifics?: string[];
+    safety_specifics?: {
+      concerns: string[];
+      protocols_required: string[];
+      personnel_needed: string[];
+      actor_prep_required: string;
+    };
     department_specific_notes?: Record<string, string>;
   };
   directing_vision: {
@@ -1418,29 +1450,36 @@ const ProjectDetails = () => {
                         <div className="space-y-2">
                           <h3 className="text-sm font-semibold text-primary flex items-center gap-2">📊 Scene Complexity</h3>
                           <div className="text-sm text-foreground bg-muted/30 rounded-lg p-3 flex items-center gap-3">
-                            <span className="font-medium">{selectedAnalysis.producing_logistics?.scene_complexity || 'Not rated'}</span>
+                            <span className="font-medium">{selectedAnalysis.producing_logistics?.scene_complexity?.rating || 'Not rated'}/5</span>
                             <div className="flex gap-1">
-                              {['Low', 'Medium', 'High', 'Very High'].map((level, idx) => (
+                              {[1, 2, 3, 4, 5].map((level) => (
                                 <div
                                   key={level}
                                   className={`w-3 h-3 rounded-full ${
-                                    ['Low', 'Medium', 'High', 'Very High'].indexOf(
-                                      selectedAnalysis.producing_logistics?.scene_complexity || ''
-                                    ) >= idx
-                                      ? idx <= 1 ? 'bg-green-500' : idx === 2 ? 'bg-amber-500' : 'bg-red-500'
+                                    (selectedAnalysis.producing_logistics?.scene_complexity?.rating || 0) >= level
+                                      ? level <= 2 ? 'bg-green-500' : level <= 3 ? 'bg-amber-500' : 'bg-red-500'
                                       : 'bg-muted-foreground/20'
                                   }`}
                                 />
                               ))}
                             </div>
                           </div>
+                          {selectedAnalysis.producing_logistics?.scene_complexity?.justification && (
+                            <p className="text-xs text-muted-foreground italic px-1">{selectedAnalysis.producing_logistics.scene_complexity.justification}</p>
+                          )}
                         </div>
 
                         {/* Estimated Screen Time */}
                         <div className="space-y-2">
                           <h3 className="text-sm font-semibold text-primary flex items-center gap-2">⏱️ Estimated Screen Time</h3>
-                          <div className="text-sm text-foreground bg-muted/30 rounded-lg p-3">
-                            <span className="font-medium">{selectedAnalysis.producing_logistics?.estimated_screen_time || 'Not estimated'}</span>
+                          <div className="text-sm text-foreground bg-muted/30 rounded-lg p-3 space-y-1">
+                            <p><span className="font-medium">{selectedAnalysis.producing_logistics?.estimated_screen_time?.estimated_minutes || 'Not estimated'}</span>
+                            {selectedAnalysis.producing_logistics?.estimated_screen_time?.pages ? (
+                              <span className="text-muted-foreground ml-2">({selectedAnalysis.producing_logistics.estimated_screen_time.pages} pages)</span>
+                            ) : null}</p>
+                            {selectedAnalysis.producing_logistics?.estimated_screen_time?.pacing_note && (
+                              <p className="text-xs text-muted-foreground italic">{selectedAnalysis.producing_logistics.estimated_screen_time.pacing_note}</p>
+                            )}
                           </div>
                         </div>
 
@@ -1449,46 +1488,67 @@ const ProjectDetails = () => {
                           <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🔗 Continuity</h3>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
-                              <p className="text-xs font-semibold text-blue-400 mb-1">Carries In</p>
-                              <div className="space-y-1">
-                                {(selectedAnalysis.producing_logistics?.continuity?.carries_in || []).map((item: string, idx: number) => (
-                                  <p key={idx} className="text-sm text-foreground">• {item}</p>
-                                ))}
-                                {(!selectedAnalysis.producing_logistics?.continuity?.carries_in?.length) &&
-                                  <p className="text-sm text-muted-foreground italic">None noted</p>}
+                              <p className="text-xs font-semibold text-blue-400 mb-2">Carries In</p>
+                              <div className="space-y-1 text-sm">
+                                {selectedAnalysis.producing_logistics?.continuity?.carries_in ? (
+                                  Object.entries(selectedAnalysis.producing_logistics.continuity.carries_in)
+                                    .filter(([, val]) => val && String(val).trim())
+                                    .map(([key, val]) => (
+                                      <p key={key} className="text-foreground">
+                                        <span className="text-muted-foreground capitalize">{key.replace(/_/g, ' ')}:</span> {String(val)}
+                                      </p>
+                                    ))
+                                ) : (
+                                  <p className="text-muted-foreground italic">None noted</p>
+                                )}
                               </div>
                             </div>
                             <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
-                              <p className="text-xs font-semibold text-green-400 mb-1">Carries Out</p>
-                              <div className="space-y-1">
-                                {(selectedAnalysis.producing_logistics?.continuity?.carries_out || []).map((item: string, idx: number) => (
-                                  <p key={idx} className="text-sm text-foreground">• {item}</p>
-                                ))}
-                                {(!selectedAnalysis.producing_logistics?.continuity?.carries_out?.length) &&
-                                  <p className="text-sm text-muted-foreground italic">None noted</p>}
+                              <p className="text-xs font-semibold text-green-400 mb-2">Carries Out</p>
+                              <div className="space-y-1 text-sm">
+                                {selectedAnalysis.producing_logistics?.continuity?.carries_out ? (
+                                  Object.entries(selectedAnalysis.producing_logistics.continuity.carries_out)
+                                    .filter(([, val]) => val && String(val).trim())
+                                    .map(([key, val]) => (
+                                      <p key={key} className="text-foreground">
+                                        <span className="text-muted-foreground capitalize">{key.replace(/_/g, ' ')}:</span> {String(val)}
+                                      </p>
+                                    ))
+                                ) : (
+                                  <p className="text-muted-foreground italic">None noted</p>
+                                )}
                               </div>
                             </div>
                           </div>
-                          {selectedAnalysis.producing_logistics?.continuity?.watch_for && (
-                            <div className="text-sm bg-amber-500/10 border border-amber-500/20 rounded-lg p-2 mt-1">
-                              <span className="text-amber-400 font-semibold text-xs">Watch For:</span>{' '}
-                              <span className="text-foreground">{selectedAnalysis.producing_logistics.continuity.watch_for}</span>
-                            </div>
-                          )}
                         </div>
 
                         {/* Scheduling Notes */}
                         <div className="space-y-2 md:col-span-2">
                           <h3 className="text-sm font-semibold text-primary flex items-center gap-2">📅 Scheduling Notes</h3>
-                          <div className="space-y-1">
-                            {(selectedAnalysis.producing_logistics?.scheduling_notes || []).map((note: string, idx: number) => (
-                              <div key={idx} className="flex items-start gap-2 text-sm">
-                                <span className="text-primary">•</span>
-                                <span className="text-foreground">{note}</span>
-                              </div>
-                            ))}
-                            {(!selectedAnalysis.producing_logistics?.scheduling_notes?.length) &&
-                              <p className="text-sm text-muted-foreground italic">No scheduling notes</p>}
+                          <div className="bg-muted/30 rounded-lg p-3 space-y-2 text-sm">
+                            {selectedAnalysis.producing_logistics?.scheduling_notes?.time_of_day_requirement && (
+                              <p><span className="text-muted-foreground font-medium">Time of Day:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics.scheduling_notes.time_of_day_requirement}</span></p>
+                            )}
+                            {selectedAnalysis.producing_logistics?.scheduling_notes?.weather_dependency && (
+                              <p><span className="text-muted-foreground font-medium">Weather:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics.scheduling_notes.weather_dependency}</span></p>
+                            )}
+                            {selectedAnalysis.producing_logistics?.scheduling_notes?.actor_availability_note && (
+                              <p><span className="text-muted-foreground font-medium">Cast Notes:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics.scheduling_notes.actor_availability_note}</span></p>
+                            )}
+                            {(selectedAnalysis.producing_logistics?.scheduling_notes?.combinable_with?.length ?? 0) > 0 && (
+                              <p><span className="text-muted-foreground font-medium">Combinable With:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics?.scheduling_notes?.combinable_with?.join(', ')}</span></p>
+                            )}
+                            {(selectedAnalysis.producing_logistics?.scheduling_notes?.must_schedule_before?.length ?? 0) > 0 && (
+                              <p><span className="text-muted-foreground font-medium">Must Schedule Before:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics?.scheduling_notes?.must_schedule_before?.join(', ')}</span></p>
+                            )}
+                            {(selectedAnalysis.producing_logistics?.scheduling_notes?.must_schedule_after?.length ?? 0) > 0 && (
+                              <p><span className="text-muted-foreground font-medium">Must Schedule After:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics?.scheduling_notes?.must_schedule_after?.join(', ')}</span></p>
+                            )}
+                            {!selectedAnalysis.producing_logistics?.scheduling_notes?.time_of_day_requirement &&
+                             !selectedAnalysis.producing_logistics?.scheduling_notes?.weather_dependency &&
+                             !selectedAnalysis.producing_logistics?.scheduling_notes?.actor_availability_note &&
+                             !(selectedAnalysis.producing_logistics?.scheduling_notes?.combinable_with?.length) &&
+                              <p className="text-muted-foreground italic">No scheduling notes</p>}
                           </div>
                         </div>
 
@@ -1496,36 +1556,56 @@ const ProjectDetails = () => {
                         <div className="space-y-2 md:col-span-2">
                           <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🔊 Sound Design</h3>
                           <div className="bg-muted/30 rounded-lg p-3 space-y-2 text-sm">
-                            {selectedAnalysis.producing_logistics?.sound_design?.ambient && (
-                              <p><span className="text-muted-foreground font-medium">Ambient:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics.sound_design.ambient}</span></p>
+                            {(selectedAnalysis.producing_logistics?.sound_design?.production_sound_challenges?.length ?? 0) > 0 && (
+                              <p><span className="text-muted-foreground font-medium">Challenges:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics?.sound_design?.production_sound_challenges?.join(', ')}</span></p>
                             )}
-                            {(selectedAnalysis.producing_logistics?.sound_design?.key_sounds?.length ?? 0) > 0 && (
-                              <div>
-                                <span className="text-muted-foreground font-medium">Key Sounds:</span>{' '}
-                                <span className="text-foreground">{selectedAnalysis.producing_logistics?.sound_design?.key_sounds?.join(', ')}</span>
-                              </div>
+                            {(selectedAnalysis.producing_logistics?.sound_design?.ambient_requirements?.length ?? 0) > 0 && (
+                              <p><span className="text-muted-foreground font-medium">Ambient:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics?.sound_design?.ambient_requirements?.join(', ')}</span></p>
                             )}
-                            {selectedAnalysis.producing_logistics?.sound_design?.music_cue && (
-                              <p><span className="text-muted-foreground font-medium">Music Cue:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics.sound_design.music_cue}</span></p>
+                            {(selectedAnalysis.producing_logistics?.sound_design?.silence_moments?.length ?? 0) > 0 && (
+                              <p><span className="text-muted-foreground font-medium">Silence Moments:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics?.sound_design?.silence_moments?.join(', ')}</span></p>
                             )}
-                            {!selectedAnalysis.producing_logistics?.sound_design?.ambient &&
-                             !selectedAnalysis.producing_logistics?.sound_design?.key_sounds?.length &&
-                             !selectedAnalysis.producing_logistics?.sound_design?.music_cue &&
+                            {(selectedAnalysis.producing_logistics?.sound_design?.sound_effects_needed?.length ?? 0) > 0 && (
+                              <p><span className="text-muted-foreground font-medium">SFX Needed:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics?.sound_design?.sound_effects_needed?.join(', ')}</span></p>
+                            )}
+                            {selectedAnalysis.producing_logistics?.sound_design?.music_notes && (
+                              <p><span className="text-muted-foreground font-medium">Music:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics.sound_design.music_notes}</span></p>
+                            )}
+                            {!selectedAnalysis.producing_logistics?.sound_design?.production_sound_challenges?.length &&
+                             !selectedAnalysis.producing_logistics?.sound_design?.ambient_requirements?.length &&
+                             !selectedAnalysis.producing_logistics?.sound_design?.sound_effects_needed?.length &&
+                             !selectedAnalysis.producing_logistics?.sound_design?.music_notes &&
                               <p className="text-muted-foreground italic">No sound design notes</p>}
                           </div>
                         </div>
 
                         {/* Safety Specifics - conditional */}
-                        {(selectedAnalysis.producing_logistics?.safety_specifics?.length ?? 0) > 0 && (
+                        {((selectedAnalysis.producing_logistics?.safety_specifics?.concerns?.length ?? 0) > 0 ||
+                          (selectedAnalysis.producing_logistics?.safety_specifics?.protocols_required?.length ?? 0) > 0 ||
+                          (selectedAnalysis.producing_logistics?.safety_specifics?.personnel_needed?.length ?? 0) > 0) && (
                           <div className="space-y-2 md:col-span-2">
                             <h3 className="text-sm font-semibold text-red-400 flex items-center gap-2">🛡️ Safety Specifics</h3>
-                            <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 space-y-1">
-                              {selectedAnalysis.producing_logistics?.safety_specifics?.map((item: string, idx: number) => (
-                                <div key={idx} className="flex items-start gap-2 text-sm">
-                                  <span className="text-red-400">⚠️</span>
-                                  <span className="text-foreground">{item}</span>
+                            <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 space-y-2 text-sm">
+                              {(selectedAnalysis.producing_logistics?.safety_specifics?.concerns?.length ?? 0) > 0 && (
+                                <div>
+                                  <span className="text-red-400 font-medium">Concerns:</span>
+                                  {selectedAnalysis.producing_logistics?.safety_specifics?.concerns?.map((item: string, idx: number) => (
+                                    <div key={idx} className="flex items-start gap-2 ml-2 mt-1">
+                                      <span className="text-red-400">⚠️</span>
+                                      <span className="text-foreground">{item}</span>
+                                    </div>
+                                  ))}
                                 </div>
-                              ))}
+                              )}
+                              {(selectedAnalysis.producing_logistics?.safety_specifics?.protocols_required?.length ?? 0) > 0 && (
+                                <p><span className="text-red-400 font-medium">Protocols:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics?.safety_specifics?.protocols_required?.join(', ')}</span></p>
+                              )}
+                              {(selectedAnalysis.producing_logistics?.safety_specifics?.personnel_needed?.length ?? 0) > 0 && (
+                                <p><span className="text-red-400 font-medium">Personnel Needed:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics?.safety_specifics?.personnel_needed?.join(', ')}</span></p>
+                              )}
+                              {selectedAnalysis.producing_logistics?.safety_specifics?.actor_prep_required && (
+                                <p><span className="text-red-400 font-medium">Actor Prep:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics.safety_specifics.actor_prep_required}</span></p>
+                              )}
                             </div>
                           </div>
                         )}
