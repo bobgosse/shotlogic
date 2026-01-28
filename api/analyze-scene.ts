@@ -336,6 +336,13 @@ Without the LANDING shot, the turn is incomplete. The scene's purpose is unfulfi
 
 RULE: Every scene's TURN must have both CATALYST and LANDING shots. This is non-negotiable. The turn is why the scene exists — missing it means missing the scene's purpose.
 
+MANDATORY TURN COVERAGE:
+When covering THE TURN, you MUST create:
+1. A CLOSE_UP of the character delivering the catalyst (the action/words that cause the change) — tag serves_story_element: "TURN_CATALYST"
+2. IMMEDIATELY FOLLOWED BY a CLOSE_UP of the character whose value changes, showing the change register on their face — tag serves_story_element: "TURN_LANDING"
+
+These two shots are the HEART of the scene. Do not skip the reaction shot. Do not combine it with another beat. The turn landing deserves its own dedicated shot. The TURN_LANDING shot should come IMMEDIATELY after the TURN_CATALYST in the shot list — they are a pair.
+
 ACTION/REACTION PAIRS: Beyond THE TURN, significant moments require action/reaction coverage:
 - Power shifts between characters
 - Major revelations
@@ -351,10 +358,10 @@ CHECKLIST BEFORE FINALIZING SHOT LIST:
 1. Have I identified THE TURN in this scene?
 2. What is the VALUE CHANGE? (Negative to Positive or Positive to Negative)
 3. Who experiences the change?
-4. Do I have a CATALYST shot (serves_story_element: TURN_CATALYST) showing the cause?
-5. Do I have a LANDING shot (serves_story_element: TURN_LANDING) showing the change register?
+4. Do I have a TURN_CATALYST shot showing the cause?
+5. Do I have a TURN_LANDING shot IMMEDIATELY AFTER showing the change register on the character's face?
 6. Is this the most carefully covered moment in my shot list?
-If any answer is NO, revise the shot list.
+If any answer is NO, revise the shot list before returning.
 
 Return ONLY valid JSON.`
 
@@ -663,6 +670,17 @@ export default async function handler(
     console.log(`   - Scene rhythm tempo: ${directingResult.data.scene_rhythm?.tempo || 'missing'}`)
     console.log(`   - What not to do: ${directingResult.data.what_not_to_do?.length || 0} items`)
     console.log(`   - Creative questions: ${directingResult.data.creative_questions?.length || 0} items`)
+    // Log shot list story elements for debugging
+    if (directingResult.data.shot_list?.length > 0) {
+      const storyElements = directingResult.data.shot_list.map((s: any, i: number) => `${i + 1}:${s.serves_story_element || 'NONE'}`)
+      console.log(`   - Shot story elements: [${storyElements.join(', ')}]`)
+      const hasCatalyst = directingResult.data.shot_list.some((s: any) => s.serves_story_element === 'TURN_CATALYST')
+      const hasLanding = directingResult.data.shot_list.some((s: any) => s.serves_story_element === 'TURN_LANDING')
+      console.log(`   - Turn coverage: catalyst=${hasCatalyst}, landing=${hasLanding}`)
+    }
+    if (directingResult.data.shot_list_rationale) {
+      console.log(`   - Shot list rationale: "${directingResult.data.shot_list_rationale.substring(0, 80)}..."`)
+    }
 
     // Normalize new directing fields with safe defaults if Claude omitted them
     if (!directingResult.data.actor_objectives || typeof directingResult.data.actor_objectives !== 'object') directingResult.data.actor_objectives = {}
