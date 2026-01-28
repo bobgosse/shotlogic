@@ -271,6 +271,16 @@ const ProjectDetails = () => {
     }
   }, [scenes, selectedSceneId]);
 
+  // Reset edit states when switching scenes
+  useEffect(() => {
+    setEditingStory(false);
+    setEditingDirecting(false);
+    setEditingProducing(false);
+    setEditedStoryData(null);
+    setEditedDirectingData(null);
+    setEditedProducingData(null);
+  }, [selectedSceneId]);
+
   // Get selected scene and its index
   const selectedSceneIndex = scenes.findIndex(s => s.id === selectedSceneId);
   const selectedScene = selectedSceneIndex >= 0 ? scenes[selectedSceneIndex] : null;
@@ -778,24 +788,31 @@ const ProjectDetails = () => {
 
   const EditableField = ({ label, value, onChange, multiline = false }: {
     label: string; value: string; onChange: (v: string) => void; multiline?: boolean;
-  }) => (
-    <div>
-      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{label}</label>
-      {multiline ? (
-        <Textarea value={value || ''} onChange={(e) => onChange(e.target.value)} className="mt-1 text-sm min-h-[60px]" />
-      ) : (
-        <Input value={value || ''} onChange={(e) => onChange(e.target.value)} className="mt-1 h-8 text-sm" />
-      )}
-    </div>
-  );
+  }) => {
+    // Defensive: coerce non-string values to string
+    const safeValue = (value == null) ? '' : (typeof value === 'object' ? JSON.stringify(value) : String(value));
+    return (
+      <div>
+        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{label}</label>
+        {multiline ? (
+          <Textarea value={safeValue} onChange={(e) => onChange(e.target.value)} className="mt-1 text-sm min-h-[60px]" />
+        ) : (
+          <Input value={safeValue} onChange={(e) => onChange(e.target.value)} className="mt-1 h-8 text-sm" />
+        )}
+      </div>
+    );
+  };
 
   const EditableArrayField = ({ label, items, onChange }: {
     label: string; items: string[]; onChange: (items: string[]) => void;
-  }) => (
+  }) => {
+    // Defensive: ensure items is an array of strings
+    const safeItems = Array.isArray(items) ? items.map(item => (item == null) ? '' : (typeof item === 'object' ? JSON.stringify(item) : String(item))) : [];
+    return (
     <div>
       <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{label}</label>
       <div className="mt-1 space-y-1">
-        {(items || []).map((item, i) => (
+        {safeItems.map((item, i) => (
           <div key={i} className="flex gap-1">
             <Input value={item} onChange={(e) => { const n = [...items]; n[i] = e.target.value; onChange(n); }} className="h-8 text-sm flex-1" />
             <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-500" onClick={() => onChange(items.filter((_, j) => j !== i))}><X className="w-3 h-3" /></Button>
@@ -805,6 +822,7 @@ const ProjectDetails = () => {
       </div>
     </div>
   );
+  };
 
   const SectionEditButtons = ({ section, editing }: { section: 'story' | 'directing' | 'producing'; editing: boolean }) => (
     editing ? (
