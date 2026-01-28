@@ -215,10 +215,10 @@ Return ONLY this JSON (no markdown):
     "timeOfDay": "[DAY or NIGHT]"
   },
   "cast": {
-    "principal": ["Names of characters with significant dialogue/action"],
-    "speaking": ["All characters with any dialogue"],
-    "silent": ["Named characters without dialogue"],
-    "extras": {"count": "number or 'none'", "description": "what they're doing"}
+    "principal": ["Main characters featured in this scene - characters central to the scene's action"],
+    "speaking": ["Characters with dialogue"],
+    "silent": ["Named characters present without dialogue - e.g. someone accompanying another character, observing, reacting, or mentioned in stage directions as being in the scene"],
+    "extras": "Description of any unnamed background people needed (e.g., 'bar patrons', 'pedestrians') or 'None'"
   },
   "key_props": ["Every object characters interact with"],
   "red_flags": ["Budget concerns: night shoot, crowds, stunts, VFX, etc."],
