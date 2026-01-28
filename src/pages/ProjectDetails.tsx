@@ -18,7 +18,7 @@ import { VisualProfileEditor } from "@/components/VisualProfileEditor";
 import { VisualProfile } from "@/types/visualProfile";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, ArrowLeft, Film, Camera, Printer, Download, RefreshCw, FileText, Edit, Save, Menu, Sparkles, ImageIcon, Palette, X, Check, ChevronLeft, ChevronRight, Users } from "lucide-react";
+import { Trash2, ArrowLeft, Film, Camera, Printer, Download, RefreshCw, FileText, Edit, Save, Menu, Sparkles, ImageIcon, Palette, X, Check, ChevronLeft, ChevronRight, Users, Plus, ArrowUp, ArrowDown, Copy, Pencil } from "lucide-react";
 import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { exportShotListPDF, exportShotListCSV, exportStoryboardPDF, exportAnalysisOnlyPDF } from "@/utils/shotListExporter";
@@ -217,6 +217,12 @@ const ProjectDetails = () => {
   const [showRetryDialog, setShowRetryDialog] = useState(false);
   const [retrySceneData, setRetrySceneData] = useState<{ id: string; number: number; content: string } | null>(null);
   const [isSavingVisualProfile, setIsSavingVisualProfile] = useState(false);
+  const [editingStory, setEditingStory] = useState(false);
+  const [editingDirecting, setEditingDirecting] = useState(false);
+  const [editingProducing, setEditingProducing] = useState(false);
+  const [editedStoryData, setEditedStoryData] = useState<any>(null);
+  const [editedDirectingData, setEditedDirectingData] = useState<any>(null);
+  const [editedProducingData, setEditedProducingData] = useState<any>(null);
   const isMobile = useMediaQuery("(max-width: 768px)");
   const isTablet = useMediaQuery("(max-width: 1024px)");
 
@@ -653,6 +659,167 @@ const ProjectDetails = () => {
       setIsSaving(false);
     }
   };
+
+  // ═══════════════════════════════════════════════════════════════
+  // SHOT LIST MANIPULATION HANDLERS
+  // ═══════════════════════════════════════════════════════════════
+
+  const getEditableShotList = (): ShotListItem[] => {
+    if (!selectedScene || !selectedAnalysis) return [];
+    const edits = editedScenes[selectedScene.id];
+    const rawList = edits?.shot_list || selectedAnalysis.shot_list || [];
+    return rawList.filter(isShotListItem);
+  };
+
+  const updateShotList = (newList: ShotListItem[]) => {
+    if (!selectedScene || !selectedAnalysis) return;
+    const currentEdits = editedScenes[selectedScene.id] || { ...selectedAnalysis };
+    setEditedScenes({ ...editedScenes, [selectedScene.id]: { ...currentEdits, shot_list: newList } });
+  };
+
+  const handleAddShot = () => {
+    const currentList = getEditableShotList();
+    const newShot: ShotListItem = {
+      shot_type: 'MEDIUM',
+      subject: '',
+      visual: '',
+      serves_story_element: 'CORE',
+      rationale: '',
+      editorial_note: '',
+    };
+    updateShotList([...currentList, newShot]);
+  };
+
+  const handleDeleteShot = (idx: number) => {
+    if (!window.confirm(`Delete Shot ${idx + 1}? This cannot be undone.`)) return;
+    const currentList = getEditableShotList();
+    updateShotList(currentList.filter((_, i) => i !== idx));
+  };
+
+  const handleDuplicateShot = (idx: number) => {
+    const currentList = getEditableShotList();
+    const copy = { ...currentList[idx] };
+    const newList = [...currentList];
+    newList.splice(idx + 1, 0, copy);
+    updateShotList(newList);
+  };
+
+  const handleMoveShot = (idx: number, direction: 'up' | 'down') => {
+    const currentList = getEditableShotList();
+    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= currentList.length) return;
+    const newList = [...currentList];
+    [newList[idx], newList[targetIdx]] = [newList[targetIdx], newList[idx]];
+    updateShotList(newList);
+  };
+
+  // ═══════════════════════════════════════════════════════════════
+  // SECTION EDIT/SAVE HANDLERS
+  // ═══════════════════════════════════════════════════════════════
+
+  const startEditingSection = (section: 'story' | 'directing' | 'producing') => {
+    if (!selectedAnalysis) return;
+    if (section === 'story') {
+      setEditedStoryData(JSON.parse(JSON.stringify(selectedAnalysis.story_analysis)));
+      setEditingStory(true);
+    } else if (section === 'directing') {
+      setEditedDirectingData(JSON.parse(JSON.stringify(selectedAnalysis.directing_vision)));
+      setEditingDirecting(true);
+    } else if (section === 'producing') {
+      setEditedProducingData(JSON.parse(JSON.stringify(selectedAnalysis.producing_logistics)));
+      setEditingProducing(true);
+    }
+  };
+
+  const cancelEditingSection = (section: 'story' | 'directing' | 'producing') => {
+    if (section === 'story') { setEditedStoryData(null); setEditingStory(false); }
+    else if (section === 'directing') { setEditedDirectingData(null); setEditingDirecting(false); }
+    else if (section === 'producing') { setEditedProducingData(null); setEditingProducing(false); }
+  };
+
+  const saveSection = async (section: 'story' | 'directing' | 'producing') => {
+    if (!selectedScene || !selectedAnalysis || !id) return;
+    setIsSaving(true);
+    try {
+      const currentEdits = editedScenes[selectedScene.id] || { ...selectedAnalysis };
+      let updated: AnalysisData;
+      if (section === 'story') {
+        updated = { ...currentEdits, story_analysis: editedStoryData };
+      } else if (section === 'directing') {
+        updated = { ...currentEdits, directing_vision: editedDirectingData };
+      } else {
+        updated = { ...currentEdits, producing_logistics: editedProducingData };
+      }
+      const sceneUpdates = { [selectedScene.id]: updated };
+      await api.post('/api/projects/save-scene', {
+        projectId: id,
+        sceneUpdates
+      }, {
+        context: `Saving ${section} edits`,
+        timeoutMs: 30000,
+        maxRetries: 2
+      });
+      // Update local editedScenes so other tabs see the change
+      setEditedScenes({ ...editedScenes, [selectedScene.id]: updated });
+      toast({ title: "Changes saved", description: `${section.charAt(0).toUpperCase() + section.slice(1)} analysis updated.` });
+      cancelEditingSection(section);
+      queryClient.invalidateQueries({ queryKey: ['project', id] });
+    } catch (error: any) {
+      const errorMsg = (error as ApiError).userMessage || error.message || 'Failed to save';
+      toast({ title: "Save failed", description: errorMsg, variant: "destructive" });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // ═══════════════════════════════════════════════════════════════
+  // INLINE EDIT HELPERS
+  // ═══════════════════════════════════════════════════════════════
+
+  const EditableField = ({ label, value, onChange, multiline = false }: {
+    label: string; value: string; onChange: (v: string) => void; multiline?: boolean;
+  }) => (
+    <div>
+      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{label}</label>
+      {multiline ? (
+        <Textarea value={value || ''} onChange={(e) => onChange(e.target.value)} className="mt-1 text-sm min-h-[60px]" />
+      ) : (
+        <Input value={value || ''} onChange={(e) => onChange(e.target.value)} className="mt-1 h-8 text-sm" />
+      )}
+    </div>
+  );
+
+  const EditableArrayField = ({ label, items, onChange }: {
+    label: string; items: string[]; onChange: (items: string[]) => void;
+  }) => (
+    <div>
+      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{label}</label>
+      <div className="mt-1 space-y-1">
+        {(items || []).map((item, i) => (
+          <div key={i} className="flex gap-1">
+            <Input value={item} onChange={(e) => { const n = [...items]; n[i] = e.target.value; onChange(n); }} className="h-8 text-sm flex-1" />
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-500" onClick={() => onChange(items.filter((_, j) => j !== i))}><X className="w-3 h-3" /></Button>
+          </div>
+        ))}
+        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onChange([...(items || []), ''])}><Plus className="w-3 h-3 mr-1" />Add</Button>
+      </div>
+    </div>
+  );
+
+  const SectionEditButtons = ({ section, editing }: { section: 'story' | 'directing' | 'producing'; editing: boolean }) => (
+    editing ? (
+      <div className="flex gap-2">
+        <Button size="sm" className="h-7 bg-green-600 hover:bg-green-700 text-white" onClick={() => saveSection(section)} disabled={isSaving}>
+          <Save className="w-3 h-3 mr-1" />{isSaving ? 'Saving...' : 'Save'}
+        </Button>
+        <Button size="sm" variant="outline" className="h-7" onClick={() => cancelEditingSection(section)} disabled={isSaving}>Cancel</Button>
+      </div>
+    ) : (
+      <Button size="sm" variant="ghost" className="h-7" onClick={() => startEditingSection(section)}>
+        <Pencil className="w-3 h-3 mr-1" />Edit
+      </Button>
+    )
+  );
 
   const handleDeleteProject = async () => {
     if (!id) return;
@@ -1152,6 +1319,30 @@ const ProjectDetails = () => {
                         <p className="text-muted-foreground">Generating Story Analysis...</p>
                       </div>
                     ) : (
+                      <>
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-sm font-semibold text-primary">Story Analysis</h3>
+                        <SectionEditButtons section="story" editing={editingStory} />
+                      </div>
+                      {editingStory && editedStoryData ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="md:col-span-2"><EditableField label="The Core" value={editedStoryData.the_core || ''} onChange={(v) => setEditedStoryData({...editedStoryData, the_core: v})} multiline /></div>
+                          <div className="md:col-span-2"><EditableField label="Scene Obligation" value={editedStoryData.scene_obligation || ''} onChange={(v) => setEditedStoryData({...editedStoryData, scene_obligation: v})} multiline /></div>
+                          <div className="md:col-span-2"><EditableField label="The One Thing" value={editedStoryData.the_one_thing || ''} onChange={(v) => setEditedStoryData({...editedStoryData, the_one_thing: v})} multiline /></div>
+                          <div className="md:col-span-2"><EditableField label="Synopsis" value={editedStoryData.synopsis || ''} onChange={(v) => setEditedStoryData({...editedStoryData, synopsis: v})} multiline /></div>
+                          <div className="md:col-span-2"><EditableField label="Essential Exposition" value={editedStoryData.essential_exposition || ''} onChange={(v) => setEditedStoryData({...editedStoryData, essential_exposition: v})} multiline /></div>
+                          <div className="md:col-span-2"><EditableField label="The Turn" value={editedStoryData.the_turn || ''} onChange={(v) => setEditedStoryData({...editedStoryData, the_turn: v})} multiline /></div>
+                          <EditableField label="Ownership" value={editedStoryData.ownership || ''} onChange={(v) => setEditedStoryData({...editedStoryData, ownership: v})} multiline />
+                          <EditableField label="The Times" value={editedStoryData.the_times || ''} onChange={(v) => setEditedStoryData({...editedStoryData, the_times: v})} multiline />
+                          <EditableField label="Imagery & Tone" value={editedStoryData.imagery_and_tone || ''} onChange={(v) => setEditedStoryData({...editedStoryData, imagery_and_tone: v})} multiline />
+                          <EditableField label="Stakes" value={editedStoryData.stakes || ''} onChange={(v) => setEditedStoryData({...editedStoryData, stakes: v})} multiline />
+                          <div className="md:col-span-2"><EditableField label="If This Scene Fails" value={editedStoryData.if_this_scene_fails || ''} onChange={(v) => setEditedStoryData({...editedStoryData, if_this_scene_fails: v})} multiline /></div>
+                          <div className="md:col-span-2"><EditableArrayField label="Pitfalls" items={editedStoryData.pitfalls || []} onChange={(items) => setEditedStoryData({...editedStoryData, pitfalls: items})} /></div>
+                          <EditableArrayField label="Setups" items={editedStoryData.setup_payoff?.setups || []} onChange={(items) => setEditedStoryData({...editedStoryData, setup_payoff: {...(editedStoryData.setup_payoff || {}), setups: items}})} />
+                          <EditableArrayField label="Payoffs" items={editedStoryData.setup_payoff?.payoffs || []} onChange={(items) => setEditedStoryData({...editedStoryData, setup_payoff: {...(editedStoryData.setup_payoff || {}), payoffs: items}})} />
+                          <div className="md:col-span-2"><EditableArrayField label="Alternative Readings" items={editedStoryData.alternative_readings || []} onChange={(items) => setEditedStoryData({...editedStoryData, alternative_readings: items})} /></div>
+                        </div>
+                      ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* The Core - Most Important */}
                         <div className="space-y-2 md:col-span-2">
@@ -1357,6 +1548,8 @@ const ProjectDetails = () => {
                           </div>
                         </div>
                       </div>
+                      )}
+                      </>
                     )}
                   </TabsContent>
 
@@ -1382,6 +1575,82 @@ const ProjectDetails = () => {
                         <p className="text-muted-foreground">Generating Production Analysis...</p>
                       </div>
                     ) : (
+                      <>
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-sm font-semibold text-primary">Production Logistics</h3>
+                        <SectionEditButtons section="producing" editing={editingProducing} />
+                      </div>
+                      {editingProducing && editedProducingData ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <EditableField label="Location (Primary)" value={editedProducingData.locations?.primary || editedProducingData.locations?.setting || ''} onChange={(v) => setEditedProducingData({...editedProducingData, locations: {...(editedProducingData.locations || {}), primary: v}})} />
+                          <EditableField label="Time of Day" value={editedProducingData.locations?.timeOfDay || ''} onChange={(v) => setEditedProducingData({...editedProducingData, locations: {...(editedProducingData.locations || {}), timeOfDay: v}})} />
+                          <EditableArrayField label="Principal Cast" items={editedProducingData.cast?.principal || []} onChange={(items) => setEditedProducingData({...editedProducingData, cast: {...(editedProducingData.cast || {}), principal: items}})} />
+                          <EditableArrayField label="Speaking" items={editedProducingData.cast?.speaking || []} onChange={(items) => setEditedProducingData({...editedProducingData, cast: {...(editedProducingData.cast || {}), speaking: items}})} />
+                          <EditableArrayField label="Silent" items={editedProducingData.cast?.silent || []} onChange={(items) => setEditedProducingData({...editedProducingData, cast: {...(editedProducingData.cast || {}), silent: items}})} />
+                          <EditableField label="Extras" value={editedProducingData.cast?.extras || ''} onChange={(v) => setEditedProducingData({...editedProducingData, cast: {...(editedProducingData.cast || {}), extras: v}})} />
+                          <div className="md:col-span-2"><EditableArrayField label="Key Props" items={editedProducingData.key_props || []} onChange={(items) => setEditedProducingData({...editedProducingData, key_props: items})} /></div>
+                          <div className="md:col-span-2"><EditableArrayField label="Red Flags / Budget Flags" items={editedProducingData.red_flags || editedProducingData.budget_flags || []} onChange={(items) => setEditedProducingData({...editedProducingData, red_flags: items})} /></div>
+                          <div>
+                            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Resource Impact</label>
+                            <select value={editedProducingData.resource_impact || 'Low'} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setEditedProducingData({...editedProducingData, resource_impact: e.target.value})} className="w-full h-8 text-sm rounded-md border border-input bg-background px-3 py-1 mt-1">
+                              {['Low', 'Medium', 'High'].map(v => <option key={v} value={v}>{v}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Scene Complexity (1-5)</label>
+                            <select value={editedProducingData.scene_complexity?.rating || 1} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setEditedProducingData({...editedProducingData, scene_complexity: {...(editedProducingData.scene_complexity || {}), rating: parseInt(e.target.value)}})} className="w-full h-8 text-sm rounded-md border border-input bg-background px-3 py-1 mt-1">
+                              {[1,2,3,4,5].map(v => <option key={v} value={v}>{v}</option>)}
+                            </select>
+                          </div>
+                          <div className="md:col-span-2"><EditableField label="Complexity Justification" value={editedProducingData.scene_complexity?.justification || ''} onChange={(v) => setEditedProducingData({...editedProducingData, scene_complexity: {...(editedProducingData.scene_complexity || {}), justification: v}})} multiline /></div>
+                          <EditableField label="Estimated Minutes" value={editedProducingData.estimated_screen_time?.estimated_minutes || ''} onChange={(v) => setEditedProducingData({...editedProducingData, estimated_screen_time: {...(editedProducingData.estimated_screen_time || {}), estimated_minutes: v}})} />
+                          <EditableField label="Pacing Note" value={editedProducingData.estimated_screen_time?.pacing_note || ''} onChange={(v) => setEditedProducingData({...editedProducingData, estimated_screen_time: {...(editedProducingData.estimated_screen_time || {}), pacing_note: v}})} />
+                          {/* Continuity */}
+                          <div className="md:col-span-2">
+                            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Continuity - Carries In</label>
+                            <div className="mt-1 grid grid-cols-1 md:grid-cols-2 gap-2">
+                              {['costume', 'props', 'makeup', 'time_logic', 'emotional_state'].map(field => (
+                                <EditableField key={field} label={field.replace(/_/g, ' ')} value={editedProducingData.continuity?.carries_in?.[field] || ''} onChange={(v) => setEditedProducingData({...editedProducingData, continuity: {...(editedProducingData.continuity || {}), carries_in: {...(editedProducingData.continuity?.carries_in || {}), [field]: v}}})} />
+                              ))}
+                            </div>
+                          </div>
+                          <div className="md:col-span-2">
+                            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Continuity - Carries Out</label>
+                            <div className="mt-1 grid grid-cols-1 md:grid-cols-2 gap-2">
+                              {['costume', 'props', 'makeup', 'time_logic', 'emotional_state'].map(field => (
+                                <EditableField key={field} label={field.replace(/_/g, ' ')} value={editedProducingData.continuity?.carries_out?.[field] || ''} onChange={(v) => setEditedProducingData({...editedProducingData, continuity: {...(editedProducingData.continuity || {}), carries_out: {...(editedProducingData.continuity?.carries_out || {}), [field]: v}}})} />
+                              ))}
+                            </div>
+                          </div>
+                          {/* Scheduling */}
+                          <EditableField label="Time of Day Requirement" value={editedProducingData.scheduling_notes?.time_of_day_requirement || ''} onChange={(v) => setEditedProducingData({...editedProducingData, scheduling_notes: {...(editedProducingData.scheduling_notes || {}), time_of_day_requirement: v}})} />
+                          <EditableField label="Weather Dependency" value={editedProducingData.scheduling_notes?.weather_dependency || ''} onChange={(v) => setEditedProducingData({...editedProducingData, scheduling_notes: {...(editedProducingData.scheduling_notes || {}), weather_dependency: v}})} />
+                          <EditableField label="Actor Availability Note" value={editedProducingData.scheduling_notes?.actor_availability_note || ''} onChange={(v) => setEditedProducingData({...editedProducingData, scheduling_notes: {...(editedProducingData.scheduling_notes || {}), actor_availability_note: v}})} />
+                          <EditableArrayField label="Combinable With" items={editedProducingData.scheduling_notes?.combinable_with || []} onChange={(items) => setEditedProducingData({...editedProducingData, scheduling_notes: {...(editedProducingData.scheduling_notes || {}), combinable_with: items}})} />
+                          {/* Sound Design */}
+                          <div className="md:col-span-2"><EditableArrayField label="Production Sound Challenges" items={editedProducingData.sound_design?.production_sound_challenges || []} onChange={(items) => setEditedProducingData({...editedProducingData, sound_design: {...(editedProducingData.sound_design || {}), production_sound_challenges: items}})} /></div>
+                          <EditableArrayField label="Ambient Requirements" items={editedProducingData.sound_design?.ambient_requirements || []} onChange={(items) => setEditedProducingData({...editedProducingData, sound_design: {...(editedProducingData.sound_design || {}), ambient_requirements: items}})} />
+                          <EditableField label="Music Notes" value={editedProducingData.sound_design?.music_notes || ''} onChange={(v) => setEditedProducingData({...editedProducingData, sound_design: {...(editedProducingData.sound_design || {}), music_notes: v}})} multiline />
+                          {/* Safety */}
+                          <div className="md:col-span-2"><EditableArrayField label="Safety Concerns" items={editedProducingData.safety_specifics?.concerns || []} onChange={(items) => setEditedProducingData({...editedProducingData, safety_specifics: {...(editedProducingData.safety_specifics || {}), concerns: items}})} /></div>
+                          <EditableArrayField label="Protocols Required" items={editedProducingData.safety_specifics?.protocols_required || []} onChange={(items) => setEditedProducingData({...editedProducingData, safety_specifics: {...(editedProducingData.safety_specifics || {}), protocols_required: items}})} />
+                          <EditableField label="Actor Prep Required" value={editedProducingData.safety_specifics?.actor_prep_required || ''} onChange={(v) => setEditedProducingData({...editedProducingData, safety_specifics: {...(editedProducingData.safety_specifics || {}), actor_prep_required: v}})} multiline />
+                          {/* Department Notes */}
+                          <div className="md:col-span-2">
+                            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Department Notes</label>
+                            <div className="mt-1 space-y-2">
+                              {Object.entries(editedProducingData.department_specific_notes || {}).map(([dept, note]) => (
+                                <div key={dept} className="flex gap-2 items-start">
+                                  <span className="text-xs font-bold text-primary capitalize shrink-0 mt-2 w-24">{dept.replace(/_/g, ' ')}:</span>
+                                  <Textarea value={note as string} onChange={(e) => setEditedProducingData({...editedProducingData, department_specific_notes: {...editedProducingData.department_specific_notes, [dept]: e.target.value}})} className="text-sm min-h-[40px] flex-1" />
+                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-500 shrink-0" onClick={() => { const obj = {...editedProducingData.department_specific_notes}; delete obj[dept]; setEditedProducingData({...editedProducingData, department_specific_notes: obj}); }}><X className="w-3 h-3" /></Button>
+                                </div>
+                              ))}
+                              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { const name = prompt('Department name:'); if (name) setEditedProducingData({...editedProducingData, department_specific_notes: {...(editedProducingData.department_specific_notes || {}), [name]: ''}}); }}><Plus className="w-3 h-3 mr-1" />Add Department</Button>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* Locations */}
                         <div className="space-y-2">
@@ -1645,6 +1914,8 @@ const ProjectDetails = () => {
                           </div>
                         )}
                       </div>
+                      )}
+                      </>
                     )}
                   </TabsContent>
 
@@ -1670,6 +1941,64 @@ const ProjectDetails = () => {
                         <p className="text-muted-foreground">Generating Directing Vision...</p>
                       </div>
                     ) : (
+                      <>
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-sm font-semibold text-primary">Directing Vision</h3>
+                        <SectionEditButtons section="directing" editing={editingDirecting} />
+                      </div>
+                      {editingDirecting && editedDirectingData ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Tone & Mood</label>
+                            <div className="mt-1 space-y-2">
+                              <EditableField label="Opens" value={editedDirectingData.tone_and_mood?.opening || ''} onChange={(v) => setEditedDirectingData({...editedDirectingData, tone_and_mood: {...(editedDirectingData.tone_and_mood || {}), opening: v}})} />
+                              <EditableField label="Shifts" value={editedDirectingData.tone_and_mood?.shift || ''} onChange={(v) => setEditedDirectingData({...editedDirectingData, tone_and_mood: {...(editedDirectingData.tone_and_mood || {}), shift: v}})} />
+                              <EditableField label="Closes" value={editedDirectingData.tone_and_mood?.closing || ''} onChange={(v) => setEditedDirectingData({...editedDirectingData, tone_and_mood: {...(editedDirectingData.tone_and_mood || {}), closing: v}})} />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Scene Rhythm</label>
+                            <div className="mt-1 space-y-2">
+                              <div>
+                                <label className="text-xs text-muted-foreground">Tempo</label>
+                                <select value={editedDirectingData.scene_rhythm?.tempo || ''} onChange={(e) => setEditedDirectingData({...editedDirectingData, scene_rhythm: {...(editedDirectingData.scene_rhythm || {}), tempo: e.target.value}})} className="w-full h-8 text-sm rounded-md border border-input bg-background px-3 py-1 mt-1">
+                                  {['SLOW_BUILD', 'STEADY', 'ACCELERATING', 'DECELERATING', 'STACCATO', 'VARIABLE'].map(t => <option key={t} value={t}>{t}</option>)}
+                                </select>
+                              </div>
+                              <EditableField label="Breaths" value={editedDirectingData.scene_rhythm?.breaths || ''} onChange={(v) => setEditedDirectingData({...editedDirectingData, scene_rhythm: {...(editedDirectingData.scene_rhythm || {}), breaths: v}})} multiline />
+                              <EditableField label="Acceleration Points" value={editedDirectingData.scene_rhythm?.acceleration_points || ''} onChange={(v) => setEditedDirectingData({...editedDirectingData, scene_rhythm: {...(editedDirectingData.scene_rhythm || {}), acceleration_points: v}})} multiline />
+                              <EditableField label="Holds" value={editedDirectingData.scene_rhythm?.holds || ''} onChange={(v) => setEditedDirectingData({...editedDirectingData, scene_rhythm: {...(editedDirectingData.scene_rhythm || {}), holds: v}})} multiline />
+                            </div>
+                          </div>
+                          <EditableField label="Tone Reference" value={editedDirectingData.tone_reference || ''} onChange={(v) => setEditedDirectingData({...editedDirectingData, tone_reference: v})} />
+                          <div>
+                            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Visual Strategy</label>
+                            <div className="mt-1 space-y-2">
+                              <EditableField label="Approach" value={editedDirectingData.visual_strategy?.approach || ''} onChange={(v) => setEditedDirectingData({...editedDirectingData, visual_strategy: {...(editedDirectingData.visual_strategy || {}), approach: v}})} />
+                              <EditableField label="Camera" value={editedDirectingData.visual_strategy?.cameraPersonality || ''} onChange={(v) => setEditedDirectingData({...editedDirectingData, visual_strategy: {...(editedDirectingData.visual_strategy || {}), cameraPersonality: v}})} />
+                              <EditableField label="Lighting" value={editedDirectingData.visual_strategy?.lightingMood || ''} onChange={(v) => setEditedDirectingData({...editedDirectingData, visual_strategy: {...(editedDirectingData.visual_strategy || {}), lightingMood: v}})} />
+                            </div>
+                          </div>
+                          <div className="md:col-span-2"><EditableField label="Visual Metaphor" value={editedDirectingData.visual_metaphor || ''} onChange={(v) => setEditedDirectingData({...editedDirectingData, visual_metaphor: v})} multiline /></div>
+                          <div className="md:col-span-2"><EditableField label="Editorial Intent" value={editedDirectingData.editorial_intent || ''} onChange={(v) => setEditedDirectingData({...editedDirectingData, editorial_intent: v})} multiline /></div>
+                          {/* Actor Objectives - key-value editing */}
+                          <div className="md:col-span-2">
+                            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Actor Objectives</label>
+                            <div className="mt-1 space-y-2">
+                              {Object.entries(editedDirectingData.actor_objectives || {}).map(([character, objective]) => (
+                                <div key={character} className="flex gap-2 items-start">
+                                  <span className="text-xs font-bold text-primary uppercase shrink-0 mt-2 w-24">{character}:</span>
+                                  <Textarea value={objective as string} onChange={(e) => setEditedDirectingData({...editedDirectingData, actor_objectives: {...editedDirectingData.actor_objectives, [character]: e.target.value}})} className="text-sm min-h-[40px] flex-1" />
+                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-500 shrink-0" onClick={() => { const obj = {...editedDirectingData.actor_objectives}; delete obj[character]; setEditedDirectingData({...editedDirectingData, actor_objectives: obj}); }}><X className="w-3 h-3" /></Button>
+                                </div>
+                              ))}
+                              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { const name = prompt('Character name:'); if (name) setEditedDirectingData({...editedDirectingData, actor_objectives: {...(editedDirectingData.actor_objectives || {}), [name]: ''}}); }}><Plus className="w-3 h-3 mr-1" />Add Character</Button>
+                            </div>
+                          </div>
+                          <div className="md:col-span-2"><EditableArrayField label="What NOT To Do" items={editedDirectingData.what_not_to_do || []} onChange={(items) => setEditedDirectingData({...editedDirectingData, what_not_to_do: items})} /></div>
+                          <div className="md:col-span-2"><EditableArrayField label="Creative Questions" items={editedDirectingData.creative_questions || []} onChange={(items) => setEditedDirectingData({...editedDirectingData, creative_questions: items})} /></div>
+                        </div>
+                      ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* Tone & Mood */}
                         <div className="space-y-2">
@@ -1910,6 +2239,8 @@ const ProjectDetails = () => {
                           </div>
                         </div>
                       </div>
+                      )}
+                      </>
                     )}
                   </TabsContent>
 
@@ -1967,13 +2298,34 @@ const ProjectDetails = () => {
                                   <div className="flex-1 space-y-2">
                                     {isEditMode ? (
                                       <>
+                                        <div className="flex items-center justify-between mb-2">
+                                          <span className="text-xs font-semibold text-muted-foreground">Shot {idx + 1}</span>
+                                          <div className="flex gap-1">
+                                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => handleMoveShot(idx, 'up')} disabled={idx === 0} title="Move up">
+                                              <ArrowUp className="w-3 h-3" />
+                                            </Button>
+                                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => handleMoveShot(idx, 'down')} disabled={idx === (editedScenes[selectedScene.id]?.shot_list || selectedAnalysis.shot_list || []).length - 1} title="Move down">
+                                              <ArrowDown className="w-3 h-3" />
+                                            </Button>
+                                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => handleDuplicateShot(idx)} title="Duplicate">
+                                              <Copy className="w-3 h-3" />
+                                            </Button>
+                                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-500 hover:text-red-600" onClick={() => handleDeleteShot(idx)} title="Delete">
+                                              <Trash2 className="w-3 h-3" />
+                                            </Button>
+                                          </div>
+                                        </div>
                                         <div className="flex items-center gap-2">
                                           <label className="text-xs text-muted-foreground w-20">Shot Type:</label>
-                                          <Input
+                                          <select
                                             value={getCurrentShot(idx)?.shot_type || getShotType(shot)}
                                             onChange={(e) => handleShotEdit(idx, 'shot_type', e.target.value)}
-                                            className="h-8 text-sm font-bold uppercase"
-                                          />
+                                            className="h-8 text-sm font-bold uppercase rounded-md border border-input bg-background px-3 py-1 flex-1"
+                                          >
+                                            {['WIDE', 'MEDIUM', 'CLOSE_UP', 'EXTREME_CLOSE_UP', 'TWO_SHOT', 'GROUP_SHOT', 'INSERT', 'POV', 'OVER_SHOULDER'].map(t => (
+                                              <option key={t} value={t}>{t}</option>
+                                            ))}
+                                          </select>
                                         </div>
                                         <div>
                                           <label className="text-xs text-muted-foreground">Subject:</label>
@@ -1995,12 +2347,15 @@ const ProjectDetails = () => {
                                         </div>
                                         <div className="flex items-center gap-2">
                                           <label className="text-xs text-muted-foreground w-20">Serves:</label>
-                                          <Input
+                                          <select
                                             value={getCurrentShot(idx)?.serves_story_element || getShotStoryElement(shot)}
                                             onChange={(e) => handleShotEdit(idx, 'serves_story_element', e.target.value)}
-                                            className="h-8 text-sm uppercase"
-                                            placeholder="CORE | TURN | SUBTEXT | CONFLICT | STAKES | SETUP | PAYOFF"
-                                          />
+                                            className="h-8 text-sm uppercase rounded-md border border-input bg-background px-3 py-1 flex-1"
+                                          >
+                                            {['CORE', 'TURN_CATALYST', 'TURN_LANDING', 'SUBTEXT', 'CONFLICT', 'STAKES', 'SETUP', 'PAYOFF'].map(t => (
+                                              <option key={t} value={t}>{t}</option>
+                                            ))}
+                                          </select>
                                         </div>
                                         <div>
                                           <label className="text-xs text-muted-foreground">Rationale:</label>
@@ -2084,6 +2439,11 @@ const ProjectDetails = () => {
                             }
                           })}
                         </div>
+                        {isEditMode && (
+                          <Button variant="outline" className="w-full mt-3 border-dashed" onClick={handleAddShot}>
+                            <Plus className="w-4 h-4 mr-2" />Add Shot
+                          </Button>
+                        )}
                       </>
                     )}
                   </TabsContent>
