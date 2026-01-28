@@ -134,7 +134,7 @@ async function callClaude(
 }
 
 // ═══════════════════════════════════════════════════════════════
-// CALL 1: STORY ANALYSIS (8 simple fields, no nesting)
+// CALL 1: STORY ANALYSIS (14 fields including story-critical analysis)
 // ═══════════════════════════════════════════════════════════════
 async function analyzeStory(
   apiKey: string,
@@ -143,7 +143,7 @@ async function analyzeStory(
   invocationId: string
 ): Promise<{ success: boolean; data?: any; error?: string }> {
 
-  const systemPrompt = `You are a professional script analyst. Analyze the scene and return ONLY valid JSON with these 8 fields. Each field must be filled with specific content from THIS scene - never use placeholder text.`
+  const systemPrompt = `You are a professional script analyst and story consultant. Analyze the scene and return ONLY valid JSON with these 14 fields. Each field must be filled with specific, substantive content from THIS scene - never use placeholder text. Think deeply about what this scene MUST accomplish for the story to work, not just what happens in it.`
 
   const userPrompt = `Analyze this scene and return JSON with exactly these fields:
 
@@ -164,7 +164,16 @@ Return ONLY this JSON structure (no markdown, no explanation):
   "the_times": "[Era, period, or contemporary setting details that matter]",
   "imagery_and_tone": "[Visual quality and emotional temperature: dark/light, warm/cold, confined/open]",
   "stakes": "[What CHARACTER NAME risks losing if they fail in this scene]",
-  "pitfalls": ["Risk 1", "Risk 2", "Risk 3"]
+  "pitfalls": ["Risk 1", "Risk 2", "Risk 3"],
+  "scene_obligation": "What MUST this scene accomplish for the story to work? Frame as a requirement, not a description. Start with 'This scene must...'",
+  "the_one_thing": "If this scene can only accomplish one thing due to time/budget constraints, what is the single most essential element that must land?",
+  "setup_payoff": {
+    "setups": ["List what this scene plants or establishes for later scenes. Empty array if none."],
+    "payoffs": ["List what this scene pays off from earlier scenes. Empty array if none."]
+  },
+  "essential_exposition": "What specific information must the audience receive in this scene to understand the story going forward?",
+  "if_this_scene_fails": "What breaks in the larger story if this scene doesn't work? What downstream scenes or payoffs depend on this?",
+  "alternative_readings": ["List 1-3 reasonable but different interpretations of character motivation or scene meaning that the creative team should align on before shooting"]
 }`
 
   return callClaude(apiKey, systemPrompt, userPrompt, invocationId, 'STORY_ANALYSIS')
@@ -415,6 +424,19 @@ export default async function handler(
     console.log(`✅ [${invocationId}] Story analysis complete`)
     console.log(`   - the_core: "${storyResult.data.the_core?.substring(0, 60)}..."`)
     console.log(`   - the_turn: "${storyResult.data.the_turn?.substring(0, 60)}..."`)
+    console.log(`   - scene_obligation: "${storyResult.data.scene_obligation?.substring(0, 60)}..."`)
+    console.log(`   - the_one_thing: "${storyResult.data.the_one_thing?.substring(0, 60)}..."`)
+    console.log(`   - alternative_readings: ${storyResult.data.alternative_readings?.length || 0} readings`)
+
+    // Normalize new fields with safe defaults if Claude omitted them
+    if (!storyResult.data.scene_obligation) storyResult.data.scene_obligation = ''
+    if (!storyResult.data.the_one_thing) storyResult.data.the_one_thing = ''
+    if (!storyResult.data.setup_payoff) storyResult.data.setup_payoff = { setups: [], payoffs: [] }
+    if (!storyResult.data.setup_payoff.setups) storyResult.data.setup_payoff.setups = []
+    if (!storyResult.data.setup_payoff.payoffs) storyResult.data.setup_payoff.payoffs = []
+    if (!storyResult.data.essential_exposition) storyResult.data.essential_exposition = ''
+    if (!storyResult.data.if_this_scene_fails) storyResult.data.if_this_scene_fails = ''
+    if (!Array.isArray(storyResult.data.alternative_readings)) storyResult.data.alternative_readings = []
 
     // ═══════════════════════════════════════════════════════════════
     // CALL 2: Producing Logistics
@@ -505,6 +527,16 @@ export default async function handler(
     }
     if (!analysis.shot_list || analysis.shot_list.length === 0) {
       validationIssues.push('No shots generated')
+    }
+    // Validate new story analysis fields
+    if (!analysis.story_analysis.scene_obligation || analysis.story_analysis.scene_obligation.length < 30) {
+      validationIssues.push('scene_obligation is missing or too short (min 30 chars)')
+    }
+    if (!analysis.story_analysis.the_one_thing || analysis.story_analysis.the_one_thing.length < 20) {
+      validationIssues.push('the_one_thing is missing or too short (min 20 chars)')
+    }
+    if (analysis.story_analysis.alternative_readings && !Array.isArray(analysis.story_analysis.alternative_readings)) {
+      validationIssues.push('alternative_readings should be an array')
     }
 
     return res.status(200).json({
