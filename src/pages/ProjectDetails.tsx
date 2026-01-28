@@ -1396,8 +1396,14 @@ const ProjectDetails = () => {
                             {selectedAnalysis.producing_logistics?.cast?.speaking?.length > 0 && (
                               <p><span className="text-muted-foreground">Speaking:</span> {selectedAnalysis.producing_logistics.cast.speaking.join(', ')}</p>
                             )}
-                            {!selectedAnalysis.producing_logistics?.cast?.principal?.length && 
-                             !selectedAnalysis.producing_logistics?.cast?.speaking?.length && 
+                            {selectedAnalysis.producing_logistics?.cast?.silent?.length > 0 && (
+                              <p><span className="text-muted-foreground">Silent:</span> {selectedAnalysis.producing_logistics.cast.silent.join(', ')}</p>
+                            )}
+                            {selectedAnalysis.producing_logistics?.cast?.extras && selectedAnalysis.producing_logistics.cast.extras !== 'None' && (
+                              <p><span className="text-muted-foreground">Extras:</span> {selectedAnalysis.producing_logistics.cast.extras}</p>
+                            )}
+                            {!selectedAnalysis.producing_logistics?.cast?.principal?.length &&
+                             !selectedAnalysis.producing_logistics?.cast?.speaking?.length &&
                              <p className="text-muted-foreground italic">No cast listed</p>}
                           </div>
                         </div>
