@@ -110,6 +110,21 @@ interface AnalysisData {
     scheduling_concerns?: any;
     budget_flags?: string[];
     special_requirements?: string[];
+    continuity?: {
+      carries_in: string[];
+      carries_out: string[];
+      watch_for: string;
+    };
+    scene_complexity?: "Low" | "Medium" | "High" | "Very High";
+    estimated_screen_time?: string;
+    scheduling_notes?: string[];
+    sound_design?: {
+      ambient: string;
+      key_sounds: string[];
+      music_cue: string;
+    };
+    safety_specifics?: string[];
+    department_specific_notes?: Record<string, string>;
   };
   directing_vision: {
     visual_metaphor: string;
@@ -1393,11 +1408,146 @@ const ProjectDetails = () => {
                                 <span className="text-foreground">{flag}</span>
                               </div>
                             ))}
-                            {(!selectedAnalysis.producing_logistics?.budget_flags?.length && 
+                            {(!selectedAnalysis.producing_logistics?.budget_flags?.length &&
                               !selectedAnalysis.producing_logistics?.red_flags?.length) &&
                               <p className="text-sm text-muted-foreground italic">No budget concerns</p>}
                           </div>
                         </div>
+
+                        {/* Scene Complexity */}
+                        <div className="space-y-2">
+                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">📊 Scene Complexity</h3>
+                          <div className="text-sm text-foreground bg-muted/30 rounded-lg p-3 flex items-center gap-3">
+                            <span className="font-medium">{selectedAnalysis.producing_logistics?.scene_complexity || 'Not rated'}</span>
+                            <div className="flex gap-1">
+                              {['Low', 'Medium', 'High', 'Very High'].map((level, idx) => (
+                                <div
+                                  key={level}
+                                  className={`w-3 h-3 rounded-full ${
+                                    ['Low', 'Medium', 'High', 'Very High'].indexOf(
+                                      selectedAnalysis.producing_logistics?.scene_complexity || ''
+                                    ) >= idx
+                                      ? idx <= 1 ? 'bg-green-500' : idx === 2 ? 'bg-amber-500' : 'bg-red-500'
+                                      : 'bg-muted-foreground/20'
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Estimated Screen Time */}
+                        <div className="space-y-2">
+                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">⏱️ Estimated Screen Time</h3>
+                          <div className="text-sm text-foreground bg-muted/30 rounded-lg p-3">
+                            <span className="font-medium">{selectedAnalysis.producing_logistics?.estimated_screen_time || 'Not estimated'}</span>
+                          </div>
+                        </div>
+
+                        {/* Continuity */}
+                        <div className="space-y-2 md:col-span-2">
+                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🔗 Continuity</h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+                              <p className="text-xs font-semibold text-blue-400 mb-1">Carries In</p>
+                              <div className="space-y-1">
+                                {(selectedAnalysis.producing_logistics?.continuity?.carries_in || []).map((item: string, idx: number) => (
+                                  <p key={idx} className="text-sm text-foreground">• {item}</p>
+                                ))}
+                                {(!selectedAnalysis.producing_logistics?.continuity?.carries_in?.length) &&
+                                  <p className="text-sm text-muted-foreground italic">None noted</p>}
+                              </div>
+                            </div>
+                            <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
+                              <p className="text-xs font-semibold text-green-400 mb-1">Carries Out</p>
+                              <div className="space-y-1">
+                                {(selectedAnalysis.producing_logistics?.continuity?.carries_out || []).map((item: string, idx: number) => (
+                                  <p key={idx} className="text-sm text-foreground">• {item}</p>
+                                ))}
+                                {(!selectedAnalysis.producing_logistics?.continuity?.carries_out?.length) &&
+                                  <p className="text-sm text-muted-foreground italic">None noted</p>}
+                              </div>
+                            </div>
+                          </div>
+                          {selectedAnalysis.producing_logistics?.continuity?.watch_for && (
+                            <div className="text-sm bg-amber-500/10 border border-amber-500/20 rounded-lg p-2 mt-1">
+                              <span className="text-amber-400 font-semibold text-xs">Watch For:</span>{' '}
+                              <span className="text-foreground">{selectedAnalysis.producing_logistics.continuity.watch_for}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Scheduling Notes */}
+                        <div className="space-y-2 md:col-span-2">
+                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">📅 Scheduling Notes</h3>
+                          <div className="space-y-1">
+                            {(selectedAnalysis.producing_logistics?.scheduling_notes || []).map((note: string, idx: number) => (
+                              <div key={idx} className="flex items-start gap-2 text-sm">
+                                <span className="text-primary">•</span>
+                                <span className="text-foreground">{note}</span>
+                              </div>
+                            ))}
+                            {(!selectedAnalysis.producing_logistics?.scheduling_notes?.length) &&
+                              <p className="text-sm text-muted-foreground italic">No scheduling notes</p>}
+                          </div>
+                        </div>
+
+                        {/* Sound Design */}
+                        <div className="space-y-2 md:col-span-2">
+                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🔊 Sound Design</h3>
+                          <div className="bg-muted/30 rounded-lg p-3 space-y-2 text-sm">
+                            {selectedAnalysis.producing_logistics?.sound_design?.ambient && (
+                              <p><span className="text-muted-foreground font-medium">Ambient:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics.sound_design.ambient}</span></p>
+                            )}
+                            {(selectedAnalysis.producing_logistics?.sound_design?.key_sounds?.length ?? 0) > 0 && (
+                              <div>
+                                <span className="text-muted-foreground font-medium">Key Sounds:</span>{' '}
+                                <span className="text-foreground">{selectedAnalysis.producing_logistics?.sound_design?.key_sounds?.join(', ')}</span>
+                              </div>
+                            )}
+                            {selectedAnalysis.producing_logistics?.sound_design?.music_cue && (
+                              <p><span className="text-muted-foreground font-medium">Music Cue:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics.sound_design.music_cue}</span></p>
+                            )}
+                            {!selectedAnalysis.producing_logistics?.sound_design?.ambient &&
+                             !selectedAnalysis.producing_logistics?.sound_design?.key_sounds?.length &&
+                             !selectedAnalysis.producing_logistics?.sound_design?.music_cue &&
+                              <p className="text-muted-foreground italic">No sound design notes</p>}
+                          </div>
+                        </div>
+
+                        {/* Safety Specifics - conditional */}
+                        {(selectedAnalysis.producing_logistics?.safety_specifics?.length ?? 0) > 0 && (
+                          <div className="space-y-2 md:col-span-2">
+                            <h3 className="text-sm font-semibold text-red-400 flex items-center gap-2">🛡️ Safety Specifics</h3>
+                            <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 space-y-1">
+                              {selectedAnalysis.producing_logistics?.safety_specifics?.map((item: string, idx: number) => (
+                                <div key={idx} className="flex items-start gap-2 text-sm">
+                                  <span className="text-red-400">⚠️</span>
+                                  <span className="text-foreground">{item}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Department-Specific Notes */}
+                        {selectedAnalysis.producing_logistics?.department_specific_notes &&
+                         Object.entries(selectedAnalysis.producing_logistics.department_specific_notes)
+                           .filter(([, value]) => value && (value as string).toLowerCase() !== 'none required' && (value as string).toLowerCase() !== 'none').length > 0 && (
+                          <div className="space-y-2 md:col-span-2">
+                            <h3 className="text-sm font-semibold text-primary flex items-center gap-2">📋 Department Notes</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                              {Object.entries(selectedAnalysis.producing_logistics.department_specific_notes)
+                                .filter(([, value]) => value && (value as string).toLowerCase() !== 'none required' && (value as string).toLowerCase() !== 'none')
+                                .map(([dept, note]) => (
+                                  <div key={dept} className="bg-muted/30 rounded-lg p-3">
+                                    <p className="text-xs font-semibold text-primary capitalize mb-1">{dept.replace(/_/g, ' ')}</p>
+                                    <p className="text-sm text-foreground">{note as string}</p>
+                                  </div>
+                                ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </TabsContent>
