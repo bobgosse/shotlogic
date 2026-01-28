@@ -1131,14 +1131,20 @@ if (dv) {
       analysis.shot_list.forEach((shot, shotIndex) => {
         checkPageBreak(35);
 
-        // Shot header bar
-        pdf.setFillColor(50, 50, 50);
+        // Shot header bar — gold for TURN shots, dark gray for others
+        const isTurnShot = shot.serves_story_element?.startsWith('TURN_');
+        if (isTurnShot) {
+          pdf.setFillColor(180, 130, 20); // gold/amber
+        } else {
+          pdf.setFillColor(50, 50, 50);
+        }
         pdf.rect(margin, yPosition - 3, maxWidth, 7, 'F');
         pdf.setFont("helvetica", "bold");
         pdf.setFontSize(7);
         pdf.setTextColor(255, 255, 255);
         const shotType = shot.shot_type || 'WIDE';
-        pdf.text(`${scene.scene_number}.${shotIndex + 1}  ${shotType}`, margin + 2, yPosition + 1);
+        const turnIndicator = isTurnShot ? '* THE TURN - ' : '';
+        pdf.text(`${scene.scene_number}.${shotIndex + 1}  ${turnIndicator}${shotType}`, margin + 2, yPosition + 1);
         if (shot.serves_story_element) {
           pdf.text(`SERVES: ${shot.serves_story_element}`, margin + 80, yPosition + 1);
         }

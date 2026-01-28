@@ -306,13 +306,55 @@ async function analyzeDirecting(
   const systemPrompt = `You are a professional director, acting coach, and DP planning coverage for a scene. Use the provided story analysis to inform your shot choices and performance guidance. Every shot must serve a story purpose. Frame actor objectives as actable verbs, not emotions.
 
 SHOT LIST PHILOSOPHY — STORY-DRIVEN, NOT COVERAGE-DRIVEN:
-- LESS IS MORE. Every shot must EARN its place by serving a specific story element (CORE, TURN, SUBTEXT, CONFLICT, STAKES, SETUP, PAYOFF).
+- LESS IS MORE. Every shot must EARN its place by serving a specific story element (CORE, TURN_CATALYST, TURN_LANDING, SUBTEXT, CONFLICT, STAKES, SETUP, PAYOFF).
 - Think like an EDITOR: What shots do I need to CUT THIS SCENE TOGETHER and tell the story? Not "what angles could we get?"
 - A 1-page dialogue scene needs 3-5 shots, not 8-12. If you can tell the story in fewer shots, DO IT.
 - Each shot must deliver story information that NO OTHER SHOT provides. If two shots serve the same purpose, CUT ONE.
 - The shot list is a STORYTELLING PLAN, not a coverage checklist.
 - Include editorial_note for each shot explaining the CUT LOGIC — how it connects to the previous/next shot.
 - When a scene exceeds 10 shots, you MUST include shot_list_rationale explaining WHY this scene genuinely requires more coverage.
+
+UNDERSTANDING THE TURN — VALUE CHANGE:
+
+The TURN in a scene is the moment when a principal character's VALUE STATE changes polarity:
+- NEGATIVE to POSITIVE (despair to hope, rejection to acceptance, powerless to empowered)
+- POSITIVE to NEGATIVE (safety to danger, trust to betrayal, certainty to doubt)
+
+The TURN is not just what happens — it's the CHANGE that happens TO someone.
+
+THE TURN REQUIRES TWO SHOTS:
+1. THE CATALYST — The action, line, or revelation that CAUSES the value change. Tag as serves_story_element: "TURN_CATALYST"
+2. THE LANDING — The character whose value changes, showing the change REGISTER on their face/body. Tag as serves_story_element: "TURN_LANDING"
+
+If you only show the catalyst without the landing, you've missed the turn. The audience doesn't experience the change — they're told about it.
+
+EXAMPLE — Scene where Leo's value turns from NEGATIVE to POSITIVE:
+- Shot X: CLOSE_UP — Virginia reciting Leo's poetry (TURN_CATALYST — she delivers the words that will change him)
+- Shot X+1: CLOSE_UP — Leo hearing his own words spoken back (TURN_LANDING — we SEE the value change happen: guarded to vulnerable to recognized)
+
+Without the LANDING shot, the turn is incomplete. The scene's purpose is unfulfilled.
+
+RULE: Every scene's TURN must have both CATALYST and LANDING shots. This is non-negotiable. The turn is why the scene exists — missing it means missing the scene's purpose.
+
+ACTION/REACTION PAIRS: Beyond THE TURN, significant moments require action/reaction coverage:
+- Power shifts between characters
+- Major revelations
+- Emotional confrontations
+- Any moment one character fundamentally affects another
+
+THE TURN gets priority coverage. It should be the most carefully constructed sequence in the shot list. Consider:
+- Timing: Let the catalyst land before cutting to the reaction
+- Scale: The turn often warrants closer shots than surrounding coverage
+- Duration: The reaction shot may need to breathe — let the audience absorb the change
+
+CHECKLIST BEFORE FINALIZING SHOT LIST:
+1. Have I identified THE TURN in this scene?
+2. What is the VALUE CHANGE? (Negative to Positive or Positive to Negative)
+3. Who experiences the change?
+4. Do I have a CATALYST shot (serves_story_element: TURN_CATALYST) showing the cause?
+5. Do I have a LANDING shot (serves_story_element: TURN_LANDING) showing the change register?
+6. Is this the most carefully covered moment in my shot list?
+If any answer is NO, revise the shot list.
 
 Return ONLY valid JSON.`
 
@@ -401,7 +443,7 @@ Return ONLY this JSON (no markdown):
       "shot_type": "WIDE | MEDIUM | CLOSE_UP | EXTREME_CLOSE_UP | TWO_SHOT | GROUP_SHOT | INSERT | POV | OVER_SHOULDER",
       "subject": "What/who is in frame and what action occurs",
       "visual": "Composition and camera notes for Director/DP",
-      "serves_story_element": "CORE | TURN | SUBTEXT | CONFLICT | STAKES | SETUP | PAYOFF",
+      "serves_story_element": "CORE | TURN_CATALYST | TURN_LANDING | SUBTEXT | CONFLICT | STAKES | SETUP | PAYOFF",
       "rationale": "Why this shot is NECESSARY - what story information does it deliver that no other shot provides?",
       "editorial_note": "How this shot connects to previous/next shot - the cut logic"
     }
@@ -693,6 +735,19 @@ export default async function handler(
       }
       if (analysis.shot_list.length >= 10 && (!analysis.shot_list_rationale || analysis.shot_list_rationale.length < 20)) {
         validationIssues.push('Scene has 10+ shots but missing shot_list_rationale explanation')
+      }
+      // Validate turn coverage: catalyst + landing must both exist
+      const hasTurn = analysis.story_analysis.the_turn && analysis.story_analysis.the_turn.length > 20
+      if (hasTurn) {
+        const hasCatalyst = analysis.shot_list.some((s: any) => s.serves_story_element === 'TURN_CATALYST')
+        const hasLanding = analysis.shot_list.some((s: any) => s.serves_story_element === 'TURN_LANDING')
+        if (!hasCatalyst && !hasLanding) {
+          validationIssues.push('Turn coverage missing - no TURN_CATALYST or TURN_LANDING shots for identified scene turn')
+        } else if (!hasCatalyst) {
+          validationIssues.push('Turn coverage incomplete - missing TURN_CATALYST shot (the cause of the value change)')
+        } else if (!hasLanding) {
+          validationIssues.push('Turn coverage incomplete - missing TURN_LANDING shot (the character registering the change)')
+        }
       }
     }
     // Validate new story analysis fields

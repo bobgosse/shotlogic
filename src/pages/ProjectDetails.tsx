@@ -1952,8 +1952,16 @@ const ProjectDetails = () => {
                           {(editedScenes[selectedScene.id]?.shot_list || selectedAnalysis.shot_list).map((shot, idx) => {
                             if (isShotListItem(shot)) {
                               return (
-                                <div key={idx} className="flex gap-4 p-4 bg-muted/30 rounded-lg border border-border">
-                                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-sm">
+                                <div key={idx} className={`flex gap-4 p-4 rounded-lg border ${
+                                  getShotStoryElement(shot).startsWith('TURN_')
+                                    ? 'bg-amber-500/5 border-amber-500/30 ring-1 ring-amber-500/20'
+                                    : 'bg-muted/30 border-border'
+                                }`}>
+                                  <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
+                                    getShotStoryElement(shot).startsWith('TURN_')
+                                      ? 'bg-amber-500/20 text-amber-600'
+                                      : 'bg-primary/20 text-primary'
+                                  }`}>
                                     {idx + 1}
                                   </div>
                                   <div className="flex-1 space-y-2">
@@ -2021,8 +2029,12 @@ const ProjectDetails = () => {
                                               {getShotType(shot)}
                                             </span>
                                             {getShotStoryElement(shot) && (
-                                              <span className="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
-                                                {getShotStoryElement(shot)}
+                                              <span className={`text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded border ${
+                                                getShotStoryElement(shot).startsWith('TURN_')
+                                                  ? 'bg-amber-500/15 text-amber-600 border-amber-500/30'
+                                                  : 'bg-primary/10 text-primary border-primary/20'
+                                              }`}>
+                                                {getShotStoryElement(shot).startsWith('TURN_') ? '★ ' : ''}{getShotStoryElement(shot)}
                                               </span>
                                             )}
                                           </div>
