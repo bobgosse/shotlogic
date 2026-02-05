@@ -1,23 +1,14 @@
 // api/analyze-scene.ts
 // Scene analysis using Claude API (Anthropic)
 // ARCHITECTURE: 3 focused API calls for reliable complete analysis
-// MODEL: Claude Opus 4.6 with adaptive thinking
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { logger } from "./lib/logger";
 
-const DEPLOY_TIMESTAMP = "2025-02-05T00:00:00Z_OPUS_4_6_ADAPTIVE"
+const DEPLOY_TIMESTAMP = "2025-02-05T01:00:00Z_SONNET_REVERT"
 
 // Model selection with environment variable fallback
-const MODEL = process.env.CLAUDE_MODEL || "claude-opus-4-6"
-
-// Effort level mapping for adaptive thinking
-type AnalysisDepth = "quick" | "standard" | "deep"
-const EFFORT_MAP: Record<AnalysisDepth, string> = {
-  quick: "low",      // Fast, basic analysis
-  standard: "medium", // Default, balanced
-  deep: "high"       // Thorough, catches nuance
-}
+const MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-4-5-20250929"
 
 function getEnvironmentVariable(name: string): string | undefined {
   try {
@@ -70,11 +61,10 @@ interface AnalyzeSceneRequest {
   visualProfile?: VisualProfile
   characters?: Array<{ name: string; physical: string }>
   customInstructions?: string
-  analysisDepth?: AnalysisDepth  // Controls adaptive thinking effort level
 }
 
 // ═══════════════════════════════════════════════════════════════
-// HELPER: Make Claude API call with adaptive thinking
+// HELPER: Make Claude API call
 // ═══════════════════════════════════════════════════════════════
 async function callClaude(
   apiKey: string,
@@ -82,30 +72,14 @@ async function callClaude(
   userPrompt: string,
   invocationId: string,
   callName: string,
-  maxTokens: number = 8000,
-  effort: string = "medium"
+  maxTokens: number = 8000
 ): Promise<{ success: boolean; data?: any; error?: string; usage?: any }> {
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 90000) // 90s per call (increased for Opus)
+  const timeoutId = setTimeout(() => controller.abort(), 60000) // 60s per call
 
   try {
-    logger.log("analyze-scene", `🤖 [${invocationId}] Calling ${MODEL} for ${callName} (effort: ${effort})...`)
+    logger.log("analyze-scene", `🤖 [${invocationId}] Calling ${MODEL} for ${callName}...`)
     const startTime = Date.now()
-
-    const requestBody: any = {
-      model: MODEL,
-      max_tokens: maxTokens,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userPrompt }]
-    }
-
-    // Add adaptive thinking for Opus 4.6
-    if (MODEL.includes('opus')) {
-      requestBody.thinking = {
-        type: "enabled",
-        budget_tokens: effort === "high" ? 5000 : effort === "medium" ? 2000 : 1000
-      }
-    }
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -114,7 +88,12 @@ async function callClaude(
         'anthropic-version': '2023-06-01',
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(requestBody),
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: maxTokens,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }]
+      }),
       signal: controller.signal
     })
 
@@ -129,29 +108,24 @@ async function callClaude(
     }
 
     const data = await response.json()
-
-    // Extract text content (skip thinking blocks for Opus 4.6)
-    const textBlock = data.content?.find((block: any) => block.type === 'text')
-    const content = textBlock?.text
+    const content = data.content?.[0]?.text
 
     if (!content) {
       return { success: false, error: 'Empty response from Claude' }
     }
 
-    // Log token usage and cost
+    // Log token usage
     const usage = data.usage || {}
     const inputTokens = usage.input_tokens || 0
     const outputTokens = usage.output_tokens || 0
-    const thinkingTokens = usage.thinking_tokens || 0
 
-    // Cost calculation for Opus 4.6: $5 input / $25 output per million tokens
-    // Thinking tokens are charged at output rate
+    // Cost calculation for Sonnet: $3 input / $15 output per million tokens
     const estimatedCost = (
-      (inputTokens * 5 / 1_000_000) +
-      ((outputTokens + thinkingTokens) * 25 / 1_000_000)
+      (inputTokens * 3 / 1_000_000) +
+      (outputTokens * 15 / 1_000_000)
     ).toFixed(4)
 
-    logger.log("analyze-scene", `💰 [${invocationId}] ${callName} usage: input=${inputTokens}, output=${outputTokens}, thinking=${thinkingTokens}, cost=$${estimatedCost}`)
+    logger.log("analyze-scene", `💰 [${invocationId}] ${callName} usage: input=${inputTokens}, output=${outputTokens}, cost=$${estimatedCost}`)
 
     // Extract JSON from response
     let jsonStr = content
@@ -166,12 +140,12 @@ async function callClaude(
 
     const parsed = JSON.parse(jsonStr.trim())
     logger.log("analyze-scene", `✅ [${invocationId}] ${callName} parsed successfully`)
-    return { success: true, data: parsed, usage: { inputTokens, outputTokens, thinkingTokens, estimatedCost } }
+    return { success: true, data: parsed, usage: { inputTokens, outputTokens, estimatedCost } }
 
   } catch (error: any) {
     clearTimeout(timeoutId)
     if (error.name === 'AbortError') {
-      return { success: false, error: `${callName} timed out after 90s` }
+      return { success: false, error: `${callName} timed out after 60s` }
     }
     return { success: false, error: error.message || 'Unknown error' }
   }
@@ -184,8 +158,7 @@ async function analyzeStory(
   apiKey: string,
   sceneText: string,
   characters: string[],
-  invocationId: string,
-  effort: string = "medium"
+  invocationId: string
 ): Promise<{ success: boolean; data?: any; error?: string; usage?: any }> {
 
   const systemPrompt = `You are a professional script analyst and story consultant. Analyze the scene and return ONLY valid JSON with these 14 fields. Each field must be filled with specific, substantive content from THIS scene - never use placeholder text. Think deeply about what this scene MUST accomplish for the story to work, not just what happens in it.`
@@ -221,7 +194,7 @@ Return ONLY this JSON structure (no markdown, no explanation):
   "alternative_readings": ["List 1-3 reasonable but different interpretations of character motivation or scene meaning that the creative team should align on before shooting"]
 }`
 
-  return callClaude(apiKey, systemPrompt, userPrompt, invocationId, 'STORY_ANALYSIS', 8000, effort)
+  return callClaude(apiKey, systemPrompt, userPrompt, invocationId, 'STORY_ANALYSIS', 8000)
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -232,8 +205,7 @@ async function analyzeProducing(
   sceneText: string,
   sceneHeader: string,
   characters: string[],
-  invocationId: string,
-  effort: string = "medium"
+  invocationId: string
 ): Promise<{ success: boolean; data?: any; error?: string; usage?: any }> {
 
   const systemPrompt = `You are a professional 1st AD, line producer, and UPM doing a comprehensive script breakdown. Extract production information, continuity details, scheduling considerations, and department-specific notes from the scene. Return ONLY valid JSON.`
@@ -334,7 +306,7 @@ Return ONLY this JSON (no markdown):
   }
 }`
 
-  return callClaude(apiKey, systemPrompt, userPrompt, invocationId, 'PRODUCING_LOGISTICS', 8000, effort)
+  return callClaude(apiKey, systemPrompt, userPrompt, invocationId, 'PRODUCING_LOGISTICS', 8000)
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -346,8 +318,7 @@ async function analyzeDirecting(
   characters: string[],
   storyAnalysis: any,
   customInstructions: string | undefined,
-  invocationId: string,
-  effort: string = "medium"
+  invocationId: string
 ): Promise<{ success: boolean; data?: any; error?: string; usage?: any }> {
 
   const systemPrompt = `You are a professional director, acting coach, and DP planning coverage for a scene. Use the provided story analysis to inform your shot choices and performance guidance. Every shot must serve a story purpose. Frame actor objectives as actable verbs, not emotions.
@@ -546,7 +517,7 @@ Return ONLY this JSON (no markdown):
   "shot_list_rationale": "ONLY include if shot_list has 10+ shots. Explain why this scene genuinely requires more coverage than typical. Empty string if under 10 shots."
 }`
 
-  return callClaude(apiKey, systemPrompt, userPrompt, invocationId, 'DIRECTING_SHOTS', 16000, effort)
+  return callClaude(apiKey, systemPrompt, userPrompt, invocationId, 'DIRECTING_SHOTS', 16000)
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -598,11 +569,7 @@ export default async function handler(
     }
 
     const requestBody = req.body as AnalyzeSceneRequest
-    const { sceneText, sceneNumber, totalScenes, customInstructions, analysisDepth } = requestBody
-
-    // Map analysis depth to effort level for adaptive thinking
-    const effort = EFFORT_MAP[analysisDepth || 'standard']
-    logger.log("analyze-scene", `🧠 [${invocationId}] Analysis depth: ${analysisDepth || 'standard'} → effort: ${effort}`)
+    const { sceneText, sceneNumber, totalScenes, customInstructions } = requestBody
 
     logger.log("analyze-scene", `📊 [${invocationId}] Scene: ${sceneNumber}/${totalScenes}`)
     logger.log("analyze-scene", `📊 [${invocationId}] Text length: ${sceneText?.length || 0} chars`)
@@ -647,7 +614,7 @@ export default async function handler(
     // CALL 1: Story Analysis
     // ═══════════════════════════════════════════════════════════════
     logger.log("analyze-scene", `\n📖 [${invocationId}] STEP 1/3: Story Analysis...`)
-    const storyResult = await analyzeStory(anthropicKey, sceneText, characters, invocationId, effort)
+    const storyResult = await analyzeStory(anthropicKey, sceneText, characters, invocationId)
 
     if (!storyResult.success) {
       logger.error("analyze-scene", `❌ [${invocationId}] Story analysis failed: ${storyResult.error}`)
@@ -680,7 +647,7 @@ export default async function handler(
     // CALL 2: Producing Logistics
     // ═══════════════════════════════════════════════════════════════
     logger.log("analyze-scene", `\n🎬 [${invocationId}] STEP 2/3: Producing Logistics...`)
-    const producingResult = await analyzeProducing(anthropicKey, sceneText, sceneHeader, characters, invocationId, effort)
+    const producingResult = await analyzeProducing(anthropicKey, sceneText, sceneHeader, characters, invocationId)
 
     if (!producingResult.success) {
       logger.error("analyze-scene", `❌ [${invocationId}] Producing analysis failed: ${producingResult.error}`)
@@ -742,8 +709,7 @@ export default async function handler(
       characters,
       storyResult.data,
       customInstructions,
-      invocationId,
-      effort
+      invocationId
     )
 
     if (!directingResult.success) {
@@ -827,14 +793,13 @@ export default async function handler(
 
     const totalInputTokens = (storyResult.usage?.inputTokens || 0) + (producingResult.usage?.inputTokens || 0) + (directingResult.usage?.inputTokens || 0)
     const totalOutputTokens = (storyResult.usage?.outputTokens || 0) + (producingResult.usage?.outputTokens || 0) + (directingResult.usage?.outputTokens || 0)
-    const totalThinkingTokens = (storyResult.usage?.thinkingTokens || 0) + (producingResult.usage?.thinkingTokens || 0) + (directingResult.usage?.thinkingTokens || 0)
 
     logger.log("analyze-scene", `\n✅ [${invocationId}] ALL 3 CALLS COMPLETE in ${totalDuration}ms`)
     logger.log("analyze-scene", `   - Total shots: ${analysis.shot_list.length}`)
     logger.log("analyze-scene", `   - story_analysis fields: ${Object.keys(analysis.story_analysis).length}`)
     logger.log("analyze-scene", `   - producing_logistics fields: ${Object.keys(analysis.producing_logistics).length}`)
     logger.log("analyze-scene", `   - directing_vision fields: ${Object.keys(analysis.directing_vision).length}`)
-    logger.log("analyze-scene", `💰 [${invocationId}] TOTAL COST: $${totalCost} (input=${totalInputTokens}, output=${totalOutputTokens}, thinking=${totalThinkingTokens})`)
+    logger.log("analyze-scene", `💰 [${invocationId}] TOTAL COST: $${totalCost} (input=${totalInputTokens}, output=${totalOutputTokens})`)
 
     // Quick validation
     const validationIssues: string[] = []
@@ -919,14 +884,11 @@ export default async function handler(
         characters,
         actualShots: analysis.shot_list.length,
         model: MODEL,
-        analysisDepth: analysisDepth || 'standard',
-        effort,
         architecture: '3-call-split',
         deployMarker: DEPLOY_TIMESTAMP,
         usage: {
           totalInputTokens,
           totalOutputTokens,
-          totalThinkingTokens,
           totalCost
         }
       }
