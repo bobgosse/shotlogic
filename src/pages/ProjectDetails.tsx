@@ -25,6 +25,22 @@ import { logger } from "@/utils/logger";
 import { useProjectData } from "@/hooks/useProjectData";
 import { useSceneAnalysis } from "@/hooks/useSceneAnalysis";
 
+// Helper to safely convert extras field to string (handles legacy object format)
+function safeExtrasString(extras: unknown): string {
+  if (!extras) return '';
+  if (typeof extras === 'string') return extras;
+  if (typeof extras === 'object' && extras !== null) {
+    const obj = extras as Record<string, unknown>;
+    // Handle legacy {count, description} format
+    if ('count' in obj || 'description' in obj) {
+      const count = obj.count || '';
+      const desc = obj.description || '';
+      return count && desc ? `${count} - ${desc}` : (count || desc || '').toString();
+    }
+    return JSON.stringify(extras);
+  }
+  return String(extras);
+}
 
 const ProjectDetails = () => {
   const { id } = useParams();
@@ -902,7 +918,7 @@ const ProjectDetails = () => {
                           <EditableArrayField label="Principal Cast" items={editedProducingData.cast?.principal || []} onChange={(items) => setEditedProducingData({...editedProducingData, cast: {...(editedProducingData.cast || {}), principal: items}})} />
                           <EditableArrayField label="Speaking" items={editedProducingData.cast?.speaking || []} onChange={(items) => setEditedProducingData({...editedProducingData, cast: {...(editedProducingData.cast || {}), speaking: items}})} />
                           <EditableArrayField label="Silent" items={editedProducingData.cast?.silent || []} onChange={(items) => setEditedProducingData({...editedProducingData, cast: {...(editedProducingData.cast || {}), silent: items}})} />
-                          <EditableField label="Extras" value={editedProducingData.cast?.extras || ''} onChange={(v) => setEditedProducingData({...editedProducingData, cast: {...(editedProducingData.cast || {}), extras: v}})} />
+                          <EditableField label="Extras" value={safeExtrasString(editedProducingData.cast?.extras)} onChange={(v) => setEditedProducingData({...editedProducingData, cast: {...(editedProducingData.cast || {}), extras: v}})} />
                           <div className="md:col-span-2"><EditableArrayField label="Key Props" items={editedProducingData.key_props || []} onChange={(items) => setEditedProducingData({...editedProducingData, key_props: items})} /></div>
                           <div className="md:col-span-2"><EditableArrayField label="Red Flags / Budget Flags" items={editedProducingData.red_flags || editedProducingData.budget_flags || []} onChange={(items) => setEditedProducingData({...editedProducingData, red_flags: items})} /></div>
                           <div>
@@ -994,7 +1010,7 @@ const ProjectDetails = () => {
                               <p><span className="text-muted-foreground">Silent:</span> {selectedAnalysis.producing_logistics.cast.silent.join(', ')}</p>
                             )}
                             {selectedAnalysis.producing_logistics?.cast?.extras && selectedAnalysis.producing_logistics.cast.extras !== 'None' && (
-                              <p><span className="text-muted-foreground">Extras:</span> {selectedAnalysis.producing_logistics.cast.extras}</p>
+                              <p><span className="text-muted-foreground">Extras:</span> {safeExtrasString(selectedAnalysis.producing_logistics.cast.extras)}</p>
                             )}
                             {!selectedAnalysis.producing_logistics?.cast?.principal?.length &&
                              !selectedAnalysis.producing_logistics?.cast?.speaking?.length &&
