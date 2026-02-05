@@ -103,7 +103,7 @@ async function callClaude(
     if (MODEL.includes('opus')) {
       requestBody.thinking = {
         type: "enabled",
-        budget_tokens: effort === "high" ? 10000 : effort === "medium" ? 5000 : 2000
+        budget_tokens: effort === "high" ? 5000 : effort === "medium" ? 2000 : 1000
       }
     }
 
