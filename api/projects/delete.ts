@@ -4,6 +4,7 @@
 import { VercelRequest, VercelResponse } from '@vercel/node'
 import { getDb } from '../lib/mongodb.js'
 import { ObjectId } from 'mongodb'
+import { logger } from "../lib/logger";
 
 const DEPLOY_TIMESTAMP = '2025-12-16T17:45:00Z_FINAL_DELETE_FIX'
 
@@ -14,10 +15,10 @@ export default async function handler(
   const invocationId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
   const startTime = Date.now()
 
-  console.log(`\n🗑️  [${invocationId}] ═══════════════════════════════`)
-  console.log(`📅 Timestamp: ${new Date().toISOString()}`)
-  console.log(`🏷️  Deploy: ${DEPLOY_TIMESTAMP}`)
-  console.log(`📍 Method: ${req.method}`)
+  logger.log("delete", `\n🗑️  [${invocationId}] ═══════════════════════════════`)
+  logger.log("delete", `📅 Timestamp: ${new Date().toISOString()}`)
+  logger.log("delete", `🏷️  Deploy: ${DEPLOY_TIMESTAMP}`)
+  logger.log("delete", `📍 Method: ${req.method}`)
 
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -49,7 +50,7 @@ export default async function handler(
     }
 
     if (!idString) {
-      console.error(`❌ [${invocationId}] Project ID is null or empty after check`)
+      logger.error("delete", `❌ [${invocationId}] Project ID is null or empty after check`)
       return res.status(400).json({
         error: 'Missing or Invalid Project ID',
         message: 'The projectId query parameter is required and cannot be empty.',
@@ -59,7 +60,7 @@ export default async function handler(
     
     // Ensure the ID is a valid MongoDB format (24 hex characters)
     if (!ObjectId.isValid(idString)) {
-      console.error(`❌ [${invocationId}] Invalid ObjectId format: ${idString}`)
+      logger.error("delete", `❌ [${invocationId}] Invalid ObjectId format: ${idString}`)
       return res.status(400).json({
         error: 'Invalid project ID format',
         message: `"${idString}" is not a valid MongoDB ObjectId.`,
@@ -68,7 +69,7 @@ export default async function handler(
     }
 
     const objectId = new ObjectId(idString)
-    console.log(`✅ [${invocationId}] Valid ObjectId: ${objectId.toHexString()}`)
+    logger.log("delete", `✅ [${invocationId}] Valid ObjectId: ${objectId.toHexString()}`)
 
     // Connect to database
     const db = await getDb()
@@ -86,7 +87,7 @@ export default async function handler(
     }
 
     const duration = Date.now() - startTime
-    console.log(`✅ [${invocationId}] SUCCESS - Project deleted in ${duration}ms`)
+    logger.log("delete", `✅ [${invocationId}] SUCCESS - Project deleted in ${duration}ms`)
 
     return res.status(200).json({
       success: true,
@@ -98,7 +99,7 @@ export default async function handler(
 
   } catch (error) {
     const duration = Date.now() - startTime
-    console.error(`❌ FATAL ERROR: ${error instanceof Error ? error.message : String(error)}`)
+    logger.error("delete", `❌ FATAL ERROR: ${error instanceof Error ? error.message : String(error)}`)
 
     return res.status(500).json({
       error: 'Failed to delete project',

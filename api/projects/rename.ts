@@ -3,6 +3,7 @@
 import { VercelRequest, VercelResponse } from '@vercel/node'
 import { getDb } from '../lib/mongodb.js'
 import { ObjectId } from 'mongodb'
+import { logger } from "../lib/logger";
 
 const DEPLOY_TIMESTAMP = '2025-12-24T20:00:00Z_RENAME_ENDPOINT'
 
@@ -13,10 +14,10 @@ export default async function handler(
   const invocationId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
   const startTime = Date.now()
   
-  console.log(`\n✏️  [${invocationId}] ═══════════════════════════════`)
-  console.log(`📅 Timestamp: ${new Date().toISOString()}`)
-  console.log(`🏷️  Deploy: ${DEPLOY_TIMESTAMP}`)
-  console.log(`📍 Method: ${req.method}`)
+  logger.log("rename", `\n✏️  [${invocationId}] ═══════════════════════════════`)
+  logger.log("rename", `📅 Timestamp: ${new Date().toISOString()}`)
+  logger.log("rename", `🏷️  Deploy: ${DEPLOY_TIMESTAMP}`)
+  logger.log("rename", `📍 Method: ${req.method}`)
 
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -38,11 +39,11 @@ export default async function handler(
   try {
     const { projectId, newName } = req.body || {}
 
-    console.log(`📝 [${invocationId}] Rename request:`, { projectId, newName })
+    logger.log("rename", `📝 [${invocationId}] Rename request:`, { projectId, newName })
 
     // Validate projectId
     if (!projectId || typeof projectId !== 'string') {
-      console.error(`❌ [${invocationId}] Project ID is missing or invalid`)
+      logger.error("rename", `❌ [${invocationId}] Project ID is missing or invalid`)
       return res.status(400).json({
         error: 'Missing Project ID',
         message: 'The projectId field is required.',
@@ -52,7 +53,7 @@ export default async function handler(
 
     // Validate newName
     if (!newName || typeof newName !== 'string') {
-      console.error(`❌ [${invocationId}] New name is missing or invalid`)
+      logger.error("rename", `❌ [${invocationId}] New name is missing or invalid`)
       return res.status(400).json({
         error: 'Missing New Name',
         message: 'The newName field is required.',
@@ -80,7 +81,7 @@ export default async function handler(
 
     // Validate ObjectId format
     if (!ObjectId.isValid(projectId)) {
-      console.error(`❌ [${invocationId}] Invalid ObjectId format: ${projectId}`)
+      logger.error("rename", `❌ [${invocationId}] Invalid ObjectId format: ${projectId}`)
       return res.status(400).json({
         error: 'Invalid project ID format',
         message: `"${projectId}" is not a valid MongoDB ObjectId.`,
@@ -89,7 +90,7 @@ export default async function handler(
     }
 
     const objectId = new ObjectId(projectId)
-    console.log(`✅ [${invocationId}] Valid ObjectId: ${objectId.toHexString()}`)
+    logger.log("rename", `✅ [${invocationId}] Valid ObjectId: ${objectId.toHexString()}`)
 
     // Connect to database
     const db = await getDb()
@@ -115,7 +116,7 @@ export default async function handler(
     }
 
     const duration = Date.now() - startTime
-    console.log(`✅ [${invocationId}] SUCCESS - Project renamed to "${trimmedName}" in ${duration}ms`)
+    logger.log("rename", `✅ [${invocationId}] SUCCESS - Project renamed to "${trimmedName}" in ${duration}ms`)
 
     return res.status(200).json({
       success: true,
@@ -128,7 +129,7 @@ export default async function handler(
 
   } catch (error) {
     const duration = Date.now() - startTime
-    console.error(`❌ FATAL ERROR: ${error instanceof Error ? error.message : String(error)}`)
+    logger.error("rename", `❌ FATAL ERROR: ${error instanceof Error ? error.message : String(error)}`)
     
     return res.status(500).json({
       error: 'Failed to rename project',

@@ -4,6 +4,7 @@
 
 import { VercelRequest, VercelResponse } from '@vercel/node'
 import { getDb } from '../lib/mongodb.js'
+import { logger } from "../lib/logger";
 
 const ADMIN_SECRET = process.env.ADMIN_SECRET || 'change-me-in-production'
 
@@ -36,7 +37,7 @@ export default async function handler(
 
     // Get count before deletion
     const countBefore = await collection.countDocuments()
-    console.log(`📊 Found ${countBefore} projects`)
+    logger.log("clear-all-projects", `📊 Found ${countBefore} projects`)
 
     if (countBefore === 0) {
       return res.status(200).json({
@@ -48,7 +49,7 @@ export default async function handler(
 
     // Delete all projects
     const result = await collection.deleteMany({})
-    console.log(`✅ Deleted ${result.deletedCount} projects`)
+    logger.log("clear-all-projects", `✅ Deleted ${result.deletedCount} projects`)
 
     return res.status(200).json({
       success: true,
@@ -57,7 +58,7 @@ export default async function handler(
     })
 
   } catch (error) {
-    console.error('❌ Error clearing projects:', error)
+    logger.error("clear-all-projects", '❌ Error clearing projects:', error)
     return res.status(500).json({
       error: 'Failed to clear projects',
       details: error instanceof Error ? error.message : 'Unknown error'

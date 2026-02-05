@@ -1,10 +1,23 @@
 // api/analyze-scene.ts
 // Scene analysis using Claude API (Anthropic)
 // ARCHITECTURE: 3 focused API calls for reliable complete analysis
+// MODEL: Claude Opus 4.6 with adaptive thinking
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { logger } from "./lib/logger";
 
-const DEPLOY_TIMESTAMP = "2025-01-17T00:00:00Z_SPLIT_PROMPTS"
+const DEPLOY_TIMESTAMP = "2025-02-05T00:00:00Z_OPUS_4_6_ADAPTIVE"
+
+// Model selection with environment variable fallback
+const MODEL = process.env.CLAUDE_MODEL || "claude-opus-4-6"
+
+// Effort level mapping for adaptive thinking
+type AnalysisDepth = "quick" | "standard" | "deep"
+const EFFORT_MAP: Record<AnalysisDepth, string> = {
+  quick: "low",      // Fast, basic analysis
+  standard: "medium", // Default, balanced
+  deep: "high"       // Thorough, catches nuance
+}
 
 function getEnvironmentVariable(name: string): string | undefined {
   try {
@@ -16,7 +29,7 @@ function getEnvironmentVariable(name: string): string | undefined {
     }
     return undefined
   } catch (error) {
-    console.error(`Failed to access environment variable "${name}":`, error)
+    logger.error("analyze-scene", `Failed to access environment variable "${name}":`, error)
     return undefined
   }
 }
@@ -57,24 +70,42 @@ interface AnalyzeSceneRequest {
   visualProfile?: VisualProfile
   characters?: Array<{ name: string; physical: string }>
   customInstructions?: string
+  analysisDepth?: AnalysisDepth  // Controls adaptive thinking effort level
 }
 
 // ═══════════════════════════════════════════════════════════════
-// HELPER: Make Claude API call
+// HELPER: Make Claude API call with adaptive thinking
 // ═══════════════════════════════════════════════════════════════
 async function callClaude(
   apiKey: string,
   systemPrompt: string,
   userPrompt: string,
   invocationId: string,
-  callName: string
-): Promise<{ success: boolean; data?: any; error?: string }> {
+  callName: string,
+  maxTokens: number = 8000,
+  effort: string = "medium"
+): Promise<{ success: boolean; data?: any; error?: string; usage?: any }> {
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 60000) // 60s per call
+  const timeoutId = setTimeout(() => controller.abort(), 90000) // 90s per call (increased for Opus)
 
   try {
-    console.log(`🤖 [${invocationId}] Calling Claude for ${callName}...`)
+    logger.log("analyze-scene", `🤖 [${invocationId}] Calling ${MODEL} for ${callName} (effort: ${effort})...`)
     const startTime = Date.now()
+
+    const requestBody: any = {
+      model: MODEL,
+      max_tokens: maxTokens,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userPrompt }]
+    }
+
+    // Add adaptive thinking for Opus 4.6
+    if (MODEL.includes('opus')) {
+      requestBody.thinking = {
+        type: "enabled",
+        budget_tokens: effort === "high" ? 10000 : effort === "medium" ? 5000 : 2000
+      }
+    }
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -83,33 +114,46 @@ async function callClaude(
         'anthropic-version': '2023-06-01',
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 4000,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: userPrompt }]
-      }),
+      body: JSON.stringify(requestBody),
       signal: controller.signal
     })
 
     clearTimeout(timeoutId)
     const duration = Date.now() - startTime
-    console.log(`⏱️  [${invocationId}] ${callName} responded in ${duration}ms`)
+    logger.log("analyze-scene", `⏱️  [${invocationId}] ${callName} responded in ${duration}ms`)
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error(`❌ [${invocationId}] ${callName} API error (${response.status}): ${errorText}`)
+      logger.error("analyze-scene", `❌ [${invocationId}] ${callName} API error (${response.status}): ${errorText}`)
       return { success: false, error: `API error ${response.status}: ${errorText}` }
     }
 
     const data = await response.json()
-    const content = data.content?.[0]?.text
+
+    // Extract text content (skip thinking blocks for Opus 4.6)
+    const textBlock = data.content?.find((block: any) => block.type === 'text')
+    const content = textBlock?.text
 
     if (!content) {
       return { success: false, error: 'Empty response from Claude' }
     }
 
-    // Extract JSON
+    // Log token usage and cost
+    const usage = data.usage || {}
+    const inputTokens = usage.input_tokens || 0
+    const outputTokens = usage.output_tokens || 0
+    const thinkingTokens = usage.thinking_tokens || 0
+
+    // Cost calculation for Opus 4.6: $5 input / $25 output per million tokens
+    // Thinking tokens are charged at output rate
+    const estimatedCost = (
+      (inputTokens * 5 / 1_000_000) +
+      ((outputTokens + thinkingTokens) * 25 / 1_000_000)
+    ).toFixed(4)
+
+    logger.log("analyze-scene", `💰 [${invocationId}] ${callName} usage: input=${inputTokens}, output=${outputTokens}, thinking=${thinkingTokens}, cost=$${estimatedCost}`)
+
+    // Extract JSON from response
     let jsonStr = content
     const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/)
     if (jsonMatch) {
@@ -121,13 +165,13 @@ async function callClaude(
     }
 
     const parsed = JSON.parse(jsonStr.trim())
-    console.log(`✅ [${invocationId}] ${callName} parsed successfully`)
-    return { success: true, data: parsed }
+    logger.log("analyze-scene", `✅ [${invocationId}] ${callName} parsed successfully`)
+    return { success: true, data: parsed, usage: { inputTokens, outputTokens, thinkingTokens, estimatedCost } }
 
   } catch (error: any) {
     clearTimeout(timeoutId)
     if (error.name === 'AbortError') {
-      return { success: false, error: `${callName} timed out after 60s` }
+      return { success: false, error: `${callName} timed out after 90s` }
     }
     return { success: false, error: error.message || 'Unknown error' }
   }
@@ -140,8 +184,9 @@ async function analyzeStory(
   apiKey: string,
   sceneText: string,
   characters: string[],
-  invocationId: string
-): Promise<{ success: boolean; data?: any; error?: string }> {
+  invocationId: string,
+  effort: string = "medium"
+): Promise<{ success: boolean; data?: any; error?: string; usage?: any }> {
 
   const systemPrompt = `You are a professional script analyst and story consultant. Analyze the scene and return ONLY valid JSON with these 14 fields. Each field must be filled with specific, substantive content from THIS scene - never use placeholder text. Think deeply about what this scene MUST accomplish for the story to work, not just what happens in it.`
 
@@ -176,7 +221,7 @@ Return ONLY this JSON structure (no markdown, no explanation):
   "alternative_readings": ["List 1-3 reasonable but different interpretations of character motivation or scene meaning that the creative team should align on before shooting"]
 }`
 
-  return callClaude(apiKey, systemPrompt, userPrompt, invocationId, 'STORY_ANALYSIS')
+  return callClaude(apiKey, systemPrompt, userPrompt, invocationId, 'STORY_ANALYSIS', 8000, effort)
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -187,8 +232,9 @@ async function analyzeProducing(
   sceneText: string,
   sceneHeader: string,
   characters: string[],
-  invocationId: string
-): Promise<{ success: boolean; data?: any; error?: string }> {
+  invocationId: string,
+  effort: string = "medium"
+): Promise<{ success: boolean; data?: any; error?: string; usage?: any }> {
 
   const systemPrompt = `You are a professional 1st AD, line producer, and UPM doing a comprehensive script breakdown. Extract production information, continuity details, scheduling considerations, and department-specific notes from the scene. Return ONLY valid JSON.`
 
@@ -288,7 +334,7 @@ Return ONLY this JSON (no markdown):
   }
 }`
 
-  return callClaude(apiKey, systemPrompt, userPrompt, invocationId, 'PRODUCING_LOGISTICS')
+  return callClaude(apiKey, systemPrompt, userPrompt, invocationId, 'PRODUCING_LOGISTICS', 8000, effort)
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -300,8 +346,9 @@ async function analyzeDirecting(
   characters: string[],
   storyAnalysis: any,
   customInstructions: string | undefined,
-  invocationId: string
-): Promise<{ success: boolean; data?: any; error?: string }> {
+  invocationId: string,
+  effort: string = "medium"
+): Promise<{ success: boolean; data?: any; error?: string; usage?: any }> {
 
   const systemPrompt = `You are a professional director, acting coach, and DP planning coverage for a scene. Use the provided story analysis to inform your shot choices and performance guidance. Every shot must serve a story purpose. Frame actor objectives as actable verbs, not emotions.
 
@@ -499,7 +546,7 @@ Return ONLY this JSON (no markdown):
   "shot_list_rationale": "ONLY include if shot_list has 10+ shots. Explain why this scene genuinely requires more coverage than typical. Empty string if under 10 shots."
 }`
 
-  return callClaude(apiKey, systemPrompt, userPrompt, invocationId, 'DIRECTING_SHOTS')
+  return callClaude(apiKey, systemPrompt, userPrompt, invocationId, 'DIRECTING_SHOTS', 16000, effort)
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -511,9 +558,9 @@ export default async function handler(
 ) {
   const invocationId = `${Date.now()}_${Math.random().toString(36).substring(2, 11)}`
 
-  console.log(`\n🎬 [${invocationId}] ═══ SCENE ANALYSIS (3-CALL ARCHITECTURE) ═══`)
-  console.log(`📅 Timestamp: ${new Date().toISOString()}`)
-  console.log(`🏷️  Deploy: ${DEPLOY_TIMESTAMP}`)
+  logger.log("analyze-scene", `\n🎬 [${invocationId}] ═══ SCENE ANALYSIS (3-CALL ARCHITECTURE) ═══`)
+  logger.log("analyze-scene", `📅 Timestamp: ${new Date().toISOString()}`)
+  logger.log("analyze-scene", `🏷️  Deploy: ${DEPLOY_TIMESTAMP}`)
 
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
@@ -531,7 +578,7 @@ export default async function handler(
     const anthropicKey = getEnvironmentVariable('ANTHROPIC_API_KEY')
 
     if (!anthropicKey) {
-      console.error(`❌ [${invocationId}] ANTHROPIC_API_KEY not found`)
+      logger.error("analyze-scene", `❌ [${invocationId}] ANTHROPIC_API_KEY not found`)
       return res.status(500).json({
         error: 'SERVER_CONFIG_ERROR',
         message: 'Anthropic API Key is not configured',
@@ -551,10 +598,14 @@ export default async function handler(
     }
 
     const requestBody = req.body as AnalyzeSceneRequest
-    const { sceneText, sceneNumber, totalScenes, customInstructions } = requestBody
+    const { sceneText, sceneNumber, totalScenes, customInstructions, analysisDepth } = requestBody
 
-    console.log(`📊 [${invocationId}] Scene: ${sceneNumber}/${totalScenes}`)
-    console.log(`📊 [${invocationId}] Text length: ${sceneText?.length || 0} chars`)
+    // Map analysis depth to effort level for adaptive thinking
+    const effort = EFFORT_MAP[analysisDepth || 'standard']
+    logger.log("analyze-scene", `🧠 [${invocationId}] Analysis depth: ${analysisDepth || 'standard'} → effort: ${effort}`)
+
+    logger.log("analyze-scene", `📊 [${invocationId}] Scene: ${sceneNumber}/${totalScenes}`)
+    logger.log("analyze-scene", `📊 [${invocationId}] Text length: ${sceneText?.length || 0} chars`)
 
     // Validate required fields
     if (!sceneText || typeof sceneText !== 'string' || sceneText.trim().length < 5) {
@@ -585,7 +636,7 @@ export default async function handler(
     const notCharacters = ['Camera', 'Shot', 'Scene', 'Something', 'Behind', 'Wind']
     const characters = allCharacters.filter(c => c.length > 2 && !notCharacters.includes(c))
 
-    console.log(`📊 [${invocationId}] Characters: ${characters.join(', ')}`)
+    logger.log("analyze-scene", `📊 [${invocationId}] Characters: ${characters.join(', ')}`)
 
     // Extract scene header (first line, usually INT/EXT line)
     const sceneHeader = sceneText.split('\n')[0] || ''
@@ -595,11 +646,11 @@ export default async function handler(
     // ═══════════════════════════════════════════════════════════════
     // CALL 1: Story Analysis
     // ═══════════════════════════════════════════════════════════════
-    console.log(`\n📖 [${invocationId}] STEP 1/3: Story Analysis...`)
-    const storyResult = await analyzeStory(anthropicKey, sceneText, characters, invocationId)
+    logger.log("analyze-scene", `\n📖 [${invocationId}] STEP 1/3: Story Analysis...`)
+    const storyResult = await analyzeStory(anthropicKey, sceneText, characters, invocationId, effort)
 
     if (!storyResult.success) {
-      console.error(`❌ [${invocationId}] Story analysis failed: ${storyResult.error}`)
+      logger.error("analyze-scene", `❌ [${invocationId}] Story analysis failed: ${storyResult.error}`)
       return res.status(500).json({
         error: 'STORY_ANALYSIS_FAILED',
         message: storyResult.error,
@@ -608,12 +659,12 @@ export default async function handler(
       })
     }
 
-    console.log(`✅ [${invocationId}] Story analysis complete`)
-    console.log(`   - the_core: "${storyResult.data.the_core?.substring(0, 60)}..."`)
-    console.log(`   - the_turn: "${storyResult.data.the_turn?.substring(0, 60)}..."`)
-    console.log(`   - scene_obligation: "${storyResult.data.scene_obligation?.substring(0, 60)}..."`)
-    console.log(`   - the_one_thing: "${storyResult.data.the_one_thing?.substring(0, 60)}..."`)
-    console.log(`   - alternative_readings: ${storyResult.data.alternative_readings?.length || 0} readings`)
+    logger.log("analyze-scene", `✅ [${invocationId}] Story analysis complete`)
+    logger.log("analyze-scene", `   - the_core: "${storyResult.data.the_core?.substring(0, 60)}..."`)
+    logger.log("analyze-scene", `   - the_turn: "${storyResult.data.the_turn?.substring(0, 60)}..."`)
+    logger.log("analyze-scene", `   - scene_obligation: "${storyResult.data.scene_obligation?.substring(0, 60)}..."`)
+    logger.log("analyze-scene", `   - the_one_thing: "${storyResult.data.the_one_thing?.substring(0, 60)}..."`)
+    logger.log("analyze-scene", `   - alternative_readings: ${storyResult.data.alternative_readings?.length || 0} readings`)
 
     // Normalize new fields with safe defaults if Claude omitted them
     if (!storyResult.data.scene_obligation) storyResult.data.scene_obligation = ''
@@ -628,11 +679,11 @@ export default async function handler(
     // ═══════════════════════════════════════════════════════════════
     // CALL 2: Producing Logistics
     // ═══════════════════════════════════════════════════════════════
-    console.log(`\n🎬 [${invocationId}] STEP 2/3: Producing Logistics...`)
-    const producingResult = await analyzeProducing(anthropicKey, sceneText, sceneHeader, characters, invocationId)
+    logger.log("analyze-scene", `\n🎬 [${invocationId}] STEP 2/3: Producing Logistics...`)
+    const producingResult = await analyzeProducing(anthropicKey, sceneText, sceneHeader, characters, invocationId, effort)
 
     if (!producingResult.success) {
-      console.error(`❌ [${invocationId}] Producing analysis failed: ${producingResult.error}`)
+      logger.error("analyze-scene", `❌ [${invocationId}] Producing analysis failed: ${producingResult.error}`)
       // Continue with empty producing logistics rather than failing entirely
       producingResult.data = {
         locations: { primary: sceneHeader, setting: 'Unknown', intExt: 'INT', timeOfDay: 'DAY' },
@@ -651,13 +702,13 @@ export default async function handler(
       }
     }
 
-    console.log(`✅ [${invocationId}] Producing logistics complete`)
-    console.log(`   - Location: ${producingResult.data.locations?.primary}`)
-    console.log(`   - Cast: ${producingResult.data.cast?.principal?.join(', ')}`)
-    console.log(`   - Scene complexity: ${producingResult.data.scene_complexity?.rating || 'missing'}/5`)
-    console.log(`   - Est. screen time: ${producingResult.data.estimated_screen_time?.estimated_minutes || 'missing'}`)
-    console.log(`   - Sound challenges: ${producingResult.data.sound_design?.production_sound_challenges?.length || 0}`)
-    console.log(`   - Safety concerns: ${producingResult.data.safety_specifics?.concerns?.length || 0}`)
+    logger.log("analyze-scene", `✅ [${invocationId}] Producing logistics complete`)
+    logger.log("analyze-scene", `   - Location: ${producingResult.data.locations?.primary}`)
+    logger.log("analyze-scene", `   - Cast: ${producingResult.data.cast?.principal?.join(', ')}`)
+    logger.log("analyze-scene", `   - Scene complexity: ${producingResult.data.scene_complexity?.rating || 'missing'}/5`)
+    logger.log("analyze-scene", `   - Est. screen time: ${producingResult.data.estimated_screen_time?.estimated_minutes || 'missing'}`)
+    logger.log("analyze-scene", `   - Sound challenges: ${producingResult.data.sound_design?.production_sound_challenges?.length || 0}`)
+    logger.log("analyze-scene", `   - Safety concerns: ${producingResult.data.safety_specifics?.concerns?.length || 0}`)
 
     // Normalize new producing fields with safe defaults if Claude omitted them
     const emptyCarry = { costume: '', props: '', makeup: '', time_logic: '', emotional_state: '' }
@@ -684,18 +735,19 @@ export default async function handler(
     // ═══════════════════════════════════════════════════════════════
     // CALL 3: Directing + Shot List (with story context)
     // ═══════════════════════════════════════════════════════════════
-    console.log(`\n🎥 [${invocationId}] STEP 3/3: Directing Vision + Shot List...`)
+    logger.log("analyze-scene", `\n🎥 [${invocationId}] STEP 3/3: Directing Vision + Shot List...`)
     const directingResult = await analyzeDirecting(
       anthropicKey,
       sceneText,
       characters,
       storyResult.data,
       customInstructions,
-      invocationId
+      invocationId,
+      effort
     )
 
     if (!directingResult.success) {
-      console.error(`❌ [${invocationId}] Directing analysis failed: ${directingResult.error}`)
+      logger.error("analyze-scene", `❌ [${invocationId}] Directing analysis failed: ${directingResult.error}`)
       return res.status(500).json({
         error: 'DIRECTING_ANALYSIS_FAILED',
         message: directingResult.error,
@@ -704,23 +756,23 @@ export default async function handler(
       })
     }
 
-    console.log(`✅ [${invocationId}] Directing analysis complete`)
-    console.log(`   - Shots: ${directingResult.data.shot_list?.length || 0}`)
-    console.log(`   - Visual metaphor: "${directingResult.data.visual_metaphor?.substring(0, 60)}..."`)
-    console.log(`   - Actor objectives: ${Object.keys(directingResult.data.actor_objectives || {}).length} characters`)
-    console.log(`   - Scene rhythm tempo: ${directingResult.data.scene_rhythm?.tempo || 'missing'}`)
-    console.log(`   - What not to do: ${directingResult.data.what_not_to_do?.length || 0} items`)
-    console.log(`   - Creative questions: ${directingResult.data.creative_questions?.length || 0} items`)
+    logger.log("analyze-scene", `✅ [${invocationId}] Directing analysis complete`)
+    logger.log("analyze-scene", `   - Shots: ${directingResult.data.shot_list?.length || 0}`)
+    logger.log("analyze-scene", `   - Visual metaphor: "${directingResult.data.visual_metaphor?.substring(0, 60)}..."`)
+    logger.log("analyze-scene", `   - Actor objectives: ${Object.keys(directingResult.data.actor_objectives || {}).length} characters`)
+    logger.log("analyze-scene", `   - Scene rhythm tempo: ${directingResult.data.scene_rhythm?.tempo || 'missing'}`)
+    logger.log("analyze-scene", `   - What not to do: ${directingResult.data.what_not_to_do?.length || 0} items`)
+    logger.log("analyze-scene", `   - Creative questions: ${directingResult.data.creative_questions?.length || 0} items`)
     // Log shot list story elements for debugging
     if (directingResult.data.shot_list?.length > 0) {
       const storyElements = directingResult.data.shot_list.map((s: any, i: number) => `${i + 1}:${s.serves_story_element || 'NONE'}`)
-      console.log(`   - Shot story elements: [${storyElements.join(', ')}]`)
+      logger.log("analyze-scene", `   - Shot story elements: [${storyElements.join(', ')}]`)
       const hasCatalyst = directingResult.data.shot_list.some((s: any) => s.serves_story_element === 'TURN_CATALYST')
       const hasLanding = directingResult.data.shot_list.some((s: any) => s.serves_story_element === 'TURN_LANDING')
-      console.log(`   - Turn coverage: catalyst=${hasCatalyst}, landing=${hasLanding}`)
+      logger.log("analyze-scene", `   - Turn coverage: catalyst=${hasCatalyst}, landing=${hasLanding}`)
     }
     if (directingResult.data.shot_list_rationale) {
-      console.log(`   - Shot list rationale: "${directingResult.data.shot_list_rationale.substring(0, 80)}..."`)
+      logger.log("analyze-scene", `   - Shot list rationale: "${directingResult.data.shot_list_rationale.substring(0, 80)}..."`)
     }
 
     // Normalize new directing fields with safe defaults if Claude omitted them
@@ -765,11 +817,24 @@ export default async function handler(
     }
 
     const totalDuration = Date.now() - startTime
-    console.log(`\n✅ [${invocationId}] ALL 3 CALLS COMPLETE in ${totalDuration}ms`)
-    console.log(`   - Total shots: ${analysis.shot_list.length}`)
-    console.log(`   - story_analysis fields: ${Object.keys(analysis.story_analysis).length}`)
-    console.log(`   - producing_logistics fields: ${Object.keys(analysis.producing_logistics).length}`)
-    console.log(`   - directing_vision fields: ${Object.keys(analysis.directing_vision).length}`)
+
+    // Calculate total cost across all three calls
+    const totalCost = (
+      parseFloat(storyResult.usage?.estimatedCost || '0') +
+      parseFloat(producingResult.usage?.estimatedCost || '0') +
+      parseFloat(directingResult.usage?.estimatedCost || '0')
+    ).toFixed(4)
+
+    const totalInputTokens = (storyResult.usage?.inputTokens || 0) + (producingResult.usage?.inputTokens || 0) + (directingResult.usage?.inputTokens || 0)
+    const totalOutputTokens = (storyResult.usage?.outputTokens || 0) + (producingResult.usage?.outputTokens || 0) + (directingResult.usage?.outputTokens || 0)
+    const totalThinkingTokens = (storyResult.usage?.thinkingTokens || 0) + (producingResult.usage?.thinkingTokens || 0) + (directingResult.usage?.thinkingTokens || 0)
+
+    logger.log("analyze-scene", `\n✅ [${invocationId}] ALL 3 CALLS COMPLETE in ${totalDuration}ms`)
+    logger.log("analyze-scene", `   - Total shots: ${analysis.shot_list.length}`)
+    logger.log("analyze-scene", `   - story_analysis fields: ${Object.keys(analysis.story_analysis).length}`)
+    logger.log("analyze-scene", `   - producing_logistics fields: ${Object.keys(analysis.producing_logistics).length}`)
+    logger.log("analyze-scene", `   - directing_vision fields: ${Object.keys(analysis.directing_vision).length}`)
+    logger.log("analyze-scene", `💰 [${invocationId}] TOTAL COST: $${totalCost} (input=${totalInputTokens}, output=${totalOutputTokens}, thinking=${totalThinkingTokens})`)
 
     // Quick validation
     const validationIssues: string[] = []
@@ -853,14 +918,22 @@ export default async function handler(
         processingTime: totalDuration,
         characters,
         actualShots: analysis.shot_list.length,
-        model: 'claude-sonnet-4-20250514',
+        model: MODEL,
+        analysisDepth: analysisDepth || 'standard',
+        effort,
         architecture: '3-call-split',
-        deployMarker: DEPLOY_TIMESTAMP
+        deployMarker: DEPLOY_TIMESTAMP,
+        usage: {
+          totalInputTokens,
+          totalOutputTokens,
+          totalThinkingTokens,
+          totalCost
+        }
       }
     })
 
   } catch (error) {
-    console.error(`❌ [${invocationId}] Unexpected error:`, error)
+    logger.error("analyze-scene", `❌ [${invocationId}] Unexpected error:`, error)
     return res.status(500).json({
       error: 'UNEXPECTED_ERROR',
       message: error instanceof Error ? error.message : 'Unknown error occurred',

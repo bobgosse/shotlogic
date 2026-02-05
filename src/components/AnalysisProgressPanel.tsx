@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { CheckCircle2, Loader2, Circle, AlertCircle, ChevronDown, ChevronUp, Clock } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 interface Scene {
@@ -28,8 +27,6 @@ export const AnalysisProgressPanel: React.FC<AnalysisProgressPanelProps> = ({
 
   const completedCount = scenes.filter(s => s.status === 'COMPLETED').length;
   const errorCount = scenes.filter(s => s.status === 'ERROR').length;
-  const analyzingCount = scenes.filter(s => s.status === 'ANALYZING').length;
-  const pendingCount = scenes.filter(s => s.status === 'PENDING').length;
   const totalScenes = scenes.length;
 
   const remainingScenes = totalScenes - completedCount - errorCount;

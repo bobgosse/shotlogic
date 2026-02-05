@@ -3,6 +3,7 @@
 import { VercelRequest, VercelResponse } from '@vercel/node'
 import { getDb } from '../lib/mongodb.js'
 import { ObjectId } from 'mongodb'
+import { logger } from "../lib/logger";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -19,7 +20,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'projectId is required' })
     }
     
-    console.log(`🎨 Updating visual style for project ${projectId}`)
+    logger.log("update-style", `🎨 Updating visual style for project ${projectId}`)
     
     const db = await getDb()
     const collection = db.collection('projects')
@@ -34,7 +35,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     )
     
-    console.log(`✅ Visual style updated, matched: ${result.matchedCount}, modified: ${result.modifiedCount}`)
+    logger.log("update-style", `✅ Visual style updated, matched: ${result.matchedCount}, modified: ${result.modifiedCount}`)
     
     return res.status(200).json({
       success: true,
@@ -43,7 +44,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       modifiedCount: result.modifiedCount
     })
   } catch (error) {
-    console.error('Update error:', error)
+    logger.error("update-style", 'Update error:', error)
     return res.status(500).json({
       error: 'Failed to update',
       details: error instanceof Error ? error.message : 'Unknown error'

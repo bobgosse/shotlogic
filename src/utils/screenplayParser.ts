@@ -1,4 +1,5 @@
 import * as pdfjsLib from 'pdfjs-dist';
+import { logger } from "@/utils/logger";
 
 export interface Scene {
   number: number;
@@ -31,7 +32,7 @@ export async function extractTextFromPDF(fileBuffer: Uint8Array): Promise<string
     try {
       page = await pdf.getPage(i);
     } catch (error) {
-      console.warn(`PDF_WARNING: Failed to load page ${i}, skipping`);
+      logger.warn(`PDF_WARNING: Failed to load page ${i}, skipping`);
       continue;
     }
 
@@ -39,7 +40,7 @@ export async function extractTextFromPDF(fileBuffer: Uint8Array): Promise<string
 
     // CRITICAL FIX: Validate that page has extractable text
     if (!textContent.items || textContent.items.length === 0) {
-      console.warn(`PDF_WARNING: Page ${i} contains no extractable text items`);
+      logger.warn(`PDF_WARNING: Page ${i} contains no extractable text items`);
       continue;
     }
 
@@ -80,7 +81,7 @@ export async function extractTextFromPDF(fileBuffer: Uint8Array): Promise<string
     throw new Error(`PDF_ERROR: Extracted text too short (${sanitized.length} chars). PDF may be corrupted or contain primarily images.`);
   }
 
-  console.log(`PDF extraction successful: ${pdf.numPages} pages, ${totalTextItems} text items, ${sanitized.length} chars`);
+  logger.log(`PDF extraction successful: ${pdf.numPages} pages, ${totalTextItems} text items, ${sanitized.length} chars`);
 
   return sanitized;
 }
@@ -93,7 +94,7 @@ function cleanSpacedText(text: string): string {
   
   // If more than 40% of characters are spaces, the text is likely spaced out
   if (spacePercentage > 0.4) {
-    console.log('Detected spaced-out text, normalizing...');
+    logger.log('Detected spaced-out text, normalizing...');
     // Collapse single spaces between letters/numbers: "I N T ." -> "INT."
     text = text.replace(/([A-Za-z0-9])\s(?=[A-Za-z0-9])/g, '$1');
   }
@@ -171,7 +172,7 @@ function parseFDX(text: string): Scene[] {
         const trimmedContent = sceneContent.join('\n').trim();
 
         if (trimmedContent.length < 10) {
-          console.warn(`[FDX Scene ${currentScene.number}] Empty or insufficient content - skipping`);
+          logger.warn(`[FDX Scene ${currentScene.number}] Empty or insufficient content - skipping`);
         } else {
           currentScene.content = trimmedContent;
           scenes.push(currentScene);
@@ -185,7 +186,7 @@ function parseFDX(text: string): Scene[] {
 
       // Check for duplicate scene numbers
       if (seenSceneNumbers.has(sceneNumber)) {
-        console.warn(`[FDX Scene ${sceneNumber}] Duplicate scene number detected`);
+        logger.warn(`[FDX Scene ${sceneNumber}] Duplicate scene number detected`);
       }
       seenSceneNumbers.add(sceneNumber);
 
@@ -207,7 +208,7 @@ function parseFDX(text: string): Scene[] {
     const trimmedContent = sceneContent.join('\n').trim();
 
     if (trimmedContent.length < 10) {
-      console.warn(`[FDX Scene ${currentScene.number}] Empty or insufficient content - skipping final scene`);
+      logger.warn(`[FDX Scene ${currentScene.number}] Empty or insufficient content - skipping final scene`);
     } else {
       currentScene.content = trimmedContent;
       scenes.push(currentScene);
@@ -227,7 +228,7 @@ function parseFDX(text: string): Scene[] {
     throw new Error(`FDX_ERROR: Found ${sceneHeadingCount} scene headings but no valid scenes with content. All scenes may be empty.`);
   }
 
-  console.log(`FDX parsing successful: ${paragraphCount} paragraphs, ${sceneHeadingCount} headings, ${scenes.length} valid scenes`);
+  logger.log(`FDX parsing successful: ${paragraphCount} paragraphs, ${sceneHeadingCount} headings, ${scenes.length} valid scenes`);
 
   return scenes;
 }
@@ -251,7 +252,7 @@ export function parseScreenplay(text: string): Scene[] {
   text = cleanSpacedText(text);
 
   // Text is now properly formatted from position-aware PDF extraction
-  console.log('Parser input preview:', text.substring(0, 500));
+  logger.log('Parser input preview:', text.substring(0, 500));
 
   // Parse scenes with properly formatted text
 
@@ -265,7 +266,7 @@ export function parseScreenplay(text: string): Scene[] {
 
   // Skip title page - look for first valid scene header
   // Only skip lines that are clearly NOT scene headers
-  console.log(`[Parser] Searching for first scene header in ${lines.length} lines`);
+  logger.log(`[Parser] Searching for first scene header in ${lines.length} lines`);
   let previewLines = 0;
 
   while (i < lines.length) {
@@ -279,7 +280,7 @@ export function parseScreenplay(text: string): Scene[] {
 
     // DEBUG: Show first 30 non-empty lines
     if (previewLines < 30) {
-      console.log(`[Parser] Line ${i}: "${line.substring(0, 80)}${line.length > 80 ? '...' : ''}"`);
+      logger.log(`[Parser] Line ${i}: "${line.substring(0, 80)}${line.length > 80 ? '...' : ''}"`);
       previewLines++;
     }
 
@@ -293,7 +294,7 @@ export function parseScreenplay(text: string): Scene[] {
 
     // If we found a scene header, stop skipping
     if (isSceneHeader) {
-      console.log(`[Parser] ✓ Found first scene header at line ${i}: "${line}"`);
+      logger.log(`[Parser] ✓ Found first scene header at line ${i}: "${line}"`);
       break;
     }
 
@@ -302,7 +303,7 @@ export function parseScreenplay(text: string): Scene[] {
   }
 
   if (i >= lines.length) {
-    console.error('[Parser] ✗ Reached end of file without finding any scene headers');
+    logger.error('[Parser] ✗ Reached end of file without finding any scene headers');
   }
 
   // Parse scenes
@@ -357,7 +358,7 @@ export function parseScreenplay(text: string): Scene[] {
         const trimmedContent = currentScene.content.trim();
 
         if (trimmedContent.length < 10) {
-          console.warn(`[Scene ${currentScene.number}] Empty or insufficient content (${trimmedContent.length} chars) - skipping`);
+          logger.warn(`[Scene ${currentScene.number}] Empty or insufficient content (${trimmedContent.length} chars) - skipping`);
         } else {
           scenes.push(currentScene);
         }
@@ -377,7 +378,7 @@ export function parseScreenplay(text: string): Scene[] {
 
       // Check for duplicate scene numbers
       if (seenSceneNumbers.has(sceneNumber)) {
-        console.warn(`[Scene ${sceneNumber}] Duplicate scene number detected`);
+        logger.warn(`[Scene ${sceneNumber}] Duplicate scene number detected`);
       }
       seenSceneNumbers.add(sceneNumber);
 
@@ -407,7 +408,7 @@ export function parseScreenplay(text: string): Scene[] {
     const trimmedContent = currentScene.content.trim();
 
     if (trimmedContent.length < 10) {
-      console.warn(`[Scene ${currentScene.number}] Empty or insufficient content (${trimmedContent.length} chars) - skipping final scene`);
+      logger.warn(`[Scene ${currentScene.number}] Empty or insufficient content (${trimmedContent.length} chars) - skipping final scene`);
     } else {
       scenes.push(currentScene);
     }
@@ -422,7 +423,7 @@ export function parseScreenplay(text: string): Scene[] {
     throw new Error(`PARSE_ERROR: Found ${sceneHeaderCount} scene headers but no valid scenes with content. All scenes may be empty or too short.`);
   }
 
-  console.log(`Text parsing successful: ${sceneHeaderCount} headers detected, ${scenes.length} valid scenes`);
+  logger.log(`Text parsing successful: ${sceneHeaderCount} headers detected, ${scenes.length} valid scenes`);
 
   return scenes;
 }

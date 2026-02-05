@@ -2,6 +2,7 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { getDb } from '../lib/mongodb.js';
 import { ObjectId } from 'mongodb';
+import { logger } from "../lib/logger";
 
 export default async function handler(
   req: VercelRequest,
@@ -41,7 +42,7 @@ export default async function handler(
       });
     }
 
-    console.log(`✅ Project ${projectId} loaded`);
+    logger.log("get-by-id", `✅ Project ${projectId} loaded`);
 
     return res.status(200).json({
       success: true,
@@ -49,7 +50,7 @@ export default async function handler(
     });
 
   } catch (error) {
-    console.error('❌ Load error:', error);
+    logger.error("get-by-id", '❌ Load error:', error);
     
     return res.status(500).json({
       success: false,

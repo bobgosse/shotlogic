@@ -17,6 +17,7 @@ import {
   Clock
 } from 'lucide-react'
 import { api, ApiError } from '@/utils/apiClient'
+import { logger } from "@/utils/logger";
 
 // ═══════════════════════════════════════════════════════════════
 // TYPE DEFINITIONS
@@ -140,10 +141,10 @@ function ProjectList({ projects, setProjects, showToast }: ProjectListProps) {
       if (showToast && typeof showToast === 'function') {
         showToast(title, description, variant)
       } else {
-        console.log(`Toast: ${title} - ${description || ''}`)
+        logger.log(`Toast: ${title} - ${description || ''}`)
       }
     } catch (e) {
-      console.log(`Toast (fallback): ${title} - ${description || ''}`)
+      logger.log(`Toast (fallback): ${title} - ${description || ''}`)
     }
   }
 
@@ -174,7 +175,7 @@ function ProjectList({ projects, setProjects, showToast }: ProjectListProps) {
       return
     }
 
-    console.log(`✏️  Saving new name for project ${projectId}: "${trimmedName}"`)
+    logger.log(`✏️  Saving new name for project ${projectId}: "${trimmedName}"`)
     setSavingId(projectId)
 
     try {
@@ -187,7 +188,7 @@ function ProjectList({ projects, setProjects, showToast }: ProjectListProps) {
         maxRetries: 2
       })
 
-      console.log('✅ Rename successful:', result)
+      logger.log('✅ Rename successful:', result)
 
       setProjects(prevProjects =>
         prevProjects.map(p =>
@@ -204,7 +205,7 @@ function ProjectList({ projects, setProjects, showToast }: ProjectListProps) {
       safeToast('Project Renamed', `Project renamed to "${trimmedName}"`)
 
     } catch (error) {
-      console.error('❌ Rename error:', error)
+      logger.error('❌ Rename error:', error)
       setSavingId(null)
       const errorMsg = (error as ApiError).userMessage ||
                       (error instanceof Error ? error.message : 'Failed to rename project.')
@@ -237,7 +238,7 @@ function ProjectList({ projects, setProjects, showToast }: ProjectListProps) {
     
     if (!confirmed) return
 
-    console.log(`🗑️  Deleting project: ${projectName}`)
+    logger.log(`🗑️  Deleting project: ${projectName}`)
     setDeletingId(projectId)
 
     try {
@@ -253,7 +254,7 @@ function ProjectList({ projects, setProjects, showToast }: ProjectListProps) {
       safeToast('Project Deleted', `"${projectName}" has been deleted.`)
 
     } catch (error) {
-      console.error('❌ Delete error:', error)
+      logger.error('❌ Delete error:', error)
       setDeletingId(null)
       const errorMsg = (error as ApiError).userMessage ||
                       (error instanceof Error ? error.message : 'Failed to delete project.')

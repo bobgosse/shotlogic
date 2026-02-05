@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { pdfQueue } from '../../lib/queue';
+import { logger } from "../../lib/logger";
 
 export async function GET(
   req: NextRequest,
@@ -26,7 +27,7 @@ export async function GET(
       result: result || null
     });
   } catch (error) {
-    console.error('Polling error:', error);
+    logger.error("route", 'Polling error:', error);
     return NextResponse.json({ error: 'Failed to fetch job status' }, { status: 500 });
   }
 }

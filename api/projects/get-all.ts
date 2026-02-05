@@ -4,6 +4,7 @@
 import { VercelRequest, VercelResponse } from '@vercel/node'
 import { getDb } from '../lib/mongodb.js'
 import { ObjectId } from 'mongodb'
+import { logger } from "../lib/logger";
 
 const DEPLOY_TIMESTAMP = '2024-12-24T_USER_FILTER'
 
@@ -17,11 +18,11 @@ export default async function handler(
   // Get userId from query params
   const userId = req.query.userId as string | undefined
 
-  console.log(`\n📁 [${invocationId}] ═══════════════════════════════`)
-  console.log(`📅 Timestamp: ${new Date().toISOString()}`)
-  console.log(`🏷️  Deploy: ${DEPLOY_TIMESTAMP}`)
-  console.log(`📍 Method: ${req.method}`)
-  console.log(`👤 UserId: ${userId || 'none (showing all)'}`)
+  logger.log("get-all", `\n📁 [${invocationId}] ═══════════════════════════════`)
+  logger.log("get-all", `📅 Timestamp: ${new Date().toISOString()}`)
+  logger.log("get-all", `🏷️  Deploy: ${DEPLOY_TIMESTAMP}`)
+  logger.log("get-all", `📍 Method: ${req.method}`)
+  logger.log("get-all", `👤 UserId: ${userId || 'none (showing all)'}`)
 
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -48,7 +49,7 @@ export default async function handler(
 
     // Build query - filter by userId if provided
     const query = userId ? { userId } : {}
-    console.log(`🔍 [${invocationId}] Query filter:`, query)
+    logger.log("get-all", `🔍 [${invocationId}] Query filter:`, query)
 
     const projectList = await collection
       .find(query)
@@ -57,14 +58,14 @@ export default async function handler(
       .limit(100)
       .toArray()
 
-    console.log(`📦 [${invocationId}] Found ${projectList.length} project(s)`)
+    logger.log("get-all", `📦 [${invocationId}] Found ${projectList.length} project(s)`)
 
     const projects = projectList.map((project, index) => {
       const idString = project._id instanceof ObjectId
         ? project._id.toHexString()
         : String(project._id)
       
-      console.log(`   [${index}] "${project.name}" (user: ${project.userId || 'legacy'})`)
+      logger.log("get-all", `   [${index}] "${project.name}" (user: ${project.userId || 'legacy'})`)
       
       return {
         _id: idString,
@@ -78,7 +79,7 @@ export default async function handler(
     })
 
     const totalDuration = Date.now() - startTime
-    console.log(`✅ [${invocationId}] SUCCESS in ${totalDuration}ms`)
+    logger.log("get-all", `✅ [${invocationId}] SUCCESS in ${totalDuration}ms`)
 
     return res.status(200).json({
       success: true,
@@ -91,7 +92,7 @@ export default async function handler(
     })
   } catch (error) {
     const totalDuration = Date.now() - startTime
-    console.error(`❌ [${invocationId}] Error:`, error)
+    logger.error("get-all", `❌ [${invocationId}] Error:`, error)
 
     return res.status(500).json({
       error: 'Failed to fetch projects',

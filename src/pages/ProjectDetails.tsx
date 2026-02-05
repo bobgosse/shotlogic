@@ -1,9 +1,8 @@
 import React from 'react';
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,276 +13,61 @@ import { AnalysisProgressPanel } from "@/components/AnalysisProgressPanel";
 import { SceneNavigator } from "@/components/SceneNavigator";
 import { MobileSceneView } from "@/components/MobileSceneView";
 import { RetryAnalysisDialog } from "@/components/RetryAnalysisDialog";
-import { VisualProfileEditor } from "@/components/VisualProfileEditor";
-import { VisualProfile } from "@/types/visualProfile";
+import { AnalysisData, Scene, ShotListItem, parseAnalysis } from "@/types/analysis";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, ArrowLeft, Film, Camera, Printer, Download, RefreshCw, FileText, Edit, Save, Menu, Sparkles, ImageIcon, Palette, X, Check, ChevronLeft, ChevronRight, Users, Plus, ArrowUp, ArrowDown, Copy, Pencil } from "lucide-react";
+import { Trash2, ArrowLeft, Film, Camera, Printer, Download, RefreshCw, FileText, Save, Menu, Sparkles, ImageIcon, Palette, X, Check, ChevronLeft, ChevronRight, Users, Plus, ArrowUp, ArrowDown, Copy, Pencil } from "lucide-react";
 import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { exportShotListPDF, exportShotListCSV, exportStoryboardPDF, exportAnalysisOnlyPDF } from "@/utils/shotListExporter";
 import { generatePromptPair } from "@/utils/promptBuilder";
-import { generateStoryboardPDF } from "@/utils/storyboardPdfGenerator";
-import { requestNotificationPermission, notifyAnalysisComplete } from "@/utils/notifications";
-import jsPDF from "jspdf";
-import { parseScreenplay } from "@/utils/screenplayParser";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import logo from "@/assets/shotlogic-logo-netflix.png";
-import { api, ApiError } from "@/utils/apiClient";
+import { logger } from "@/utils/logger";
+import { useProjectData } from "@/hooks/useProjectData";
+import { useSceneAnalysis } from "@/hooks/useSceneAnalysis";
 
-interface Scene {
-  id: string;
-  scene_number: number;
-  header: string;
-  content: string;
-  analysis: string | null;
-  status: string;
-}
-
-interface Project {
-  id: string;
-  title: string;
-  total_scenes: number;
-  current_scene: number;
-  status: string;
-  visual_style?: string | null;
-  characters?: Array<{ name: string; physical: string }>;
-  visual_profile?: VisualProfile | null;
-}
-
-interface ShotListItem {
-  shot_type: string;
-  subject?: string;
-  visual: string;
-  serves_story_element?: string;
-  rationale: string;
-  editorial_note?: string;
-  visual_description?: string;
-}
-
-interface AnalysisData {
-  story_analysis: {
-    stakes?: string;
-    ownership?: string;
-    breaking_point?: string;
-    key_props?: string | string[];
-    synopsis?: string;
-    the_core?: string;
-    the_turn?: string;
-    the_times?: string;
-    imagery_and_tone?: string;
-    tone?: string;
-    what_changes?: string;
-    pitfalls?: string[];
-    scene_obligation?: string;
-    the_one_thing?: string;
-    setup_payoff?: {
-      setups: string[];
-      payoffs: string[];
-    };
-    essential_exposition?: string;
-    if_this_scene_fails?: string;
-    alternative_readings?: string[];
-    subtext?: {
-      what_they_say_vs_want?: string;
-      power_dynamic?: string;
-      emotional_turn?: string;
-      revelation_or_realization?: string;
-    };
-    conflict?: {
-      type?: string;
-      what_characters_want?: string[];
-      obstacles?: string[];
-      tactics?: string[];
-      winner?: string;
-      description?: string;
-    };
-  };
-  producing_logistics: {
-    red_flags: string[];
-    resource_impact: "Low" | "Medium" | "High";
-    departments_affected: string[];
-    locations?: any;
-    cast?: any;
-    key_props?: string[];
-    vehicles?: string[];
-    sfx?: any;
-    wardrobe?: any;
-    makeup?: any;
-    scheduling_concerns?: any;
-    budget_flags?: string[];
-    special_requirements?: string[];
-    continuity?: {
-      carries_in: {
-        costume: string;
-        props: string;
-        makeup: string;
-        time_logic: string;
-        emotional_state: string;
-      };
-      carries_out: {
-        costume: string;
-        props: string;
-        makeup: string;
-        time_logic: string;
-        emotional_state: string;
-      };
-    };
-    scene_complexity?: {
-      rating: number;
-      justification: string;
-    };
-    estimated_screen_time?: {
-      pages: number;
-      estimated_minutes: string;
-      pacing_note: string;
-    };
-    scheduling_notes?: {
-      combinable_with: string[];
-      must_schedule_before: string[];
-      must_schedule_after: string[];
-      time_of_day_requirement: string;
-      weather_dependency: string;
-      actor_availability_note: string;
-    };
-    sound_design?: {
-      production_sound_challenges: string[];
-      ambient_requirements: string[];
-      silence_moments: string[];
-      sound_effects_needed: string[];
-      music_notes: string;
-    };
-    safety_specifics?: {
-      concerns: string[];
-      protocols_required: string[];
-      personnel_needed: string[];
-      actor_prep_required: string;
-    };
-    department_specific_notes?: Record<string, string>;
-  };
-  directing_vision: {
-    visual_metaphor: string;
-    editorial_intent: string;
-    shot_motivation: string;
-    character_motivations?: any[];
-    conflict?: any;
-    subtext?: string;
-    tone_and_mood?: any;
-    visual_strategy?: any;
-    key_moments?: any[];
-    blocking?: any;
-    blocking_ideas?: any;
-    visual_approach?: string;
-    actor_objectives?: Record<string, string>;
-    scene_rhythm?: {
-      tempo: string;
-      breaths: string;
-      acceleration_points: string;
-      holds: string;
-    };
-    what_not_to_do?: string[];
-    tone_reference?: string;
-    creative_questions?: string[];
-    performance_notes?: Record<string, {
-      physical_state: string;
-      emotional_undercurrent: string;
-      arc_in_scene: string;
-    }>;
-  };
-  shot_list?: Array<ShotListItem | string>;
-  shot_list_rationale?: string;
-}
 
 const ProjectDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const [reanalyzing, setReanalyzing] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [editedScenes, setEditedScenes] = useState<Record<string, AnalysisData>>({});
-  const [isSaving, setIsSaving] = useState(false);
+
+  // ─── Project data hook ───
+  const {
+    project, scenes, isLoading, error,
+    editingVisualStyle, setEditingVisualStyle, tempVisualStyle, setTempVisualStyle, handleSaveVisualStyle,
+    editingCharacters, setEditingCharacters, tempCharacters, setTempCharacters, handleSaveCharacters,
+    handleDeleteProject,
+  } = useProjectData(id);
+
+  // ─── Scene analysis hook ───
+  const {
+    selectedSceneId, setSelectedSceneId, selectedSceneIndex, selectedScene, selectedAnalysis,
+    reanalyzing, handleRegenerateAll, handleReanalyzeScene, handleTryAgain, handleRetryWithInstructions,
+    showRetryDialog, setShowRetryDialog, retrySceneData,
+    isEditMode, setIsEditMode, editedScenes, isSaving, handleSaveEdits,
+    editingStory, editingDirecting, editingProducing,
+    editedStoryData, setEditedStoryData, editedDirectingData, setEditedDirectingData,
+    editedProducingData, setEditedProducingData,
+    startEditingSection, cancelEditingSection, saveSection,
+    isShotListItem, handleShotEdit, getCurrentShot,
+    handleAddShot, handleDeleteShot, handleDuplicateShot, handleMoveShot,
+  } = useSceneAnalysis({
+    id, scenes,
+    projectVisualStyle: project?.visual_style,
+    projectVisualProfile: project?.visual_profile,
+    projectCharacters: project?.characters,
+    totalScenes: project?.total_scenes,
+  });
+
+  // ─── Local UI state ───
   const [storyboardScene, setStoryboardScene] = useState<{ scene: Scene; analysis: AnalysisData } | null>(null);
   const [showExportModal, setShowExportModal] = useState(false);
-  const [hasRequestedNotifications, setHasRequestedNotifications] = useState(false);
   const [showNavigator, setShowNavigator] = useState(true); // Always visible by default
-  const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
   const [forceMobileView, setForceMobileView] = useState(false);
   const [forceDesktopView, setForceDesktopView] = useState(false);
-  const [editingVisualStyle, setEditingVisualStyle] = useState(false);
-  const [editingCharacters, setEditingCharacters] = useState(false);
-  const [tempCharacters, setTempCharacters] = useState<Array<{ name: string; physical: string }>>([]);
-  const [tempVisualStyle, setTempVisualStyle] = useState("");
-  const [showRetryDialog, setShowRetryDialog] = useState(false);
-  const [retrySceneData, setRetrySceneData] = useState<{ id: string; number: number; content: string } | null>(null);
-  const [isSavingVisualProfile, setIsSavingVisualProfile] = useState(false);
-  const [editingStory, setEditingStory] = useState(false);
-  const [editingDirecting, setEditingDirecting] = useState(false);
-  const [editingProducing, setEditingProducing] = useState(false);
-  const [editedStoryData, setEditedStoryData] = useState<any>(null);
-  const [editedDirectingData, setEditedDirectingData] = useState<any>(null);
-  const [editedProducingData, setEditedProducingData] = useState<any>(null);
   const isMobile = useMediaQuery("(max-width: 768px)");
   const isTablet = useMediaQuery("(max-width: 1024px)");
 
-  const { data: projectData, isLoading, error } = useQuery({
-    queryKey: ['project', id],
-    queryFn: async () => {
-      console.log('[ProjectDetails] Fetching project with ID:', id);
-
-      const projectResult = await api.get(`/api/projects/get-one?projectId=${id}`, {
-        context: 'Loading project',
-        timeoutMs: 30000,
-        maxRetries: 2
-      });
-
-      if (!projectResult.success || !projectResult.project) {
-        console.warn('[ProjectDetails] No project found with ID:', id);
-        return { project: null, scenes: [] };
-      }
-
-      const project = projectResult.project;
-      const scenes = project.scenes || [];
-
-      console.log('[ProjectDetails] Project loaded:', {
-        projectId: project._id,
-        scenesCount: scenes.length
-      });
-
-      return { project, scenes };
-    },
-    refetchInterval: (query) => {
-      const data = query.state.data;
-      if (editingVisualStyle) return false;
-      return data?.project?.status !== 'COMPLETED' ? 3000 : false;
-    },
-    enabled: !!id && !editingVisualStyle,
-    retry: 1,
-  });
-
-  const project = projectData?.project || null;
-  const scenes = projectData?.scenes || [];
-
-  // Select first scene when scenes load
-  useEffect(() => {
-    if (scenes.length > 0 && !selectedSceneId) {
-      setSelectedSceneId(scenes[0].id);
-    }
-  }, [scenes, selectedSceneId]);
-
-  // Reset edit states when switching scenes
-  useEffect(() => {
-    setEditingStory(false);
-    setEditingDirecting(false);
-    setEditingProducing(false);
-    setEditedStoryData(null);
-    setEditedDirectingData(null);
-    setEditedProducingData(null);
-  }, [selectedSceneId]);
-
-  // Get selected scene and its index
-  const selectedSceneIndex = scenes.findIndex(s => s.id === selectedSceneId);
-  const selectedScene = selectedSceneIndex >= 0 ? scenes[selectedSceneIndex] : null;
 
   // Keyboard shortcuts for scene navigation
   useKeyboardShortcut({ key: "j" }, () => {
@@ -298,217 +82,6 @@ const ProjectDetails = () => {
     }
   });
 
-  // Request notification permission on mount
-  useEffect(() => {
-    if (!hasRequestedNotifications && project?.status !== 'COMPLETED') {
-      requestNotificationPermission().then(() => {
-        setHasRequestedNotifications(true);
-      });
-    }
-  }, [hasRequestedNotifications, project?.status]);
-
-  // Check for completion and notify
-  useEffect(() => {
-    if (project?.status === 'COMPLETED' && project.title) {
-      notifyAnalysisComplete(project.title, project.id);
-    }
-  }, [project?.status, project?.title, project?.id]);
-
-  const parseAnalysis = (analysisString: string | null): AnalysisData | null => {
-    if (!analysisString) return null;
-    try {
-      return JSON.parse(analysisString);
-    } catch {
-      return null;
-    }
-  };
-
-  const handleSaveVisualStyle = async () => {
-    if (!project) {
-      setEditingVisualStyle(false);
-      return;
-    }
-    try {
-      await api.post('/api/projects/update-style', {
-        projectId: id,
-        visualStyle: tempVisualStyle.trim() || null
-      }, {
-        context: 'Updating visual style',
-        timeoutMs: 15000,
-        maxRetries: 2
-      });
-
-      queryClient.setQueryData(['project', id], (oldData: any) => ({
-        ...oldData,
-        project: { ...oldData.project, visual_style: tempVisualStyle.trim() || null }
-      }));
-      setEditingVisualStyle(false);
-
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['project', id] });
-      }, 100);
-
-      toast({
-        title: "Visual style updated",
-        description: "Image prompts will now use this aesthetic",
-      });
-    } catch (error: any) {
-      console.error('Error updating visual style:', error);
-      const errorMsg = (error as ApiError).userMessage || error.message || 'Failed to update';
-      toast({
-        title: "Update failed",
-        description: errorMsg,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleSaveCharacters = async () => {
-    if (!project) {
-      setEditingCharacters(false);
-      return;
-    }
-    try {
-      await api.post("/api/projects/update-characters", {
-        projectId: id,
-        characters: tempCharacters.filter(c => c.name.trim())
-      }, {
-        context: 'Updating characters',
-        timeoutMs: 15000,
-        maxRetries: 2
-      });
-
-      queryClient.setQueryData(["project", id], (oldData: any) => ({
-        ...oldData,
-        project: { ...oldData.project, characters: tempCharacters.filter(c => c.name.trim()) }
-      }));
-      setEditingCharacters(false);
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ["project", id] });
-      }, 100);
-      toast({
-        title: "Characters updated",
-        description: "These descriptions will be used in all scene analyses",
-      });
-    } catch (error: any) {
-      console.error("Error updating characters:", error);
-      const errorMsg = (error as ApiError).userMessage || error.message || 'Failed to update';
-      toast({
-        title: "Update failed",
-        description: errorMsg,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleSaveVisualProfile = async (profile: VisualProfile) => {
-    if (!project || !id) return;
-
-    setIsSavingVisualProfile(true);
-    try {
-      await api.post('/api/visual-profile', {
-        projectId: id,
-        visualProfile: profile
-      }, {
-        context: 'Saving Visual Profile',
-        timeoutMs: 15000,
-        maxRetries: 2
-      });
-
-      queryClient.setQueryData(['project', id], (oldData: any) => ({
-        ...oldData,
-        project: { ...oldData.project, visual_profile: profile }
-      }));
-
-      queryClient.invalidateQueries({ queryKey: ['project', id] });
-
-      toast({
-        title: "Visual Profile saved",
-        description: "Your visual style settings have been updated"
-      });
-    } catch (error: any) {
-      console.error('Error saving Visual Profile:', error);
-      const errorMsg = (error as ApiError).userMessage || error.message || 'Failed to save';
-      toast({
-        title: "Save failed",
-        description: errorMsg,
-        variant: "destructive"
-      });
-    } finally {
-      setIsSavingVisualProfile(false);
-    }
-  };
-
-  const handleRegenerateAll = async () => {
-    if (!project || !id || scenes.length === 0) return;
-
-    const confirmed = window.confirm(
-      `This will regenerate analysis for all ${scenes.length} scenes with image prompts and your visual style. This may take several minutes. Continue?`
-    );
-
-    if (!confirmed) return;
-
-    setReanalyzing(true);
-    let successCount = 0;
-    let errorCount = 0;
-
-    toast({
-      title: "Regenerating all scenes",
-      description: `Processing ${scenes.length} scenes. Each scene may take up to 2 minutes...`,
-    });
-
-    for (const scene of scenes) {
-      // Show progress toast for each scene
-      toast({
-        title: `Analyzing scene ${scene.scene_number}`,
-        description: "This may take 1-2 minutes for complex scenes...",
-      });
-
-      try {
-        const analysisResult = await api.post('/api/analyze-scene', {
-          sceneText: scene.content,
-          sceneNumber: scene.scene_number,
-          totalScenes: scenes.length,
-          visualStyle: project?.visual_style || null,
-          visualProfile: project?.visual_profile || null,
-          characters: project?.characters || []
-        }, {
-          context: `Regenerating scene ${scene.scene_number}`,
-          timeoutMs: 150000, // 2.5 minutes for complex scenes with Visual Profile
-          maxRetries: 1 // Reduce retries since each attempt takes longer
-        });
-
-        await api.post('/api/projects/update-scene-analysis', {
-          projectId: id,
-          sceneNumber: scene.scene_number,
-          analysis: analysisResult.analysis || analysisResult
-        }, {
-          context: `Saving scene ${scene.scene_number}`,
-          timeoutMs: 30000,
-          maxRetries: 2
-        });
-
-        successCount++;
-
-        toast({
-          title: `Scene ${scene.scene_number} complete`,
-          description: `${successCount} of ${scenes.length} scenes regenerated`,
-        });
-
-      } catch (error: any) {
-        console.error(`Failed to regenerate scene ${scene.scene_number}:`, error);
-        errorCount++;
-      }
-    }
-
-    await queryClient.invalidateQueries({ queryKey: ['project', id] });
-    setReanalyzing(false);
-
-    toast({
-      title: "Bulk regeneration complete",
-      description: `${successCount} scenes updated successfully${errorCount > 0 ? `, ${errorCount} failed` : ''}`,
-    });
-  };
 
   const hasNewAnalysisStructure = (analysis: any): boolean => {
     return !!(
@@ -520,83 +93,6 @@ const ProjectDetails = () => {
     );
   };
 
-  const handleReanalyzeScene = async (sceneId: string, sceneNumber: number, sceneContent: string, customInstructions?: string) => {
-    try {
-      setReanalyzing(true);
-      toast({
-        title: customInstructions ? "Re-analyzing scene with custom instructions..." : "Analyzing scene...",
-        description: `Generating structured analysis for Scene ${sceneNumber}`
-      });
-      console.log("[handleReanalyzeScene] Calling Railway analyze-scene API for scene", sceneNumber);
-
-      const analysisResult = await api.post("/api/analyze-scene", {
-        sceneText: sceneContent,
-        sceneNumber: sceneNumber,
-        totalScenes: project?.total_scenes || 1,
-        visualStyle: project?.visual_style || null,
-        visualProfile: project?.visual_profile || null,
-        characters: project?.characters || [],
-        customInstructions: customInstructions || undefined
-      }, {
-        context: `Analyzing scene ${sceneNumber}`,
-        timeoutMs: 150000, // 2.5 minutes for complex scenes with Visual Profile
-        maxRetries: 1 // Reduce retries since each attempt takes longer
-      });
-
-      console.log("[handleReanalyzeScene] Analysis result:", analysisResult);
-
-      await api.post("/api/projects/update-scene-analysis", {
-        projectId: id,
-        sceneNumber: sceneNumber,
-        analysis: analysisResult.analysis || analysisResult
-      }, {
-        context: `Saving scene ${sceneNumber} analysis`,
-        timeoutMs: 30000,
-        maxRetries: 2
-      });
-
-      console.log("[handleReanalyzeScene] Analysis saved successfully for scene", sceneNumber);
-
-      await queryClient.invalidateQueries({ queryKey: ["project", id] });
-
-      toast({
-        title: "Analysis complete!",
-        description: `Scene ${sceneNumber} has been analyzed`
-      });
-    } catch (error: any) {
-      console.error("[handleReanalyzeScene] Error:", error);
-      const errorMsg = (error as ApiError).userMessage || error.message || "Failed to generate analysis";
-      toast({
-        title: "Analysis failed",
-        description: errorMsg,
-        variant: "destructive"
-      });
-    } finally {
-      setReanalyzing(false);
-    }
-  };
-
-  const handleTryAgain = (sceneId: string, sceneNumber: number, sceneContent: string) => {
-    setRetrySceneData({ id: sceneId, number: sceneNumber, content: sceneContent });
-    setShowRetryDialog(true);
-  };
-
-  const handleRetryWithInstructions = async (customInstructions: string) => {
-    if (!retrySceneData) return;
-
-    setShowRetryDialog(false);
-    await handleReanalyzeScene(
-      retrySceneData.id,
-      retrySceneData.number,
-      retrySceneData.content,
-      customInstructions
-    );
-    setRetrySceneData(null);
-  };
-
-  const isShotListItem = (shot: string | ShotListItem): shot is ShotListItem => {
-    return typeof shot === 'object' && shot !== null && ('shot_type' in shot || 'shotType' in shot || 'subject' in shot || 'action' in shot);
-  };
 
   // Helper to get shot properties (handles both snake_case and camelCase)
   const getShotType = (shot: any): string => shot.shot_type || shot.shotType || 'SHOT';
@@ -617,174 +113,6 @@ const ProjectDetails = () => {
     visual_description: shot.visual_description || shot.visualDescription || ''
   });
 
-  // Handle editing a shot in the current scene
-  const handleShotEdit = (shotIndex: number, field: keyof ShotListItem, value: string) => {
-    if (!selectedScene || !selectedAnalysis) return;
-    const currentEdits = editedScenes[selectedScene.id] || { ...selectedAnalysis };
-    const updatedShotList = [...(currentEdits.shot_list || [])];
-    if (updatedShotList[shotIndex] && typeof updatedShotList[shotIndex] === "object") {
-      updatedShotList[shotIndex] = { ...updatedShotList[shotIndex] as ShotListItem, [field]: value };
-    }
-    setEditedScenes({ ...editedScenes, [selectedScene.id]: { ...currentEdits, shot_list: updatedShotList } });
-  };
-
-  // Get current shot data (edited or original)
-  const getCurrentShot = (shotIndex: number): ShotListItem | null => {
-    if (!selectedScene || !selectedAnalysis?.shot_list) return null;
-    const edits = editedScenes[selectedScene.id];
-    const shotList = edits?.shot_list || selectedAnalysis.shot_list;
-    const shot = shotList[shotIndex];
-    return isShotListItem(shot) ? shot : null;
-  };
-
-  const handleSaveEdits = async () => {
-    if (!id) return;
-    setIsSaving(true);
-    try {
-      await api.post('/api/projects/save-scene', {
-        projectId: id,
-        sceneUpdates: editedScenes
-      }, {
-        context: 'Saving scene edits',
-        timeoutMs: 30000,
-        maxRetries: 2
-      });
-
-      toast({
-        title: "Changes saved",
-        description: `Updated ${Object.keys(editedScenes).length} scene(s)`,
-      });
-
-      setEditedScenes({});
-      setIsEditMode(false);
-      queryClient.invalidateQueries({ queryKey: ['project', id] });
-    } catch (error: any) {
-      const errorMsg = (error as ApiError).userMessage || error.message || 'Failed to save';
-      toast({
-        title: "Save failed",
-        description: errorMsg,
-        variant: "destructive",
-      });
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  // ═══════════════════════════════════════════════════════════════
-  // SHOT LIST MANIPULATION HANDLERS
-  // ═══════════════════════════════════════════════════════════════
-
-  const getEditableShotList = (): ShotListItem[] => {
-    if (!selectedScene || !selectedAnalysis) return [];
-    const edits = editedScenes[selectedScene.id];
-    const rawList = edits?.shot_list || selectedAnalysis.shot_list || [];
-    return rawList.filter(isShotListItem);
-  };
-
-  const updateShotList = (newList: ShotListItem[]) => {
-    if (!selectedScene || !selectedAnalysis) return;
-    const currentEdits = editedScenes[selectedScene.id] || { ...selectedAnalysis };
-    setEditedScenes({ ...editedScenes, [selectedScene.id]: { ...currentEdits, shot_list: newList } });
-  };
-
-  const handleAddShot = () => {
-    const currentList = getEditableShotList();
-    const newShot: ShotListItem = {
-      shot_type: 'MEDIUM',
-      subject: '',
-      visual: '',
-      serves_story_element: 'CORE',
-      rationale: '',
-      editorial_note: '',
-    };
-    updateShotList([...currentList, newShot]);
-  };
-
-  const handleDeleteShot = (idx: number) => {
-    if (!window.confirm(`Delete Shot ${idx + 1}? This cannot be undone.`)) return;
-    const currentList = getEditableShotList();
-    updateShotList(currentList.filter((_, i) => i !== idx));
-  };
-
-  const handleDuplicateShot = (idx: number) => {
-    const currentList = getEditableShotList();
-    const copy = { ...currentList[idx] };
-    const newList = [...currentList];
-    newList.splice(idx + 1, 0, copy);
-    updateShotList(newList);
-  };
-
-  const handleMoveShot = (idx: number, direction: 'up' | 'down') => {
-    const currentList = getEditableShotList();
-    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
-    if (targetIdx < 0 || targetIdx >= currentList.length) return;
-    const newList = [...currentList];
-    [newList[idx], newList[targetIdx]] = [newList[targetIdx], newList[idx]];
-    updateShotList(newList);
-  };
-
-  // ═══════════════════════════════════════════════════════════════
-  // SECTION EDIT/SAVE HANDLERS
-  // ═══════════════════════════════════════════════════════════════
-
-  const startEditingSection = (section: 'story' | 'directing' | 'producing') => {
-    if (!selectedAnalysis) return;
-    if (section === 'story') {
-      setEditedStoryData(JSON.parse(JSON.stringify(selectedAnalysis.story_analysis)));
-      setEditingStory(true);
-    } else if (section === 'directing') {
-      setEditedDirectingData(JSON.parse(JSON.stringify(selectedAnalysis.directing_vision)));
-      setEditingDirecting(true);
-    } else if (section === 'producing') {
-      setEditedProducingData(JSON.parse(JSON.stringify(selectedAnalysis.producing_logistics)));
-      setEditingProducing(true);
-    }
-  };
-
-  const cancelEditingSection = (section: 'story' | 'directing' | 'producing') => {
-    if (section === 'story') { setEditedStoryData(null); setEditingStory(false); }
-    else if (section === 'directing') { setEditedDirectingData(null); setEditingDirecting(false); }
-    else if (section === 'producing') { setEditedProducingData(null); setEditingProducing(false); }
-  };
-
-  const saveSection = async (section: 'story' | 'directing' | 'producing') => {
-    if (!selectedScene || !selectedAnalysis || !id) return;
-    setIsSaving(true);
-    try {
-      const currentEdits = editedScenes[selectedScene.id] || { ...selectedAnalysis };
-      let updated: AnalysisData;
-      if (section === 'story') {
-        updated = { ...currentEdits, story_analysis: editedStoryData };
-      } else if (section === 'directing') {
-        updated = { ...currentEdits, directing_vision: editedDirectingData };
-      } else {
-        updated = { ...currentEdits, producing_logistics: editedProducingData };
-      }
-      const sceneUpdates = { [selectedScene.id]: updated };
-      await api.post('/api/projects/save-scene', {
-        projectId: id,
-        sceneUpdates
-      }, {
-        context: `Saving ${section} edits`,
-        timeoutMs: 30000,
-        maxRetries: 2
-      });
-      // Update local editedScenes so other tabs see the change
-      setEditedScenes({ ...editedScenes, [selectedScene.id]: updated });
-      toast({ title: "Changes saved", description: `${section.charAt(0).toUpperCase() + section.slice(1)} analysis updated.` });
-      cancelEditingSection(section);
-      queryClient.invalidateQueries({ queryKey: ['project', id] });
-    } catch (error: any) {
-      const errorMsg = (error as ApiError).userMessage || error.message || 'Failed to save';
-      toast({ title: "Save failed", description: errorMsg, variant: "destructive" });
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  // ═══════════════════════════════════════════════════════════════
-  // INLINE EDIT HELPERS
-  // ═══════════════════════════════════════════════════════════════
 
   const EditableField = ({ label, value, onChange, multiline = false }: {
     label: string; value: string; onChange: (v: string) => void; multiline?: boolean;
@@ -839,33 +167,6 @@ const ProjectDetails = () => {
     )
   );
 
-  const handleDeleteProject = async () => {
-    if (!id) return;
-    const confirmed = window.confirm(
-      `Are you sure you want to delete "${project?.title || "this project"}"? This action cannot be undone.`
-    );
-    if (!confirmed) return;
-    try {
-      await api.delete(`/api/projects/delete?projectId=${id}`, {
-        context: 'Deleting project',
-        timeoutMs: 15000,
-        maxRetries: 1
-      });
-
-      toast({
-        title: "Project deleted",
-        description: "Redirecting to dashboard...",
-      });
-      setTimeout(() => navigate("/"), 1000);
-    } catch (error: any) {
-      const errorMsg = (error as ApiError).userMessage || error.message || 'Failed to delete';
-      toast({
-        title: "Delete failed",
-        description: errorMsg,
-        variant: "destructive",
-      });
-    }
-  };
 
   const handleExportModalOpen = () => {
     setShowExportModal(true);
@@ -903,7 +204,7 @@ const ProjectDetails = () => {
         });
       }
     } catch (error) {
-      console.error("Export error:", error);
+      logger.error("Export error:", error);
       toast({
         title: "Export failed",
         description: "There was an error generating your export",
@@ -924,7 +225,7 @@ const ProjectDetails = () => {
   }
 
   if (error) {
-    console.error('[ProjectDetails] Query error:', error);
+    logger.error('[ProjectDetails] Query error:', error);
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center space-y-4 max-w-md">
@@ -974,8 +275,6 @@ const ProjectDetails = () => {
     );
   }
 
-  // Get analysis for selected scene
-  const selectedAnalysis = selectedScene ? parseAnalysis(selectedScene.analysis) : null;
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -1054,7 +353,7 @@ const ProjectDetails = () => {
                 <Button 
                   variant="outline" 
                   size="sm"
-                  onClick={handleDeleteProject}
+                  onClick={() => handleDeleteProject(navigate)}
                   className="text-red-500 hover:text-red-600 hover:bg-red-50"
                 >
                   <Trash2 className="w-4 h-4" />

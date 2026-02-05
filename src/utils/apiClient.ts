@@ -1,6 +1,7 @@
 /**
  * API Client with automatic retry, timeout handling, and user-friendly errors
  */
+import { logger } from "@/utils/logger";
 
 export interface RetryConfig {
   maxRetries?: number;
@@ -187,7 +188,7 @@ export async function fetchWithRetry(
 
       if (attempt < finalConfig.maxRetries && finalConfig.shouldRetry(lastError as any, attempt)) {
         const delay = getBackoffDelay(attempt, finalConfig.initialDelayMs, finalConfig.maxDelayMs);
-        console.warn(`[ApiClient] Request failed (attempt ${attempt + 1}/${finalConfig.maxRetries + 1}), retrying in ${delay}ms...`, {
+        logger.warn(`[ApiClient] Request failed (attempt ${attempt + 1}/${finalConfig.maxRetries + 1}), retrying in ${delay}ms...`, {
           url,
           status: response.status
         });
@@ -204,7 +205,7 @@ export async function fetchWithRetry(
       // Check if we should retry
       if (attempt < finalConfig.maxRetries && finalConfig.shouldRetry(error, attempt)) {
         const delay = getBackoffDelay(attempt, finalConfig.initialDelayMs, finalConfig.maxDelayMs);
-        console.warn(`[ApiClient] Request failed (attempt ${attempt + 1}/${finalConfig.maxRetries + 1}), retrying in ${delay}ms...`, {
+        logger.warn(`[ApiClient] Request failed (attempt ${attempt + 1}/${finalConfig.maxRetries + 1}), retrying in ${delay}ms...`, {
           url,
           error: error.message
         });

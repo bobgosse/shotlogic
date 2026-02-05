@@ -3,6 +3,7 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { getDb } from '../lib/mongodb.js'; // CRITICAL: Must use .js extension
 import { ObjectId } from 'mongodb';
 import { MongoClient } from 'mongodb'; // CRITICAL: Ensure MongoDB driver dependency is resolved
+import { logger } from "../lib/logger";
 
 const DEPLOY_TIMESTAMP = '2024-12-16T12:58:00Z_SAVE_INIT';
 
@@ -44,7 +45,7 @@ export default async function handler(
     const result = await collection.insertOne(projectToSave);
 
     const duration = Date.now() - startTime;
-    console.log(`✅ Project saved in ${duration}ms. ID: ${result.insertedId}`);
+    logger.log("save", `✅ Project saved in ${duration}ms. ID: ${result.insertedId}`);
 
     return res.status(201).json({
       success: true,
@@ -55,7 +56,7 @@ export default async function handler(
 
   } catch (error) {
     const duration = Date.now() - startTime;
-    console.error(`❌ FATAL ERROR in save.ts after ${duration}ms:`, error);
+    logger.error("save", `❌ FATAL ERROR in save.ts after ${duration}ms:`, error);
     
     // CRITICAL: Ensure we return JSON on error, not an HTML page.
     return res.status(500).json({

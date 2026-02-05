@@ -1,47 +1,11 @@
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Camera, ArrowLeft, Eye, EyeOff, Sparkles, ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-
-interface Scene {
-  id: string;
-  scene_number: number;
-  header: string;
-  content: string;
-  analysis: string | null;
-  status: string;
-}
-
-interface ShotListItem {
-  shot_type: string;
-  visual: string;
-  rationale: string;
-  image_prompt?: string;
-}
-
-interface AnalysisData {
-  story_analysis: {
-    stakes: string;
-    ownership: string;
-    breaking_point: string;
-    key_props: string;
-  };
-  producing_logistics: {
-    red_flags: string[];
-    resource_impact: "Low" | "Medium" | "High";
-    departments_affected: string[];
-  };
-  directing_vision: {
-    visual_metaphor: string;
-    editorial_intent: string;
-    shot_motivation: string;
-  };
-  shot_list?: Array<ShotListItem | string>;
-}
+import { Scene, ShotListItem, parseAnalysis } from "@/types/analysis";
 
 interface MobileSceneViewProps {
   scenes: Scene[];
@@ -68,15 +32,6 @@ export const MobileSceneView = ({
 
   const scene = scenes[currentIndex];
   if (!scene) return null;
-
-  const parseAnalysis = (analysisString: string | null): AnalysisData | null => {
-    if (!analysisString) return null;
-    try {
-      return JSON.parse(analysisString);
-    } catch {
-      return null;
-    }
-  };
 
   const analysis = parseAnalysis(scene.analysis);
 
@@ -110,16 +65,6 @@ export const MobileSceneView = ({
     setTouchStart(0);
     setTouchEnd(0);
   };
-
-  const getToneColor = (tone: string): string => {
-    const lowerTone = tone.toLowerCase();
-    if (lowerTone.includes('tense') || lowerTone.includes('dramatic')) return 'bg-red-500/20 text-red-400 border-red-500/30';
-    if (lowerTone.includes('light') || lowerTone.includes('playful')) return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
-    if (lowerTone.includes('melancholy') || lowerTone.includes('somber')) return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
-    if (lowerTone.includes('intimate') || lowerTone.includes('warm')) return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
-    return 'bg-muted text-muted-foreground border-border';
-  };
-
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Mobile Header */}

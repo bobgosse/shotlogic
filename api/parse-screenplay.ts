@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { XMLParser } from 'fast-xml-parser'
+import { logger } from "./lib/logger";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024
 
@@ -14,7 +15,7 @@ async function parsePDF(buffer: Buffer): Promise<string> {
   try {
     pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.js')
   } catch (importError) {
-    console.error('Failed to import PDF library:', importError)
+    logger.error("parse-screenplay", 'Failed to import PDF library:', importError)
     throw new Error('PDF_ERROR: Server configuration error - PDF library unavailable')
   }
 
@@ -29,7 +30,7 @@ async function parsePDF(buffer: Buffer): Promise<string> {
 
     pdfDocument = await loadingTask.promise
   } catch (loadError: any) {
-    console.error('PDF loading error:', loadError)
+    logger.error("parse-screenplay", 'PDF loading error:', loadError)
 
     // Specific error types for common PDF issues
     if (loadError.message?.includes('password') || loadError.message?.includes('encrypted')) {
@@ -52,7 +53,7 @@ async function parsePDF(buffer: Buffer): Promise<string> {
   let totalTextItems = 0
   let pagesWithText = 0
 
-  console.log(`[PDF] Processing ${numPages} pages`)
+  logger.log("parse-screenplay", `[PDF] Processing ${numPages} pages`)
 
   try {
     // Extract text from each page, preserving line breaks
@@ -61,7 +62,7 @@ async function parsePDF(buffer: Buffer): Promise<string> {
       try {
         page = await pdfDocument.getPage(pageNum)
       } catch (pageError) {
-        console.warn(`[PDF] Failed to load page ${pageNum}, skipping`)
+        logger.warn("parse-screenplay", `[PDF] Failed to load page ${pageNum}, skipping`)
         continue
       }
 
@@ -69,7 +70,7 @@ async function parsePDF(buffer: Buffer): Promise<string> {
 
       // CRITICAL FIX: Check if page has extractable text
       if (!textContent.items || textContent.items.length === 0) {
-        console.warn(`[PDF] Page ${pageNum} has no extractable text`)
+        logger.warn("parse-screenplay", `[PDF] Page ${pageNum} has no extractable text`)
         continue
       }
 
@@ -105,7 +106,7 @@ async function parsePDF(buffer: Buffer): Promise<string> {
       fullText += pageText + '\n\n'
     }
   } catch (extractError) {
-    console.error('PDF text extraction error:', extractError)
+    logger.error("parse-screenplay", 'PDF text extraction error:', extractError)
     throw new Error(`PDF_ERROR: Failed during text extraction - ${extractError instanceof Error ? extractError.message : 'Unknown error'}`)
   }
 
@@ -119,7 +120,7 @@ async function parsePDF(buffer: Buffer): Promise<string> {
   }
 
   if (pagesWithText < numPages * 0.5) {
-    console.warn(`[PDF] Only ${pagesWithText}/${numPages} pages had extractable text`)
+    logger.warn("parse-screenplay", `[PDF] Only ${pagesWithText}/${numPages} pages had extractable text`)
   }
 
   if (!fullText || fullText.trim().length < 50) {
@@ -140,7 +141,7 @@ async function parsePDF(buffer: Buffer): Promise<string> {
   const spacePercentage = spaceCount / totalChars
 
   if (spacePercentage > 0.4) {
-    console.log(`[PDF] Detected spaced-out text (${(spacePercentage * 100).toFixed(1)}% spaces), normalizing...`)
+    logger.log("parse-screenplay", `[PDF] Detected spaced-out text (${(spacePercentage * 100).toFixed(1)}% spaces), normalizing...`)
     // Collapse single spaces between letters/numbers: "I N T ." -> "INT."
     normalized = normalized.replace(/([A-Za-z0-9])\s(?=[A-Za-z0-9])/g, '$1')
     // Remove spaces before periods: "INT ." -> "INT."
@@ -149,8 +150,8 @@ async function parsePDF(buffer: Buffer): Promise<string> {
     normalized = normalized.replace(/  +/g, ' ')
   }
 
-  console.log(`[PDF] Success: ${numPages} pages, ${totalTextItems} text items, ${normalized.length} chars`)
-  console.log(`[PDF] First 1000 chars of extracted text:`, normalized.substring(0, 1000))
+  logger.log("parse-screenplay", `[PDF] Success: ${numPages} pages, ${totalTextItems} text items, ${normalized.length} chars`)
+  logger.log("parse-screenplay", `[PDF] First 1000 chars of extracted text:`, normalized.substring(0, 1000))
 
   return normalized
 }
@@ -184,7 +185,7 @@ async function parseFDX(buffer: Buffer): Promise<string> {
 
     xmlDoc = parser.parse(xmlText)
   } catch (parseError) {
-    console.error('[FDX] XML parsing error:', parseError)
+    logger.error("parse-screenplay", '[FDX] XML parsing error:', parseError)
     throw new Error(`FDX_ERROR: Failed to parse XML - ${parseError instanceof Error ? parseError.message : 'Malformed XML'}`)
   }
 
@@ -207,7 +208,7 @@ async function parseFDX(buffer: Buffer): Promise<string> {
     throw new Error('FDX_ERROR: No <Paragraph> elements found. FDX file may be empty or corrupted.')
   }
 
-  console.log('[FDX] Found paragraphs:', paragraphs.length);
+  logger.log("parse-screenplay", '[FDX] Found paragraphs:', paragraphs.length);
 
   if (paragraphs.length === 0) {
     throw new Error('FDX_ERROR: FDX file contains no paragraphs. File may be empty.')
@@ -238,7 +239,7 @@ async function parseFDX(buffer: Buffer): Promise<string> {
     switch (type) {
       case 'Scene Heading':
         sceneHeadingCount++
-        console.log('[FDX] Scene:', text);
+        logger.log("parse-screenplay", '[FDX] Scene:', text);
         lines.push('')
         lines.push(text.toUpperCase())
         lines.push('')
@@ -270,7 +271,7 @@ async function parseFDX(buffer: Buffer): Promise<string> {
     throw new Error(`FDX_ERROR: Extracted text too short (${result.length} chars). File may be mostly empty.`)
   }
 
-  console.log('[FDX] Success: Output length:', result.length, 'Scene headings:', sceneHeadingCount);
+  logger.log("parse-screenplay", '[FDX] Success: Output length:', result.length, 'Scene headings:', sceneHeadingCount);
   return result
 }
 
@@ -298,7 +299,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
   const startTime = Date.now()
-  console.log('[Parse] Request received')
+  logger.log("parse-screenplay", '[Parse] Request received')
 
   try {
     // Validate request body
@@ -365,7 +366,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       })
     }
 
-    console.log(`[Parse] Processing ${fileType.toUpperCase()}: ${fileName} (${(buffer.length / 1024).toFixed(2)}KB)`)
+    logger.log("parse-screenplay", `[Parse] Processing ${fileType.toUpperCase()}: ${fileName} (${(buffer.length / 1024).toFixed(2)}KB)`)
 
     let screenplayText = ''
 
@@ -378,7 +379,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         screenplayText = await parsePDF(buffer)
       }
     } catch (parseError: any) {
-      console.error(`[Parse] ${fileType.toUpperCase()} error:`, parseError)
+      logger.error("parse-screenplay", `[Parse] ${fileType.toUpperCase()} error:`, parseError)
 
       // Extract error code and provide user-friendly message
       const errorMessage = parseError.message || 'Unknown error'
@@ -405,7 +406,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const duration = Date.now() - startTime
-    console.log(`[Parse] Success: ${screenplayText.length} chars in ${duration}ms`)
+    logger.log("parse-screenplay", `[Parse] Success: ${screenplayText.length} chars in ${duration}ms`)
 
     return res.status(200).json({
       success: true,
@@ -420,7 +421,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   } catch (error) {
     const duration = Date.now() - startTime
-    console.error('[Parse] Unexpected error:', error)
+    logger.error("parse-screenplay", '[Parse] Unexpected error:', error)
 
     return res.status(500).json({
       error: 'UNEXPECTED_ERROR',

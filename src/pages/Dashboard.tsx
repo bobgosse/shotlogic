@@ -8,8 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { 
   Plus, 
   Search, 
-  Film, 
-  Clapperboard,
+  Film,
   MoreHorizontal,
   Trash2,
   FolderOpen,
@@ -18,9 +17,6 @@ import {
   CheckCircle2,
   AlertCircle,
   ArrowRight,
-  Sparkles,
-  Target,
-  Layers,
   LogOut
 } from "lucide-react";
 import shotlogicLogo from "@/assets/shotlogic-logo-netflix.png";
@@ -50,6 +46,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { logger } from "@/utils/logger";
 
 interface Project {
   _id: string;
@@ -106,16 +103,16 @@ const Dashboard = () => {
     queryKey: ["projects", user?.id],
     queryFn: async () => {
       if (!user?.id) {
-        console.log("[Dashboard] No user ID, skipping fetch");
+        logger.log("[Dashboard] No user ID, skipping fetch");
         return [];
       }
-      console.log("[Dashboard] Fetching projects for user:", user.id);
+      logger.log("[Dashboard] Fetching projects for user:", user.id);
       const data = await api.get(`/api/projects/get-all?userId=${user.id}`, {
         context: 'Loading projects',
         timeoutMs: 30000,
         maxRetries: 2
       });
-      console.log("[Dashboard] Projects loaded:", data.projects?.length || 0);
+      logger.log("[Dashboard] Projects loaded:", data.projects?.length || 0);
       return data.projects || [];
     },
     enabled: !!user?.id,
@@ -162,15 +159,6 @@ const Dashboard = () => {
       toast({ title: "Error", description: errorMsg, variant: "destructive" });
     },
   });
-
-  // Stats
-  const totalScenes = useMemo(() => {
-    return projects.reduce((sum: number, p: Project) => sum + (p.total_scenes || 0), 0);
-  }, [projects]);
-
-  const totalAnalyzed = useMemo(() => {
-    return projects.reduce((sum: number, p: Project) => sum + (p.scenes_analyzed || 0), 0);
-  }, [projects]);
 
   const mostRecentProject = useMemo(() => {
     if (projects.length === 0) return null;

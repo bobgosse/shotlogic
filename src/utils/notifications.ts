@@ -1,6 +1,8 @@
+import { logger } from "@/utils/logger";
+
 export const requestNotificationPermission = async (): Promise<boolean> => {
   if (!('Notification' in window)) {
-    console.log('This browser does not support desktop notifications');
+    logger.log('This browser does not support desktop notifications');
     return false;
   }
 

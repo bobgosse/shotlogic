@@ -3,6 +3,7 @@
 
 import { VercelRequest, VercelResponse } from '@vercel/node'
 import { getDb } from '../lib/mongodb.js'
+import { logger } from "../lib/logger";
 
 export default async function handler(
   req: VercelRequest,
@@ -36,7 +37,7 @@ export default async function handler(
       { $set: { userId: userId } }
     )
 
-    console.log("Claimed " + result.modifiedCount + " orphan projects for user " + userId);
+    logger.log("claim-orphans", "Claimed " + result.modifiedCount + " orphan projects for user " + userId);
 
     return res.status(200).json({
       success: true,
@@ -44,7 +45,7 @@ export default async function handler(
       message: `Claimed ${result.modifiedCount} project(s)`
     })
   } catch (error) {
-    console.error('❌ Error claiming orphans:', error)
+    logger.error("claim-orphans", '❌ Error claiming orphans:', error)
     return res.status(500).json({
       error: 'Failed to claim projects',
       details: error instanceof Error ? error.message : 'Unknown error'

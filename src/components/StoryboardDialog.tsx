@@ -16,41 +16,8 @@ import { StoryboardPreview } from "./StoryboardPreview";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-
-interface Scene {
-  id: string;
-  scene_number: number;
-  header: string;
-  content: string;
-  analysis: string | null;
-  status: string;
-}
-
-interface ShotListItem {
-  shot_type: string;
-  visual: string;
-  rationale: string;
-  image_prompt?: string;
-}
-
-interface AnalysisData {
-  story_analysis: {
-    stakes: string;
-    ownership: string;
-    breaking_point: string;
-    key_props: string;
-  };
-  producing_logistics: {
-    red_flags: string[];
-    resource_impact: "Low" | "Medium" | "High";
-    departments_affected: string[];
-  };
-  directing_vision: {
-    visual_metaphor: string;
-    editorial_intent: string;
-    shot_motivation: string;
-  };
-}
+import { Scene, AnalysisData } from "@/types/analysis";
+import { logger } from "@/utils/logger";
 
 interface StoryboardDialogProps {
   open: boolean;
@@ -67,10 +34,6 @@ interface ShotData {
   imageUrl: string | null;
   annotation: string;
 }
-
-const isShotListItem = (shot: string | ShotListItem): shot is ShotListItem => {
-  return typeof shot === 'object' && shot !== null && 'shot_type' in shot;
-};
 
 export const StoryboardDialog = ({ open, onOpenChange, scene, analysis }: StoryboardDialogProps) => {
   const { toast } = useToast();
@@ -96,8 +59,8 @@ export const StoryboardDialog = ({ open, onOpenChange, scene, analysis }: Storyb
   }, [shots]);
 
   const handleExportPDF = async () => {
-    console.log('Export clicked! Shots:', shots.length, shots);
-    console.log('Options:', { exportPlaceholders, includePrompts });
+    logger.log('Export clicked! Shots:', shots.length, shots);
+    logger.log('Options:', { exportPlaceholders, includePrompts });
     if (hasEmptyFrames && !exportPlaceholders) {
       toast({
         title: "Cannot export",

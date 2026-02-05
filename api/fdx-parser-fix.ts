@@ -1,3 +1,4 @@
+import { logger } from "./lib/logger";
 // Replacement parseFDX function - copy this to parse-screenplay.ts
 
 async function parseFDX(buffer: Buffer): Promise<string> {
@@ -22,7 +23,7 @@ async function parseFDX(buffer: Buffer): Promise<string> {
       : [xmlDoc.FinalDraft.Content.Paragraph]
   }
   
-  console.log('[FDX] Found paragraphs:', paragraphs.length);
+  logger.log("fdx-parser-fix", '[FDX] Found paragraphs:', paragraphs.length);
   
   const lines: string[] = []
   
@@ -47,7 +48,7 @@ async function parseFDX(buffer: Buffer): Promise<string> {
     
     switch (type) {
       case 'Scene Heading':
-        console.log('[FDX] Scene:', text);
+        logger.log("fdx-parser-fix", '[FDX] Scene:', text);
         lines.push('')
         lines.push(text.toUpperCase())
         lines.push('')
@@ -69,6 +70,6 @@ async function parseFDX(buffer: Buffer): Promise<string> {
   }
   
   const result = lines.join('\n').replace(/\n{4,}/g, '\n\n\n').trim()
-  console.log('[FDX] Output length:', result.length);
+  logger.log("fdx-parser-fix", '[FDX] Output length:', result.length);
   return result
 }

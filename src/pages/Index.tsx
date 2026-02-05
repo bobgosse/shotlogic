@@ -11,6 +11,7 @@ import {
   formatValidationError,
   checkForScannedPDF
 } from '@/utils/screenplayValidator'
+import { logger } from "@/utils/logger";
 
 interface ParsedScene {
   number: number;
@@ -30,7 +31,6 @@ export default function Index() {
   const { user } = useUser();
   
   const [fileInfo, setFileInfo] = useState<{ name: string, type: string } | null>(null);
-  const [projectName, setProjectName] = useState('Untitled Project');
   const [error, setError] = useState<string | null>(null);
   const [uploadStep, setUploadStep] = useState<UploadStep | null>(null);
   const [isParsing, setIsParsing] = useState(false);
@@ -38,8 +38,9 @@ export default function Index() {
   const [scenes, setScenes] = useState<AnalyzedScene[]>([]);
   const [currentSceneIndex, setCurrentSceneIndex] = useState(0);
   const [currentBatch, setCurrentBatch] = useState({ start: 0, end: 0, number: 0, total: 0 });
-  const [isSaving, setIsSaving] = useState(false);
+  const [isSaving] = useState(false);
   const [projectId, setProjectId] = useState<string | null>(null);
+  const [projectName, setProjectName] = useState<string>("");
   const [elapsedTime, setElapsedTime] = useState(0);
   const [batchTimes, setBatchTimes] = useState<number[]>([]);
 
@@ -70,7 +71,7 @@ export default function Index() {
       return { ...scene, analysis: result.analysis, status: 'complete', error: null };
     } catch (err) {
       const errorMsg = (err as ApiError).userMessage || 'Analysis failed';
-      console.error(`[Scene ${scene.number}] Analysis error:`, err);
+      logger.error(`[Scene ${scene.number}] Analysis error:`, err);
       return { ...scene, analysis: null, status: 'error', error: errorMsg };
     }
   };
@@ -89,7 +90,7 @@ export default function Index() {
         maxRetries: 2
       });
     } catch (err) {
-      console.error('[DEBUG] Failed to save scene:', scene.number, err);
+      logger.error('[DEBUG] Failed to save scene:', scene.number, err);
       // Don't throw - log and continue with other scenes
     }
   };
@@ -116,10 +117,10 @@ export default function Index() {
         maxRetries: 2
       });
 
-      console.log('[DEBUG] Project created with ID:', result.id);
+      logger.log('[DEBUG] Project created with ID:', result.id);
       return result.id;
     } catch (err) {
-      console.error('[DEBUG] Failed to create project:', err);
+      logger.error('[DEBUG] Failed to create project:', err);
       const errorMsg = (err as ApiError).userMessage || 'Failed to create project';
       setError(errorMsg);
       return null;
@@ -225,8 +226,8 @@ export default function Index() {
   };
 
   function processExtractedText(text: string): ParsedScene[] {
-    console.log("[DEBUG] Text length:", text?.length);
-    console.log("[DEBUG] First 1000 chars:", text?.substring(0, 1000));
+    logger.log("[DEBUG] Text length:", text?.length);
+    logger.log("[DEBUG] First 1000 chars:", text?.substring(0, 1000));
 
     // Server-side PDF parser already handles spaced-out text correctly
     // No client-side spacing fix needed
@@ -234,32 +235,32 @@ export default function Index() {
     text = text.replace(/  +/g, ' ');
     text = text.replace(/\s+(INT\.|EXT\.|I\/E\.|I\.E\.)\s+/gi, '\n$1 ');
 
-    console.log("[DEBUG] After newline injection, first 500 chars:", text.substring(0, 500));
+    logger.log("[DEBUG] After newline injection, first 500 chars:", text.substring(0, 500));
     
     const firstSceneMatch = text.match(/(?:^|\n)\s*\d*\s*(INT\.|EXT\.|I\/E|I\.E\.)\s+/i);
-    console.log("[DEBUG] First scene match:", firstSceneMatch ? firstSceneMatch[0] : "NOT FOUND");
+    logger.log("[DEBUG] First scene match:", firstSceneMatch ? firstSceneMatch[0] : "NOT FOUND");
     
     if (!firstSceneMatch) {
-      console.log("[DEBUG] No scene headers found!");
+      logger.log("[DEBUG] No scene headers found!");
       return [];
     }
     
     const scriptText = text.substring(firstSceneMatch.index!);
-    console.log("[DEBUG] Script text starts with:", scriptText.substring(0, 200));
+    logger.log("[DEBUG] Script text starts with:", scriptText.substring(0, 200));
     
     const scenePattern = /(?=(?:^|\n)[ \t]*\d*[ \t]*(?:INT\.|EXT\.|I\/E|I\.E\.)[ \t]+)/gim;
     const sceneBlocks = scriptText.split(scenePattern);
     
-    console.log("[DEBUG] Found", sceneBlocks.length, "potential scene blocks");
+    logger.log("[DEBUG] Found", sceneBlocks.length, "potential scene blocks");
     
     const scenes = sceneBlocks
       .map(block => block.trim())
       .filter(block => /^[ \t]*\d*[ \t]*(?:INT\.|EXT\.|I\/E|I\.E\.)[ \t]+/i.test(block.trim()))
       .map((block, index) => ({ number: index + 1, text: block.trim() }));
     
-    console.log("[DEBUG] Extracted", scenes.length, "valid scenes");
+    logger.log("[DEBUG] Extracted", scenes.length, "valid scenes");
     if (scenes.length > 0) {
-      console.log("[DEBUG] First scene header:", scenes[0].text.substring(0, 100));
+      logger.log("[DEBUG] First scene header:", scenes[0].text.substring(0, 100));
     }
     
     return scenes;
@@ -272,7 +273,7 @@ export default function Index() {
     setUploadStep(null);
 
     // STEP 1: Pre-upload validation (file type, size)
-    console.log('[Validation] Starting pre-upload validation...');
+    logger.log('[Validation] Starting pre-upload validation...');
     const preValidation = validateFileBeforeUpload(file);
 
     if (!preValidation.valid) {
@@ -282,7 +283,7 @@ export default function Index() {
 
     // Show warnings if any
     if (preValidation.warnings && preValidation.warnings.length > 0) {
-      console.warn('[Validation] Warnings:', preValidation.warnings);
+      logger.warn('[Validation] Warnings:', preValidation.warnings);
       const proceed = window.confirm(
         `⚠️ Upload Warning:\n\n${preValidation.warnings.join('\n')}\n\nContinue anyway?`
       );
@@ -307,7 +308,7 @@ export default function Index() {
 
     const extractedName = file.name.replace(/\.(txt|pdf|fdx)$/i, '');
     setProjectName(extractedName);
-    console.log('[DEBUG] Project name extracted:', extractedName);
+    logger.log('[DEBUG] Project name extracted:', extractedName);
 
     setIsParsing(true);
     setUploadStep('uploading');
@@ -339,21 +340,21 @@ export default function Index() {
       const { screenplayText } = parseResult;
 
       // DEBUG: Log what we got from the API
-      console.log('[Validation] API response received');
-      console.log('[Validation] screenplayText type:', typeof screenplayText);
-      console.log('[Validation] screenplayText length:', screenplayText?.length || 0);
-      console.log('[Validation] screenplayText preview:', screenplayText?.substring(0, 200) || 'undefined');
+      logger.log('[Validation] API response received');
+      logger.log('[Validation] screenplayText type:', typeof screenplayText);
+      logger.log('[Validation] screenplayText length:', screenplayText?.length || 0);
+      logger.log('[Validation] screenplayText preview:', screenplayText?.substring(0, 200) || 'undefined');
 
       // STEP 2: Content validation (screenplay format, scene headers)
-      console.log('[Validation] Validating screenplay content...');
-      console.log('[Validation] About to check for scanned PDF...');
-      console.log('[Validation] fileType:', fileType);
-      console.log('[Validation] file.size:', file.size);
-      console.log('[Validation] screenplayText exists:', !!screenplayText);
+      logger.log('[Validation] Validating screenplay content...');
+      logger.log('[Validation] About to check for scanned PDF...');
+      logger.log('[Validation] fileType:', fileType);
+      logger.log('[Validation] file.size:', file.size);
+      logger.log('[Validation] screenplayText exists:', !!screenplayText);
 
       // Check for scanned PDF
       if (fileType === 'pdf' && checkForScannedPDF(screenplayText, file.size)) {
-        console.log('[Validation] ✗ Detected as scanned PDF');
+        logger.log('[Validation] ✗ Detected as scanned PDF');
         setError(
           'This PDF appears to be a scanned image.\n\n' +
           'The file contains very little extractable text, which usually means it\'s a scanned document rather than a text-based PDF.\n\n' +
@@ -378,7 +379,7 @@ export default function Index() {
 
       // Show content warnings
       if (contentValidation.warnings && contentValidation.warnings.length > 0) {
-        console.warn('[Validation] Content warnings:', contentValidation.warnings);
+        logger.warn('[Validation] Content warnings:', contentValidation.warnings);
         const proceedWithWarnings = window.confirm(
           `⚠️ Format Warning:\n\n${contentValidation.warnings.join('\n')}\n\nContinue with analysis?`
         );
@@ -406,7 +407,7 @@ export default function Index() {
       const estimatedScenes = Math.ceil(estimatedPages / 1.5); // Rough estimate: 1 scene per 1.5 pages
 
       if (parsedScenes.length < estimatedScenes * 0.5) {
-        console.warn(`[PARSE WARNING] Only found ${parsedScenes.length} scenes, expected ~${estimatedScenes} based on screenplay length`);
+        logger.warn(`[PARSE WARNING] Only found ${parsedScenes.length} scenes, expected ~${estimatedScenes} based on screenplay length`);
         // Show warning but continue - let user decide
         const shouldContinue = window.confirm(
           `Found ${parsedScenes.length} scene${parsedScenes.length === 1 ? '' : 's'} in your screenplay.\n\n` +
@@ -427,7 +428,7 @@ export default function Index() {
     } catch (err) {
       const errorMsg = (err as ApiError).userMessage ||
                       (err instanceof Error ? err.message : 'Failed to process file');
-      console.error('[Upload] Error:', err);
+      logger.error('[Upload] Error:', err);
       setError(errorMsg);
       setIsParsing(false);
       setUploadStep(null);

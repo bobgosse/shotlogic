@@ -6,6 +6,7 @@ import { Upload, FileText, Loader2, Copy, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { extractTextFromPDF } from '@/utils/screenplayParser';
 import * as pdfjsLib from 'pdfjs-dist';
+import { logger } from "@/utils/logger";
 
 interface PDFReaderProps {
   onTextExtracted?: (text: string, filename: string) => void;
@@ -79,7 +80,7 @@ export const PDFReader = ({
         onTextExtracted(text, file.name);
       }
     } catch (error: any) {
-      console.error('PDF processing error:', error);
+      logger.error('PDF processing error:', error);
       toast({
         title: 'PDF processing failed',
         description: error.message || 'Could not extract text from PDF',

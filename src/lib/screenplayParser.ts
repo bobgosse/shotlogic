@@ -1,4 +1,6 @@
 // lib/screenplayParser.ts
+import { logger } from "@/utils/logger";
+
 export interface SceneHeader {
   raw: string;
   sceneNumber: number;
@@ -173,7 +175,7 @@ function parseSlugline(line: string, sceneNumber: number): SceneHeader {
 
     // Warn if location is suspiciously short
     if (location.length < 2) {
-      console.warn(`[Scene ${sceneNumber}] Malformed header: "${trimmed}" - location too short`);
+      logger.warn(`[Scene ${sceneNumber}] Malformed header: "${trimmed}" - location too short`);
       location = 'UNKNOWN LOCATION';
     }
 
@@ -209,7 +211,7 @@ function parseSlugline(line: string, sceneNumber: number): SceneHeader {
 
   const location = locationGroup.trim();
   if (!location) {
-    console.warn(`[Scene ${sceneNumber}] Header missing location: "${trimmed}"`);
+    logger.warn(`[Scene ${sceneNumber}] Header missing location: "${trimmed}"`);
   }
 
   return {
@@ -221,13 +223,6 @@ function parseSlugline(line: string, sceneNumber: number): SceneHeader {
   };
 }
 
-function extractIntExt(line: string): 'INT' | 'EXT' | 'INT./EXT.' | 'EXT./INT.' | null {
-  const upper = line.toUpperCase();
-  if (upper.includes('INT') && upper.includes('EXT')) return 'INT./EXT.';
-  if (upper.includes('INT') || upper.includes('INTERIOR')) return 'INT';
-  if (upper.includes('EXT') || upper.includes('EXTERIOR')) return 'EXT';
-  return null;
-}
 
 function normalizeIntExt(raw: string): 'INT' | 'EXT' | 'INT./EXT.' | 'EXT./INT.' | null {
   if (!raw) return null;
@@ -301,7 +296,7 @@ export function parseScreenplay(rawText: string): ParsedScreenplay {
 
         // CRITICAL FIX: Reject empty scenes
         if (trimmedContent.length < 10) {
-          console.warn(`[Scene ${currentScene.sceneNumber}] Empty or insufficient content (${trimmedContent.length} chars) - skipping`);
+          logger.warn(`[Scene ${currentScene.sceneNumber}] Empty or insufficient content (${trimmedContent.length} chars) - skipping`);
         } else {
           currentScene.content = trimmedContent;
           scenes.push(currentScene);
@@ -315,7 +310,7 @@ export function parseScreenplay(rawText: string): ParsedScreenplay {
       // Check for duplicate scene numbers
       if (seenSceneNumbers.has(sceneCounter)) {
         duplicateSceneNumbers.push(sceneCounter);
-        console.warn(`[Scene ${sceneCounter}] Duplicate scene number detected`);
+        logger.warn(`[Scene ${sceneCounter}] Duplicate scene number detected`);
       }
       seenSceneNumbers.add(sceneCounter);
 
@@ -336,7 +331,7 @@ export function parseScreenplay(rawText: string): ParsedScreenplay {
     const trimmedContent = contentBuffer.join('\n').trim();
 
     if (trimmedContent.length < 10) {
-      console.warn(`[Scene ${currentScene.sceneNumber}] Empty or insufficient content (${trimmedContent.length} chars) - skipping final scene`);
+      logger.warn(`[Scene ${currentScene.sceneNumber}] Empty or insufficient content (${trimmedContent.length} chars) - skipping final scene`);
     } else {
       currentScene.content = trimmedContent;
       scenes.push(currentScene);
@@ -350,7 +345,7 @@ export function parseScreenplay(rawText: string): ParsedScreenplay {
 
   // Warn about duplicate scene numbers
   if (duplicateSceneNumbers.length > 0) {
-    console.warn(`Duplicate scene numbers found: ${duplicateSceneNumbers.join(', ')}`);
+    logger.warn(`Duplicate scene numbers found: ${duplicateSceneNumbers.join(', ')}`);
   }
 
   return {

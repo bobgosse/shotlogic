@@ -5,6 +5,7 @@
 import { VercelRequest, VercelResponse } from '@vercel/node'
 import { getDb } from '../lib/mongodb.js'
 import { ObjectId } from 'mongodb'
+import { logger } from "../lib/logger";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -88,7 +89,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     })
 
   } catch (error) {
-    console.error('Delete error:', error)
+    logger.error("delete-project", 'Delete error:', error)
     return res.status(500).json({
       error: 'Failed to delete',
       details: error instanceof Error ? error.message : 'Unknown error'

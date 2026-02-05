@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { MongoClient, ObjectId } from 'mongodb'
+import { logger } from "./lib/logger";
 
 const MONGODB_URI = process.env.MONGODB_URI
 const DB_NAME = 'shotlogic'
@@ -45,7 +46,7 @@ export default async function handler(
 ) {
   const invocationId = `${Date.now()}_${Math.random().toString(36).substring(2, 11)}`
 
-  console.log(`📸 [${invocationId}] Visual Profile API: ${req.method}`)
+  logger.log("visual-profile", `📸 [${invocationId}] Visual Profile API: ${req.method}`)
 
   // CORS headers
   res.setHeader('Access-Control-Allow-Credentials', 'true')
@@ -78,7 +79,7 @@ export default async function handler(
         })
       }
 
-      console.log(`📸 [${invocationId}] GET Visual Profile for project: ${projectId}`)
+      logger.log("visual-profile", `📸 [${invocationId}] GET Visual Profile for project: ${projectId}`)
 
       const project = await projectsCollection.findOne({
         _id: new ObjectId(projectId)
@@ -120,7 +121,7 @@ export default async function handler(
         })
       }
 
-      console.log(`📸 [${invocationId}] ${req.method} Visual Profile for project: ${projectId}`)
+      logger.log("visual-profile", `📸 [${invocationId}] ${req.method} Visual Profile for project: ${projectId}`)
 
       // Validate required fields
       const requiredFields = [
@@ -176,7 +177,7 @@ export default async function handler(
         })
       }
 
-      console.log(`✅ [${invocationId}] Visual Profile ${req.method === 'POST' ? 'created' : 'updated'} successfully`)
+      logger.log("visual-profile", `✅ [${invocationId}] Visual Profile ${req.method === 'POST' ? 'created' : 'updated'} successfully`)
 
       return res.status(200).json({
         success: true,
@@ -198,7 +199,7 @@ export default async function handler(
         })
       }
 
-      console.log(`📸 [${invocationId}] DELETE Visual Profile for project: ${projectId}`)
+      logger.log("visual-profile", `📸 [${invocationId}] DELETE Visual Profile for project: ${projectId}`)
 
       const result = await projectsCollection.updateOne(
         { _id: new ObjectId(projectId) },
@@ -216,7 +217,7 @@ export default async function handler(
         })
       }
 
-      console.log(`✅ [${invocationId}] Visual Profile deleted successfully`)
+      logger.log("visual-profile", `✅ [${invocationId}] Visual Profile deleted successfully`)
 
       return res.status(200).json({
         success: true,
@@ -233,7 +234,7 @@ export default async function handler(
     })
 
   } catch (error) {
-    console.error(`❌ [${invocationId}] Error:`, error)
+    logger.error("visual-profile", `❌ [${invocationId}] Error:`, error)
     return res.status(500).json({
       error: 'INTERNAL_SERVER_ERROR',
       message: error instanceof Error ? error.message : 'Unknown error occurred',

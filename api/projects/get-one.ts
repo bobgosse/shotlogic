@@ -5,6 +5,7 @@
 import { VercelRequest, VercelResponse } from '@vercel/node'
 import { getDb } from '../lib/mongodb.js'
 import { ObjectId } from 'mongodb'
+import { logger } from "../lib/logger";
 
 const DEPLOY_TIMESTAMP = '2025-01-17T03:00:00Z_WITH_FORMAT_GUARD'
 
@@ -15,9 +16,9 @@ export default async function handler(
   const invocationId = `${Date.now()}_${Math.random().toString(36).substring(2, 11)}`
   const startTime = Date.now()
 
-  console.log(`\n📂 [${invocationId}] ═══════════════════════════════`)
-  console.log(`📅 Timestamp: ${new Date().toISOString()}`)
-  console.log(`🏷️  Deploy: ${DEPLOY_TIMESTAMP}`)
+  logger.log("get-one", `\n📂 [${invocationId}] ═══════════════════════════════`)
+  logger.log("get-one", `📅 Timestamp: ${new Date().toISOString()}`)
+  logger.log("get-one", `🏷️  Deploy: ${DEPLOY_TIMESTAMP}`)
 
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
@@ -53,7 +54,7 @@ export default async function handler(
     }
 
     const objectId = new ObjectId(idString)
-    console.log(`✅ [${invocationId}] Looking up project: ${objectId.toHexString()}`)
+    logger.log("get-one", `✅ [${invocationId}] Looking up project: ${objectId.toHexString()}`)
 
     const db = await getDb()
     const collection = db.collection('projects')
@@ -63,7 +64,7 @@ export default async function handler(
       return res.status(404).json({ error: 'Project not found', deployMarker: DEPLOY_TIMESTAMP })
     }
 
-    console.log(`✅ [${invocationId}] Project found: ${project.name || 'Untitled'}`)
+    logger.log("get-one", `✅ [${invocationId}] Project found: ${project.name || 'Untitled'}`)
 
     // Transform scenes to match frontend expectations
     const transformedScenes = (project.scenes || []).map((scene: any, index: number) => {
@@ -75,11 +76,11 @@ export default async function handler(
       // This prevents any old-format data from breaking the frontend
       // ═══════════════════════════════════════════════════════════════
       if (scene.analysis && typeof scene.analysis === 'object' && !Array.isArray(scene.analysis)) {
-        console.warn(`⚠️ [${invocationId}] FORMAT GUARD: Scene ${scene.number || 'unknown'} has object analysis, converting to string`)
+        logger.warn("get-one", `⚠️ [${invocationId}] FORMAT GUARD: Scene ${scene.number || 'unknown'} has object analysis, converting to string`)
 
         // Check if it's the old nested format
         if (scene.analysis.data) {
-          console.warn(`   [${invocationId}] Detected old nested format (analysis.data), extracting...`)
+          logger.warn("get-one", `   [${invocationId}] Detected old nested format (analysis.data), extracting...`)
           // Try to extract what we can from old format
           const oldData = scene.analysis.data
           const converted = {
@@ -121,10 +122,10 @@ export default async function handler(
             }))
           }
           scene.analysis = JSON.stringify(converted)
-          console.log(`   [${invocationId}] Converted old format to string (${converted.shot_list.length} shots)`)
+          logger.log("get-one", `   [${invocationId}] Converted old format to string (${converted.shot_list.length} shots)`)
         } else {
           // It's an object but not the old nested format - just stringify it
-          console.warn(`   [${invocationId}] Object format without .data, stringifying directly`)
+          logger.warn("get-one", `   [${invocationId}] Object format without .data, stringifying directly`)
           scene.analysis = JSON.stringify(scene.analysis)
         }
       }
@@ -135,7 +136,7 @@ export default async function handler(
       if (scene.analysis) {
         // Case 1: Analysis is already a string (new format from Index.tsx)
         if (typeof scene.analysis === 'string') {
-          console.log(`   Scene ${scene.number}: Analysis is string (new format)`)
+          logger.log("get-one", `   Scene ${scene.number}: Analysis is string (new format)`)
           // Parse, transform shot_list if needed, re-stringify
           try {
             const parsed = JSON.parse(scene.analysis);
@@ -160,7 +161,7 @@ export default async function handler(
         }
         // Case 2: Analysis is object with data property (old format)
         else if (scene.analysis.data) {
-          console.log(`   Scene ${scene.number}: Analysis has data property (old format)`)
+          logger.log("get-one", `   Scene ${scene.number}: Analysis has data property (old format)`)
           const data = scene.analysis.data;
           
           // Transform old format to new format
@@ -212,7 +213,7 @@ export default async function handler(
         }
         // Case 3: Analysis is already in correct object format (direct from API)
         else if (scene.analysis.story_analysis || scene.analysis.producing_logistics) {
-          console.log(`   Scene ${scene.number}: Analysis is object (correct format)`)
+          logger.log("get-one", `   Scene ${scene.number}: Analysis is object (correct format)`)
           analysisString = JSON.stringify(scene.analysis);
         }
       }
@@ -228,7 +229,7 @@ export default async function handler(
     });
 
     const duration = Date.now() - startTime
-    console.log(`⏱️  [${invocationId}] Total: ${duration}ms`)
+    logger.log("get-one", `⏱️  [${invocationId}] Total: ${duration}ms`)
 
     // Determine project status from scene statuses
     const completedCount = transformedScenes.filter((s: any) => s.status === 'COMPLETED').length
@@ -267,7 +268,7 @@ export default async function handler(
 
   } catch (error) {
     const duration = Date.now() - startTime
-    console.error(`❌ [${invocationId}] Error after ${duration}ms:`, error)
+    logger.error("get-one", `❌ [${invocationId}] Error after ${duration}ms:`, error)
 
     return res.status(500).json({
       error: 'Failed to retrieve project',

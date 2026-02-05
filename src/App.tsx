@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard'
 import ProjectDetails from './pages/ProjectDetails'
 import AccessRestricted from './pages/AccessRestricted'
 import { useAccessControl } from './hooks/useAccessControl'
+import { ErrorBoundary } from './components/ErrorBoundary'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -52,24 +53,26 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <Routes>
-          {/* All routes are protected and require allowlist */}
-          <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/projects" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/upload" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-          <Route path="/analyze" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-          <Route path="/new-project" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-          <Route path="/project/:id" element={<ProtectedRoute><ProjectDetails /></ProtectedRoute>} />
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <Routes>
+            {/* All routes are protected and require allowlist */}
+            <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/projects" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/upload" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/analyze" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/new-project" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/project/:id" element={<ProtectedRoute><ProjectDetails /></ProtectedRoute>} />
 
-          {/* Access restricted page - accessible when signed in but not allowed */}
-          <Route path="/access-restricted" element={
-            <SignedIn><AccessRestricted /></SignedIn>
-          } />
-        </Routes>
-      </BrowserRouter>
-    </QueryClientProvider>
+            {/* Access restricted page - accessible when signed in but not allowed */}
+            <Route path="/access-restricted" element={
+              <SignedIn><AccessRestricted /></SignedIn>
+            } />
+          </Routes>
+        </BrowserRouter>
+      </QueryClientProvider>
+    </ErrorBoundary>
   )
 }
 

@@ -2,6 +2,7 @@
 // PRODUCTION-READY MongoDB connection utility for Vercel serverless functions
 
 import { MongoClient, Db, MongoClientOptions } from 'mongodb'
+import { logger } from "./logger";
 
 const MONGODB_URI = process.env.MONGODB_URI
 const DB_NAME = 'ShotLogicDB'
@@ -61,7 +62,7 @@ export async function getDb(): Promise<Db> {
     
     return client.db(DB_NAME)
   } catch (error) {
-    console.error('MongoDB connection error:', error)
+    logger.error("mongodb", 'MongoDB connection error:', error)
     
     // If connection failed, clear the cached promise and retry once
     global._mongoClientPromise = undefined
@@ -82,7 +83,7 @@ export async function getClient(): Promise<MongoClient> {
   try {
     return await clientPromise
   } catch (error) {
-    console.error('MongoDB client error:', error)
+    logger.error("mongodb", 'MongoDB client error:', error)
     throw new Error(
       `Failed to get MongoDB client: ${error instanceof Error ? error.message : 'Unknown error'}`
     )

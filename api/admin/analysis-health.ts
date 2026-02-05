@@ -5,6 +5,7 @@
 
 import { VercelRequest, VercelResponse } from '@vercel/node'
 import { getDb } from '../lib/mongodb.js'
+import { logger } from "../lib/logger";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -154,7 +155,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     })
 
   } catch (error) {
-    console.error('Health check error:', error)
+    logger.error("analysis-health", 'Health check error:', error)
     return res.status(500).json({
       status: 'ERROR',
       error: error instanceof Error ? error.message : 'Unknown error'

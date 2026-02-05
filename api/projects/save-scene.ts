@@ -5,6 +5,7 @@
 import { VercelRequest, VercelResponse } from '@vercel/node'
 import { getDb } from '../lib/mongodb.js'
 import { ObjectId } from 'mongodb'
+import { logger } from "../lib/logger";
 
 // ╔═══════════════════════════════════════════════════════════════════════════╗
 // ║                    ⚠️  CRITICAL: DATA FORMAT LOCK  ⚠️                      ║
@@ -38,9 +39,9 @@ const DEPLOY_TIMESTAMP = '2025-01-17T02:00:00Z_WITH_VERIFICATION'
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const invocationId = `${Date.now()}_${Math.random().toString(36).substring(2, 11)}`
 
-  console.log(`\n📝 [${invocationId}] ═══ SAVE SCENE ═══`)
-  console.log(`📅 Timestamp: ${new Date().toISOString()}`)
-  console.log(`🏷️  Deploy: ${DEPLOY_TIMESTAMP}`)
+  logger.log("save-scene", `\n📝 [${invocationId}] ═══ SAVE SCENE ═══`)
+  logger.log("save-scene", `📅 Timestamp: ${new Date().toISOString()}`)
+  logger.log("save-scene", `🏷️  Deploy: ${DEPLOY_TIMESTAMP}`)
 
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -66,7 +67,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       })
     }
 
-    console.log(`📊 [${invocationId}] Saving ${Object.keys(sceneUpdates).length} scene(s) for project ${projectId}`)
+    logger.log("save-scene", `📊 [${invocationId}] Saving ${Object.keys(sceneUpdates).length} scene(s) for project ${projectId}`)
 
     const db = await getDb()
     const collection = db.collection('projects')
@@ -86,9 +87,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (sceneUpdates[sceneKey]) {
         const analysisData = sceneUpdates[sceneKey]
 
-        console.log(`   ✏️ [${invocationId}] Updating scene ${scene.number}`)
-        console.log(`      - story_analysis keys: ${Object.keys(analysisData.story_analysis || {}).join(', ')}`)
-        console.log(`      - shot_list count: ${analysisData.shot_list?.length || 0}`)
+        logger.log("save-scene", `   ✏️ [${invocationId}] Updating scene ${scene.number}`)
+        logger.log("save-scene", `      - story_analysis keys: ${Object.keys(analysisData.story_analysis || {}).join(', ')}`)
+        logger.log("save-scene", `      - shot_list count: ${analysisData.shot_list?.length || 0}`)
 
         // CRITICAL: Store as JSON string (same format as update-scene-analysis.ts)
         // This ensures get-one.ts handles all scenes consistently
@@ -112,7 +113,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     )
 
-    console.log(`✅ [${invocationId}] Updated ${result.modifiedCount} project(s)`)
+    logger.log("save-scene", `✅ [${invocationId}] Updated ${result.modifiedCount} project(s)`)
 
     // ═══════════════════════════════════════════════════════════════
     // VERIFICATION: Fetch back and validate format
@@ -125,13 +126,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const savedScene = savedScenes.find((s: any) => s.number === sceneNum)
 
       if (!savedScene) {
-        console.error(`❌ [${invocationId}] VERIFICATION FAILED: Scene ${sceneNum} not found after save`)
+        logger.error("save-scene", `❌ [${invocationId}] VERIFICATION FAILED: Scene ${sceneNum} not found after save`)
         continue
       }
 
       // Check format - must be a string
       if (typeof savedScene.analysis !== 'string') {
-        console.error(`❌ [${invocationId}] VERIFICATION FAILED: Scene ${sceneNum} analysis is not a string`)
+        logger.error("save-scene", `❌ [${invocationId}] VERIFICATION FAILED: Scene ${sceneNum} analysis is not a string`)
         return res.status(500).json({
           error: 'Format verification failed',
           details: `Scene ${sceneNum} saved in wrong format`,
@@ -165,13 +166,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         if (issues.length > 0) {
-          console.warn(`⚠️ [${invocationId}] VERIFICATION WARNING: Scene ${sceneNum} has incomplete data: ${issues.join(', ')}`)
+          logger.warn("save-scene", `⚠️ [${invocationId}] VERIFICATION WARNING: Scene ${sceneNum} has incomplete data: ${issues.join(', ')}`)
           // Don't fail - just warn. The analysis might legitimately have sparse data for short scenes.
         } else {
-          console.log(`✅ [${invocationId}] VERIFICATION PASSED: Scene ${sceneNum} format and content OK`)
+          logger.log("save-scene", `✅ [${invocationId}] VERIFICATION PASSED: Scene ${sceneNum} format and content OK`)
         }
       } catch (parseErr) {
-        console.error(`❌ [${invocationId}] VERIFICATION FAILED: Scene ${sceneNum} analysis is not valid JSON`)
+        logger.error("save-scene", `❌ [${invocationId}] VERIFICATION FAILED: Scene ${sceneNum} analysis is not valid JSON`)
         return res.status(500).json({
           error: 'Format verification failed',
           details: `Scene ${sceneNum} analysis not parseable`,
@@ -189,7 +190,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         { _id: objectId },
         { $set: { status: 'COMPLETED' } }
       )
-      console.log(`✅ [${invocationId}] All scenes completed — project status set to COMPLETED`)
+      logger.log("save-scene", `✅ [${invocationId}] All scenes completed — project status set to COMPLETED`)
     }
 
     return res.status(200).json({
@@ -201,7 +202,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     })
 
   } catch (error) {
-    console.error(`❌ [${invocationId}] Save error:`, error)
+    logger.error("save-scene", `❌ [${invocationId}] Save error:`, error)
     return res.status(500).json({
       error: 'Failed to save',
       details: error instanceof Error ? error.message : 'Unknown error',

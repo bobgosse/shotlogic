@@ -2,6 +2,7 @@
 // Vercel Serverless Function for analyzing overall screenplay story structure
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { logger } from "./lib/logger";
 
 const DEPLOY_TIMESTAMP = "2024-12-13T01:00:00Z_STORY_ANALYZER"
 const MAX_TEXT_LENGTH = 100000 // 100k characters max
@@ -23,9 +24,9 @@ export default async function handler(
   const invocationId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
   const startTime = Date.now()
   
-  console.log(`\n📚 [${invocationId}] ═══════════════════════════════`)
-  console.log(`📅 Timestamp: ${new Date().toISOString()}`)
-  console.log(`🏷️  Deploy: ${DEPLOY_TIMESTAMP}`)
+  logger.log("analyze-story", `\n📚 [${invocationId}] ═══════════════════════════════`)
+  logger.log("analyze-story", `📅 Timestamp: ${new Date().toISOString()}`)
+  logger.log("analyze-story", `🏷️  Deploy: ${DEPLOY_TIMESTAMP}`)
   
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -52,11 +53,11 @@ export default async function handler(
     try {
       openaiKey = process.env.OPENAI_API_KEY || process.env.OPENAI_KEY
     } catch (envError) {
-      console.error(`❌ [${invocationId}] Environment access error:`, envError)
+      logger.error("analyze-story", `❌ [${invocationId}] Environment access error:`, envError)
     }
     
     if (!openaiKey) {
-      console.error(`❌ [${invocationId}] OPENAI_API_KEY not found`)
+      logger.error("analyze-story", `❌ [${invocationId}] OPENAI_API_KEY not found`)
       return res.status(500).json({ 
         error: 'Server configuration error: OPENAI_API_KEY not set',
         details: 'The OpenAI API key must be configured in Vercel environment variables',
@@ -69,7 +70,7 @@ export default async function handler(
     try {
       requestBody = req.body
     } catch (jsonError) {
-      console.error(`❌ [${invocationId}] Failed to parse request JSON:`, jsonError)
+      logger.error("analyze-story", `❌ [${invocationId}] Failed to parse request JSON:`, jsonError)
       return res.status(400).json({ 
         error: 'Invalid request body',
         details: 'Request body must be valid JSON',

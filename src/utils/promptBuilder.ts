@@ -1,6 +1,8 @@
 // ShotLogic Prompt Builder
 // Platform-agnostic image prompts
 
+import { AnalysisData } from "@/types/analysis";
+
 interface ShotData {
   shot_number?: number;
   shot_type: string;
@@ -16,22 +18,6 @@ interface SceneData {
   scene_number: number;
   header: string;
   content: string;
-}
-
-interface AnalysisData {
-  story_analysis?: {
-    synopsis?: string;
-    stakes?: string;
-    ownership?: string;
-    key_props?: string;
-  };
-  directing_vision?: {
-    visual_metaphor?: string;
-    visual_approach?: string;
-  };
-  producing_logistics?: {
-    key_props?: string[];
-  };
 }
 
 // Build a clean, platform-agnostic image prompt
