@@ -20,6 +20,7 @@ import {
   LogOut
 } from "lucide-react";
 import shotlogicLogo from "@/assets/shotlogic-logo-netflix.png";
+import heroImage from "@/assets/SLV2.jpg";
 import { api, ApiError } from "@/utils/apiClient";
 import {
   DropdownMenu,
@@ -258,20 +259,33 @@ const Dashboard = () => {
         
         <div className="relative max-w-7xl mx-auto px-6 py-16">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
-            {/* Left: Welcome content */}
-            <div className="space-y-6">
+            {/* Left: Hero Image */}
+            <div className="order-2 lg:order-1">
+              <div className="relative">
+                <img
+                  src={heroImage}
+                  alt="ShotLogic - Script to Screen"
+                  className="w-full h-auto rounded-2xl shadow-2xl object-cover max-h-[500px]"
+                />
+                {/* Subtle gradient overlay for polish */}
+                <div className="absolute inset-0 rounded-2xl bg-gradient-to-t from-background/20 to-transparent pointer-events-none" />
+              </div>
+            </div>
+
+            {/* Right: Welcome content */}
+            <div className="space-y-6 order-1 lg:order-2">
               <h1 className="text-4xl lg:text-5xl font-bold text-foreground leading-tight">
                 Preserve your intent<br />
                 <span className="text-[#D4A843]">from page to screen.</span>
               </h1>
-              
+
               <p className="text-lg text-muted-foreground max-w-md">
                 The bridge between your script and your shoot. Story logic, coverage strategy, and editorial intent—scene by scene—so meaning survives production.
               </p>
 
               {mostRecentProject ? (
                 <div className="flex flex-col sm:flex-row gap-4">
-                  <Button 
+                  <Button
                     size="lg"
                     onClick={() => navigate(`/project/${mostRecentProject._id}`)}
                     className="bg-[#E50914] hover:bg-[#E50914]/90 text-white"
@@ -279,7 +293,7 @@ const Dashboard = () => {
                     Continue: {mostRecentProject.name?.substring(0, 20)}{(mostRecentProject.name?.length || 0) > 20 ? '...' : ''}
                     <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
-                  <Button 
+                  <Button
                     size="lg"
                     variant="outline"
                     onClick={() => navigate("/new-project")}
@@ -290,7 +304,7 @@ const Dashboard = () => {
                   </Button>
                 </div>
               ) : (
-                <Button 
+                <Button
                   size="lg"
                   onClick={() => navigate("/new-project")}
                   className="bg-[#E50914] hover:bg-[#E50914]/90 text-white"
