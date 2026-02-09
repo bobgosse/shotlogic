@@ -265,7 +265,7 @@ const Dashboard = () => {
                 <img
                   src={heroImage}
                   alt="ShotLogic - Script to Screen"
-                  className="w-full h-auto rounded-2xl shadow-2xl object-cover max-h-[500px]"
+                  className="w-full h-auto rounded-2xl shadow-2xl"
                 />
                 {/* Subtle gradient overlay for polish */}
                 <div className="absolute inset-0 rounded-2xl bg-gradient-to-t from-background/20 to-transparent pointer-events-none" />
