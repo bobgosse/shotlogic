@@ -22,6 +22,9 @@ export function useAccessControl() {
   const { user, isLoaded } = useUser()
 
   const result = useMemo(() => {
+    // DEVELOPMENT BYPASS: Allow all users on localhost
+    const isDev = import.meta.env.DEV || window.location.hostname === 'localhost'
+
     // Get allowed and admin emails from environment
     const allowedEmails = parseEmailList(import.meta.env.VITE_ALLOWED_EMAILS)
     const adminEmails = parseEmailList(import.meta.env.VITE_ADMIN_EMAILS)
@@ -32,16 +35,16 @@ export function useAccessControl() {
     // Get user's primary email (lowercase for comparison)
     const userEmail = user?.primaryEmailAddress?.emailAddress?.toLowerCase() || null
 
-    // Check access
+    // Check access - bypass in development mode
     const isAdmin = userEmail ? adminEmails.has(userEmail) : false
-    const isAllowed = isOpenAccess || isAdmin || (userEmail ? allowedEmails.has(userEmail) : false)
+    const isAllowed = isDev || isOpenAccess || isAdmin || (userEmail ? allowedEmails.has(userEmail) : false)
 
     return {
       isLoaded,
       userEmail,
       isAllowed,
-      isAdmin,
-      isOpenAccess,
+      isAdmin: isDev || isAdmin, // Give admin access in dev too for full testing
+      isOpenAccess: isDev || isOpenAccess,
     }
   }, [user, isLoaded])
 

@@ -7,7 +7,7 @@ import { getDb } from '../lib/mongodb.js'
 import { ObjectId } from 'mongodb'
 import { logger } from "../lib/logger";
 
-const DEPLOY_TIMESTAMP = '2025-01-17T03:00:00Z_WITH_FORMAT_GUARD'
+const DEPLOY_TIMESTAMP = '2025-02-05T02:00:00Z_PRESERVE_ALL_SHOT_FIELDS'
 
 export default async function handler(
   req: VercelRequest,
@@ -140,9 +140,12 @@ export default async function handler(
           // Parse, transform shot_list if needed, re-stringify
           try {
             const parsed = JSON.parse(scene.analysis);
-            // Transform camelCase shot_list to snake_case if needed
+            // Transform camelCase shot_list to snake_case if needed, PRESERVING all original fields
             if (parsed.shot_list && Array.isArray(parsed.shot_list)) {
               parsed.shot_list = parsed.shot_list.map((shot: any, idx: number) => ({
+                // Spread original shot first to preserve ALL fields (serves_story_element, editorial_note, etc.)
+                ...shot,
+                // Then normalize specific fields that may have legacy names
                 shot_number: shot.shot_number || shot.shotNumber || idx + 1,
                 shot_type: shot.shot_type || shot.shotType || 'WIDE',
                 movement: shot.movement || 'STATIC',

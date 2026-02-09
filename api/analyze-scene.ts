@@ -5,7 +5,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { logger } from "./lib/logger";
 
-const DEPLOY_TIMESTAMP = "2025-02-05T01:00:00Z_SONNET_REVERT"
+const DEPLOY_TIMESTAMP = "2025-02-05T03:00:00Z_REQUIRED_FIELDS_PROMPT"
 
 // Model selection with environment variable fallback
 const MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-4-5-20250929"
@@ -161,9 +161,9 @@ async function analyzeStory(
   invocationId: string
 ): Promise<{ success: boolean; data?: any; error?: string; usage?: any }> {
 
-  const systemPrompt = `You are a professional script analyst and story consultant. Analyze the scene and return ONLY valid JSON with these 14 fields. Each field must be filled with specific, substantive content from THIS scene - never use placeholder text. Think deeply about what this scene MUST accomplish for the story to work, not just what happens in it.`
+  const systemPrompt = `You are a professional script analyst and story consultant. Analyze the scene and return ONLY valid JSON with ALL 14 fields. CRITICAL: You must fill in EVERY field with specific, substantive content from THIS scene. Do NOT skip any fields. Do NOT use placeholder text. Do NOT truncate your response. Think deeply about what this scene MUST accomplish for the story to work.`
 
-  const userPrompt = `Analyze this scene and return JSON with exactly these fields:
+  const userPrompt = `Analyze this scene and return JSON with ALL 14 fields. Every field is REQUIRED - do not skip any.
 
 <scene>
 ${sceneText}
@@ -173,26 +173,28 @@ ${sceneText}
 ${characters.join(', ')}
 </characters>
 
-Return ONLY this JSON structure (no markdown, no explanation):
+Return ONLY valid JSON (no markdown, no explanation). Fill in EVERY field:
 {
-  "the_core": "This scene exists to [complete with specific purpose from this scene]",
-  "synopsis": "[2-3 sentences describing exactly what happens]",
-  "the_turn": "[Quote the exact line or describe the specific action where the scene pivots. If no turn: 'Scene maintains steady tension throughout']",
-  "ownership": "[CHARACTER NAME] drives this scene by [specific action]",
-  "the_times": "[Era, period, or contemporary setting details that matter]",
-  "imagery_and_tone": "[Visual quality and emotional temperature: dark/light, warm/cold, confined/open]",
-  "stakes": "[What CHARACTER NAME risks losing if they fail in this scene]",
-  "pitfalls": ["Risk 1", "Risk 2", "Risk 3"],
-  "scene_obligation": "What MUST this scene accomplish for the story to work? Frame as a requirement, not a description. Start with 'This scene must...'",
-  "the_one_thing": "If this scene can only accomplish one thing due to time/budget constraints, what is the single most essential element that must land?",
+  "the_core": "This scene exists to [REQUIRED: complete with specific purpose]",
+  "synopsis": "[REQUIRED: 2-3 sentences describing exactly what happens]",
+  "the_turn": "[REQUIRED: Quote the exact line or describe the action where the scene pivots. If no clear turn: 'Scene maintains steady tension throughout']",
+  "ownership": "[REQUIRED: CHARACTER NAME] drives this scene by [specific action]",
+  "the_times": "[REQUIRED: Era, period, or contemporary setting details]",
+  "imagery_and_tone": "[REQUIRED: Visual quality and emotional temperature]",
+  "stakes": "[REQUIRED: What CHARACTER NAME risks losing if they fail]",
+  "pitfalls": ["REQUIRED: Risk 1", "Risk 2", "Risk 3"],
+  "scene_obligation": "[REQUIRED: Start with 'This scene must...' - what MUST this scene accomplish for the story to work?]",
+  "the_one_thing": "[REQUIRED: If this scene can only accomplish one thing, what is the single most essential element?]",
   "setup_payoff": {
-    "setups": ["List what this scene plants or establishes for later scenes. Empty array if none."],
-    "payoffs": ["List what this scene pays off from earlier scenes. Empty array if none."]
+    "setups": ["REQUIRED: List what this scene plants for later. Empty array [] if none."],
+    "payoffs": ["REQUIRED: List what this scene pays off from earlier. Empty array [] if none."]
   },
-  "essential_exposition": "What specific information must the audience receive in this scene to understand the story going forward?",
-  "if_this_scene_fails": "What breaks in the larger story if this scene doesn't work? What downstream scenes or payoffs depend on this?",
-  "alternative_readings": ["List 1-3 reasonable but different interpretations of character motivation or scene meaning that the creative team should align on before shooting"]
-}`
+  "essential_exposition": "[REQUIRED: What information must the audience receive to understand the story going forward?]",
+  "if_this_scene_fails": "[REQUIRED: What breaks in the larger story if this scene doesn't work?]",
+  "alternative_readings": ["REQUIRED: 1-3 different interpretations of character motivation the team should align on"]
+}
+
+IMPORTANT: Your response must include ALL 14 fields with substantive content. Do not skip scene_obligation or the_one_thing.`
 
   return callClaude(apiKey, systemPrompt, userPrompt, invocationId, 'STORY_ANALYSIS', 8000)
 }
