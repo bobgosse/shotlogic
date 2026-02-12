@@ -119,6 +119,26 @@ app.all("/api/admin/delete-project", async (req, res) => {
   await apiHandler(req, res, join(__dirname, "api/admin/delete-project.ts"));
 });
 
+// Admin: Reset project status
+app.post("/api/admin/reset-project-status", async (req, res) => {
+  await apiHandler(req, res, join(__dirname, "api/admin/reset-project-status.ts"));
+});
+
+// Admin: Reassign projects between users
+app.all("/api/admin/reassign-projects", async (req, res) => {
+  await apiHandler(req, res, join(__dirname, "api/admin/reassign-projects.ts"));
+});
+
+// Admin: List all projects
+app.get("/api/admin/list-all-projects", async (req, res) => {
+  await apiHandler(req, res, join(__dirname, "api/admin/list-all-projects.ts"));
+});
+
+// Visual profile endpoint
+app.post("/api/visual-profile", async (req, res) => {
+  await apiHandler(req, res, join(__dirname, "api/visual-profile.ts"));
+});
+
 // Serve static files
 app.use(express.static(join(__dirname, 'dist')));
 
