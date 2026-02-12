@@ -69,13 +69,21 @@ export function useSceneAnalysis({
   // ─── Analysis handlers ───
 
   const handleRegenerateAll = async () => {
-    if (!id || scenes.length === 0) return;
+    console.log('[handleRegenerateAll] Called with id:', id, 'scenes.length:', scenes.length);
+    if (!id || scenes.length === 0) {
+      console.log('[handleRegenerateAll] BLOCKED - no id or empty scenes');
+      return;
+    }
 
     const confirmed = window.confirm(
       `This will regenerate analysis for all ${scenes.length} scenes with image prompts and your visual style. This may take several minutes. Continue?`
     );
-    if (!confirmed) return;
+    if (!confirmed) {
+      console.log('[handleRegenerateAll] User cancelled confirm dialog');
+      return;
+    }
 
+    console.log('[handleRegenerateAll] Starting analysis loop...');
     setReanalyzing(true);
     let successCount = 0;
     let errorCount = 0;
@@ -135,7 +143,8 @@ export function useSceneAnalysis({
     });
   };
 
-  const handleReanalyzeScene = async (sceneId: string, sceneNumber: number, sceneContent: string, customInstructions?: string) => {
+  const handleReanalyzeScene = async (_sceneId: string, sceneNumber: number, sceneContent: string, customInstructions?: string) => {
+    console.log('[handleReanalyzeScene] Called for scene', sceneNumber, 'content length:', sceneContent?.length);
     try {
       setReanalyzing(true);
       toast({
@@ -143,6 +152,7 @@ export function useSceneAnalysis({
         description: `Generating structured analysis for Scene ${sceneNumber}`
       });
 
+      console.log('[handleReanalyzeScene] Calling /api/analyze-scene...');
       const analysisResult = await api.post("/api/analyze-scene", {
         sceneText: sceneContent,
         sceneNumber: sceneNumber,
