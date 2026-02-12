@@ -85,11 +85,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const sceneKey = `scene-${scene.number}`
 
       if (sceneUpdates[sceneKey]) {
-        const analysisData = sceneUpdates[sceneKey]
+        let analysisData = sceneUpdates[sceneKey]
+
+        // Handle case where analysis might be null/undefined
+        if (!analysisData) {
+          logger.warn("save-scene", `   ⚠️ [${invocationId}] Scene ${scene.number} analysis is null/undefined, skipping`)
+          return scene
+        }
+
+        // Handle case where analysis is already stringified
+        if (typeof analysisData === 'string') {
+          try {
+            analysisData = JSON.parse(analysisData)
+          } catch (e) {
+            logger.error("save-scene", `   ❌ [${invocationId}] Scene ${scene.number} analysis is invalid string`)
+            return scene
+          }
+        }
 
         logger.log("save-scene", `   ✏️ [${invocationId}] Updating scene ${scene.number}`)
-        logger.log("save-scene", `      - story_analysis keys: ${Object.keys(analysisData.story_analysis || {}).join(', ')}`)
-        logger.log("save-scene", `      - shot_list count: ${analysisData.shot_list?.length || 0}`)
+        logger.log("save-scene", `      - analysisData type: ${typeof analysisData}`)
+        logger.log("save-scene", `      - top-level keys: ${Object.keys(analysisData || {}).join(', ') || 'none'}`)
+        logger.log("save-scene", `      - story_analysis keys: ${Object.keys(analysisData?.story_analysis || {}).join(', ') || 'none'}`)
+        logger.log("save-scene", `      - shot_list count: ${analysisData?.shot_list?.length || 0}`)
 
         // CRITICAL: Store as JSON string (same format as update-scene-analysis.ts)
         // This ensures get-one.ts handles all scenes consistently
