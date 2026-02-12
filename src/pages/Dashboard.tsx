@@ -290,7 +290,7 @@ const Dashboard = () => {
                     onClick={() => navigate(`/project/${mostRecentProject._id}`)}
                     className="bg-[#E50914] hover:bg-[#E50914]/90 text-white"
                   >
-                    Continue: {mostRecentProject.name?.substring(0, 20)}{(mostRecentProject.name?.length || 0) > 20 ? '...' : ''}
+                    Continue: {mostRecentProject.title?.substring(0, 20)}{(mostRecentProject.title?.length || 0) > 20 ? '...' : ''}
                     <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
                   <Button
@@ -374,7 +374,7 @@ const Dashboard = () => {
                           <FolderOpen className="w-4 h-4 mr-2" />
                           Open
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setRenameProject(project); setNewTitle(project.name); }}>
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setRenameProject(project); setNewTitle(project.title); }}>
                           <Pencil className="w-4 h-4 mr-2" />
                           Rename
                         </DropdownMenuItem>
@@ -390,7 +390,7 @@ const Dashboard = () => {
                     </DropdownMenu>
                   </div>
 
-                  <h3 className="font-semibold text-foreground mb-1 truncate">{project.name}</h3>
+                  <h3 className="font-semibold text-foreground mb-1 truncate">{project.title}</h3>
                   
                   <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
                     {getStatusIcon(project)}

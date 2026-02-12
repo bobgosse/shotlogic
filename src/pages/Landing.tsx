@@ -15,7 +15,7 @@ export default function Landing() {
         </div>
         <Link to="/projects">
           <Button variant="ghost" size="sm" className="text-white/60 hover:text-white">
-            My Projects
+            Sign In
           </Button>
         </Link>
       </header>
@@ -30,9 +30,9 @@ export default function Landing() {
           <p className="text-white/40 text-lg mb-8">
             AI-powered scene analysis and shot planning for filmmakers.
           </p>
-          <Link to="/upload">
+          <Link to="/new-project">
             <Button size="lg" className="bg-[#E50914] hover:bg-[#B20710] text-white font-semibold px-8 h-12 text-base group">
-              Upload Screenplay
+              Get Started
               <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </Button>
           </Link>
