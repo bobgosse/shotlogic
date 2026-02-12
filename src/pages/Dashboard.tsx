@@ -114,6 +114,10 @@ const Dashboard = () => {
         maxRetries: 2
       });
       logger.log("[Dashboard] Projects loaded:", data.projects?.length || 0);
+      // Debug: log first project to see structure
+      if (data.projects?.length > 0) {
+        logger.log("[Dashboard] First project structure:", JSON.stringify(data.projects[0]));
+      }
       return data.projects || [];
     },
     enabled: !!user?.id,
@@ -290,7 +294,7 @@ const Dashboard = () => {
                     onClick={() => navigate(`/project/${mostRecentProject._id}`)}
                     className="bg-[#E50914] hover:bg-[#E50914]/90 text-white"
                   >
-                    Continue: {mostRecentProject.name?.substring(0, 20)}{(mostRecentProject.name?.length || 0) > 20 ? '...' : ''}
+                    Continue: {(mostRecentProject.name || 'Untitled').substring(0, 20)}{((mostRecentProject.name || '').length) > 20 ? '...' : ''}
                     <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
                   <Button
@@ -390,7 +394,7 @@ const Dashboard = () => {
                     </DropdownMenu>
                   </div>
 
-                  <h3 className="font-semibold text-foreground mb-1 truncate">{project.name}</h3>
+                  <h3 className="font-semibold text-foreground mb-1 truncate">{project.name || 'Untitled Project'}</h3>
                   
                   <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
                     {getStatusIcon(project)}
