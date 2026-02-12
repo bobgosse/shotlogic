@@ -75,7 +75,7 @@ async function callClaude(
   maxTokens: number = 8000
 ): Promise<{ success: boolean; data?: any; error?: string; usage?: any }> {
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 180000) // 180s (3 min) per call
+  const timeoutId = setTimeout(() => controller.abort(), 300000) // 300s (5 min) per call
 
   try {
     logger.log("analyze-scene", `🤖 [${invocationId}] Calling ${MODEL} for ${callName}...`)
@@ -145,7 +145,7 @@ async function callClaude(
   } catch (error: any) {
     clearTimeout(timeoutId)
     if (error.name === 'AbortError') {
-      return { success: false, error: `${callName} timed out after 180s` }
+      return { success: false, error: `${callName} timed out after 300s` }
     }
     return { success: false, error: error.message || 'Unknown error' }
   }
