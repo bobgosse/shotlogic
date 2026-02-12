@@ -301,6 +301,7 @@ const ProjectDetails = () => {
         onSceneSelect={handleSceneSelect}
         onClose={() => setShowNavigator(false)}
         isOpen={showNavigator}
+        onRetryScene={handleReanalyzeScene}
       />
 
       {/* Main Content */}
@@ -517,6 +518,7 @@ const ProjectDetails = () => {
               scenes={scenes}
               onSceneClick={(sceneId: string) => setSelectedSceneId(sceneId)}
               currentSceneId={selectedSceneId}
+              onRetryScene={handleReanalyzeScene}
             />
           </div>
         )}

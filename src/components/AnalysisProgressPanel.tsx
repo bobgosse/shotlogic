@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { CheckCircle2, Loader2, Circle, AlertCircle, ChevronDown, ChevronUp, Clock } from 'lucide-react';
+import { CheckCircle2, Loader2, Circle, AlertCircle, ChevronDown, ChevronUp, Clock, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Scene {
   id: string;
   scene_number: number;
   header: string;
+  content: string;
   status: string;
   analysis: string | null;
 }
@@ -14,6 +15,7 @@ interface AnalysisProgressPanelProps {
   scenes: Scene[];
   onSceneClick: (sceneId: string) => void;
   currentSceneId: string | null;
+  onRetryScene?: (sceneId: string, sceneNumber: number, sceneContent: string) => void;
 }
 
 const SECONDS_PER_SCENE = 90;
@@ -22,6 +24,7 @@ export const AnalysisProgressPanel: React.FC<AnalysisProgressPanelProps> = ({
   scenes,
   onSceneClick,
   currentSceneId,
+  onRetryScene,
 }) => {
   const [isExpanded, setIsExpanded] = useState(true);
 
@@ -113,13 +116,23 @@ export const AnalysisProgressPanel: React.FC<AnalysisProgressPanelProps> = ({
         <div className="px-4 pb-4">
           <div className="max-h-48 overflow-y-auto space-y-1 mt-2">
             {scenes.map((scene) => {
-              const isClickable = scene.status === 'COMPLETED';
+              const isCompleted = scene.status === 'COMPLETED';
+              const isError = scene.status === 'ERROR' || scene.status === 'error' || scene.status === 'FAILED';
+              const isClickable = isCompleted || isError;
               const isActive = scene.id === currentSceneId;
+
+              const handleClick = () => {
+                if (isCompleted) {
+                  onSceneClick(scene.id);
+                } else if (isError && onRetryScene) {
+                  onRetryScene(scene.id, scene.scene_number, scene.content);
+                }
+              };
 
               return (
                 <div
                   key={scene.id}
-                  onClick={() => isClickable && onSceneClick(scene.id)}
+                  onClick={handleClick}
                   className={cn(
                     'flex items-center gap-2 px-3 py-1.5 rounded text-sm transition-colors',
                     isClickable && 'cursor-pointer hover:bg-white/10',
@@ -134,11 +147,14 @@ export const AnalysisProgressPanel: React.FC<AnalysisProgressPanelProps> = ({
                   )}>
                     {getSceneLabel(scene)}
                   </span>
-                  {isClickable && (
+                  {isCompleted && (
                     <span className="ml-auto text-[10px] text-green-500/70 flex-shrink-0">click to review</span>
                   )}
-                  {scene.status === 'ERROR' && (
-                    <span className="ml-auto text-[10px] text-red-400 flex-shrink-0">failed</span>
+                  {isError && (
+                    <span className="ml-auto text-[10px] text-red-400 flex-shrink-0 flex items-center gap-1">
+                      <RefreshCw className="w-3 h-3" />
+                      click to retry
+                    </span>
                   )}
                 </div>
               );

@@ -163,7 +163,7 @@ export function useSceneAnalysis({
         customInstructions: customInstructions || undefined
       }, {
         context: `Analyzing scene ${sceneNumber}`,
-        timeoutMs: 150000,
+        timeoutMs: 300000, // 300s to match backend timeout
         maxRetries: 1
       });
 
@@ -186,6 +186,26 @@ export function useSceneAnalysis({
     } catch (error: any) {
       logger.error("[handleReanalyzeScene] Error:", error);
       const errorMsg = (error as ApiError).userMessage || error.message || "Failed to generate analysis";
+
+      // Save ERROR status so the scene shows "click to retry"
+      if (id) {
+        try {
+          await api.post('/api/projects/update-scene-status', {
+            projectId: id,
+            sceneNumber: sceneNumber,
+            status: 'ERROR',
+            error: errorMsg
+          }, {
+            context: `Marking scene ${sceneNumber} as failed`,
+            timeoutMs: 10000,
+            maxRetries: 1
+          });
+          await queryClient.invalidateQueries({ queryKey: ["project", id] });
+        } catch (statusErr) {
+          logger.error("[handleReanalyzeScene] Failed to save error status:", statusErr);
+        }
+      }
+
       toast({
         title: "Analysis failed",
         description: errorMsg,

@@ -4,17 +4,19 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { 
-  X, 
-  Search, 
-  CheckCircle2, 
-  Loader2, 
-  Circle, 
+import {
+  X,
+  Search,
+  CheckCircle2,
+  Loader2,
+  Circle,
   Pencil,
   Sun,
   Moon,
   Sunrise,
-  Filter
+  Filter,
+  AlertCircle,
+  RefreshCw
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -40,6 +42,7 @@ interface SceneNavigatorProps {
   onSceneSelect: (sceneId: string) => void;
   onClose: () => void;
   isOpen: boolean;
+  onRetryScene?: (sceneId: string, sceneNumber: number, sceneContent: string) => void;
 }
 
 const getTimeOfDayIcon = (header: string) => {
@@ -63,12 +66,13 @@ const getLocationName = (header: string): string => {
   return clean.trim().substring(0, 30); // Truncate if long
 };
 
-export const SceneNavigator = ({ 
-  scenes, 
-  currentSceneId, 
-  onSceneSelect, 
+export const SceneNavigator = ({
+  scenes,
+  currentSceneId,
+  onSceneSelect,
   onClose,
-  isOpen 
+  isOpen,
+  onRetryScene
 }: SceneNavigatorProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [locationFilter, setLocationFilter] = useState<"all" | "INT" | "EXT">("all");
@@ -228,10 +232,13 @@ export const SceneNavigator = ({
                     {scene.status === "COMPLETED" && (
                       <CheckCircle2 className="w-4 h-4 text-green-500" />
                     )}
-                    {(scene.status === "analyzing" || scene.status === "pending") && (
+                    {(scene.status === "analyzing" || scene.status === "pending" || scene.status === "ANALYZING" || scene.status === "PENDING") && (
                       <Loader2 className="w-4 h-4 text-netflix-red animate-spin" />
                     )}
-                    {scene.status !== "COMPLETED" && scene.status !== "analyzing" && scene.status !== "pending" && (
+                    {(scene.status === "ERROR" || scene.status === "error" || scene.status === "FAILED") && (
+                      <AlertCircle className="w-4 h-4 text-red-500" />
+                    )}
+                    {!["COMPLETED", "analyzing", "pending", "ANALYZING", "PENDING", "ERROR", "error", "FAILED"].includes(scene.status) && (
                       <Circle className="w-4 h-4 text-muted-foreground" />
                     )}
                   </div>
@@ -255,6 +262,22 @@ export const SceneNavigator = ({
                     <div className="text-xs text-foreground line-clamp-2">
                       {locationName}
                     </div>
+
+                    {/* Failed - click to retry */}
+                    {(scene.status === "ERROR" || scene.status === "error" || scene.status === "FAILED") && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onRetryScene) {
+                            onRetryScene(scene.id, scene.scene_number, scene.content);
+                          }
+                        }}
+                        className="flex items-center gap-1 mt-1 text-[10px] text-red-400 hover:text-red-300 transition-colors"
+                      >
+                        <RefreshCw className="w-3 h-3" />
+                        Failed - click to retry
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

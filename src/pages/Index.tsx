@@ -56,7 +56,7 @@ export default function Index() {
     }
     return () => clearInterval(interval);
   }, [isAnalyzing]);
-  const analyzeScene = async (scene: AnalyzedScene, totalScenes: number): Promise<AnalyzedScene> => {
+  const analyzeScene = async (scene: AnalyzedScene, totalScenes: number, projectIdForErrors?: string): Promise<AnalyzedScene> => {
     try {
       const result = await api.post('/api/analyze-scene', {
         sceneText: scene.text,
@@ -64,7 +64,7 @@ export default function Index() {
         totalScenes: totalScenes
       }, {
         context: `Analyzing scene ${scene.number}`,
-        timeoutMs: 180000, // 180 seconds for AI analysis
+        timeoutMs: 300000, // 300 seconds for AI analysis (matches backend)
         maxRetries: 2
       });
 
@@ -72,6 +72,25 @@ export default function Index() {
     } catch (err) {
       const errorMsg = (err as ApiError).userMessage || 'Analysis failed';
       logger.error(`[Scene ${scene.number}] Analysis error:`, err);
+
+      // Save ERROR status to database so it persists and shows retry option
+      if (projectIdForErrors) {
+        try {
+          await api.post('/api/projects/update-scene-status', {
+            projectId: projectIdForErrors,
+            sceneNumber: scene.number,
+            status: 'ERROR',
+            error: errorMsg
+          }, {
+            context: `Marking scene ${scene.number} as failed`,
+            timeoutMs: 10000,
+            maxRetries: 1
+          });
+        } catch (statusErr) {
+          logger.error(`[Scene ${scene.number}] Failed to save error status:`, statusErr);
+        }
+      }
+
       return { ...scene, analysis: null, status: 'error', error: errorMsg };
     }
   };
@@ -179,7 +198,7 @@ export default function Index() {
       const batchStartTime = Date.now();
 
       const batchPromises = batchIndices.map(i =>
-        analyzeScene(analyzedScenes[i], parsedScenes.length)
+        analyzeScene(analyzedScenes[i], parsedScenes.length, newProjectId)
       );
 
       const batchResults = await Promise.all(batchPromises);

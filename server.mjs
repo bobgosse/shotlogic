@@ -110,6 +110,11 @@ app.post("/api/projects/update-scene-analysis", async (req, res) => {
   await apiHandler(req, res, join(__dirname, "api/projects/update-scene-analysis.ts"));
 });
 
+// Update scene status (for marking scenes as ERROR)
+app.post("/api/projects/update-scene-status", async (req, res) => {
+  await apiHandler(req, res, join(__dirname, "api/projects/update-scene-status.ts"));
+});
+
 // Admin endpoints
 app.get("/api/admin/analysis-health", async (req, res) => {
   await apiHandler(req, res, join(__dirname, "api/admin/analysis-health.ts"));
