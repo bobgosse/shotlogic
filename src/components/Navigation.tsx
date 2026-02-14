@@ -49,31 +49,32 @@ export const Navigation = ({ onSignOut }: NavigationProps) => {
                 <User className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56 bg-card border-border">
-            <div className="px-2 py-1.5 text-sm text-muted-foreground">
-              My Account
-            </div>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem disabled className="cursor-not-allowed opacity-50">
-              <User className="mr-2 h-4 w-4" />
-              Profile
-              <span className="ml-auto text-xs text-muted-foreground">Soon</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem disabled className="cursor-not-allowed opacity-50">
-              <Settings className="mr-2 h-4 w-4" />
-              Settings
-              <span className="ml-auto text-xs text-muted-foreground">Soon</span>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem 
-              onClick={onSignOut}
-              className="cursor-pointer text-destructive focus:text-destructive"
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              Sign Out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+            <DropdownMenuContent align="end" className="w-56 bg-card border-border">
+              <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                My Account
+              </div>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem disabled className="cursor-not-allowed opacity-50">
+                <User className="mr-2 h-4 w-4" />
+                Profile
+                <span className="ml-auto text-xs text-muted-foreground">Soon</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled className="cursor-not-allowed opacity-50">
+                <Settings className="mr-2 h-4 w-4" />
+                Settings
+                <span className="ml-auto text-xs text-muted-foreground">Soon</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                onClick={onSignOut}
+                className="cursor-pointer text-destructive focus:text-destructive"
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                Sign Out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
     </nav>
   );
