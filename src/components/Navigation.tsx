@@ -37,6 +37,7 @@ export const Navigation = ({ onSignOut }: NavigationProps) => {
 
         {/* Credits & User Menu */}
         <div className="flex items-center gap-4">
+          <div className="text-sm font-bold text-red-500">TEST</div>
           <CreditsIndicator />
           
           <DropdownMenu>
