@@ -22,6 +22,7 @@ import {
 import shotlogicLogo from "@/assets/shotlogic-logo-netflix.png";
 import heroImage from "@/assets/SLV2.jpg";
 import { api, ApiError } from "@/utils/apiClient";
+import { CreditsIndicator } from "@/components/CreditsIndicator";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -232,6 +233,7 @@ const Dashboard = () => {
               <Plus className="w-4 h-4 mr-2" />
               New Project
             </Button>
+            <CreditsIndicator />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="flex items-center gap-2 px-2">
