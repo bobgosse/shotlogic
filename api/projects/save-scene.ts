@@ -90,18 +90,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return scene
         }
 
+        // Log what we received
+        logger.log("save-scene", `   📥 [${invocationId}] Scene ${scene.number} received data type: ${typeof analysisData}`)
+        
         // Handle case where analysis is already stringified
         if (typeof analysisData === 'string') {
           try {
             analysisData = JSON.parse(analysisData)
+            logger.log("save-scene", `      ✓ Parsed string to object`)
           } catch (e) {
-            logger.error("save-scene", `   ❌ [${invocationId}] Scene ${scene.number} analysis is invalid string`)
+            logger.error("save-scene", `   ❌ [${invocationId}] Scene ${scene.number} analysis is invalid string: ${analysisData.substring(0, 100)}`)
             return scene
           }
         }
 
+        // Validate it's an object
+        if (typeof analysisData !== 'object' || analysisData === null) {
+          logger.error("save-scene", `   ❌ [${invocationId}] Scene ${scene.number} analysis is not an object: ${typeof analysisData}`)
+          return scene
+        }
+
         logger.log("save-scene", `   ✏️ [${invocationId}] Updating scene ${scene.number}`)
-        logger.log("save-scene", `      - analysisData type: ${typeof analysisData}`)
         logger.log("save-scene", `      - top-level keys: ${Object.keys(analysisData || {}).join(', ') || 'none'}`)
         logger.log("save-scene", `      - story_analysis keys: ${Object.keys(analysisData?.story_analysis || {}).join(', ') || 'none'}`)
         logger.log("save-scene", `      - shot_list count: ${analysisData?.shot_list?.length || 0}`)
@@ -116,6 +125,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       return scene
     })
+
+    // Log what we're about to save
+    for (const scene of updatedScenes) {
+      if (scene.analysis) {
+        logger.log("save-scene", `   💾 [${invocationId}] Scene ${scene.number} analysis type before save: ${typeof scene.analysis}`)
+      }
+    }
 
     // Update the project in MongoDB
     const result = await collection.updateOne(
