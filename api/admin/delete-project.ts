@@ -1,6 +1,6 @@
 // api/admin/delete-project.ts
 // Admin endpoint to delete a project by ID
-// Usage: DELETE /api/admin/delete-project?id=xxx&key=YOUR_API_KEY
+// Usage: DELETE /api/admin/delete-project?id=xxx (with X-API-Key header)
 
 import { VercelRequest, VercelResponse } from '@vercel/node'
 import { getDb } from '../lib/mongodb.js'
@@ -8,18 +8,13 @@ import { ObjectId } from 'mongodb'
 import { logger } from "../lib/logger";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, DELETE, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-API-Key')
-
-  if (req.method === 'OPTIONS') return res.status(200).end()
-  // Accept both GET (for browser testing) and DELETE (proper usage)
-  if (req.method !== 'DELETE' && req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' })
+  // CORS handled by server.mjs middleware
+  if (req.method !== 'DELETE') {
+    return res.status(405).json({ error: 'Method not allowed. Use DELETE.' })
   }
 
-  // API key authentication
-  const apiKey = req.headers['x-api-key'] || req.query.key
+  // API key authentication (header only - never use query params for secrets)
+  const apiKey = req.headers['x-api-key']
   const expectedKey = process.env.ADMIN_API_KEY
 
   if (!expectedKey) {

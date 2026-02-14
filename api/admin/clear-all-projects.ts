@@ -1,34 +1,27 @@
 // api/admin/clear-all-projects.ts
 // ADMIN ONLY: Deletes all projects from database
-// Access with: POST /api/admin/clear-all-projects?secret=YOUR_SECRET
+// Access with: POST /api/admin/clear-all-projects (with X-API-Key header)
 
 import { VercelRequest, VercelResponse } from '@vercel/node'
 import { getDb } from '../lib/mongodb.js'
 import { logger } from "../lib/logger";
 
-const ADMIN_SECRET = process.env.ADMIN_SECRET || 'change-me-in-production'
+const ADMIN_SECRET = process.env.ADMIN_API_KEY || process.env.ADMIN_SECRET || 'change-me-in-production'
 
 export default async function handler(
   req: VercelRequest,
   res: VercelResponse
 ) {
-  // CORS
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end()
-  }
+  // CORS handled by server.mjs middleware
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' })
   }
 
-  // Check admin secret
-  const secret = req.query.secret || req.body?.secret
+  // Check admin secret (header only - never use query params for secrets)
+  const secret = req.headers['x-api-key'] as string
   if (secret !== ADMIN_SECRET) {
-    return res.status(403).json({ error: 'Forbidden: Invalid admin secret' })
+    return res.status(403).json({ error: 'Forbidden: Invalid or missing X-API-Key header' })
   }
 
   try {

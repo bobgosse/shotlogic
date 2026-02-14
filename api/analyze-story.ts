@@ -28,15 +28,7 @@ export default async function handler(
   logger.log("analyze-story", `📅 Timestamp: ${new Date().toISOString()}`)
   logger.log("analyze-story", `🏷️  Deploy: ${DEPLOY_TIMESTAMP}`)
   
-  // CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-  
-  // Handle OPTIONS preflight
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end()
-  }
+  // CORS handled by server.mjs middleware
   
   // Only accept POST
   if (req.method !== 'POST') {

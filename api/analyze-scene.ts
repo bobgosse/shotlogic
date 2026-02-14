@@ -4,6 +4,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { logger } from "./lib/logger";
+import { hasEnoughCredits, deductCredits } from "./lib/credits.js";
 
 const DEPLOY_TIMESTAMP = "2025-02-05T03:00:00Z_REQUIRED_FIELDS_PROMPT"
 
@@ -54,6 +55,7 @@ interface VisualProfile {
 }
 
 interface AnalyzeSceneRequest {
+  userId: string
   sceneText: string
   sceneNumber: number
   totalScenes: number
@@ -535,13 +537,7 @@ export default async function handler(
   logger.log("analyze-scene", `📅 Timestamp: ${new Date().toISOString()}`)
   logger.log("analyze-scene", `🏷️  Deploy: ${DEPLOY_TIMESTAMP}`)
 
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end()
-  }
+  // CORS handled by server.mjs middleware
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed', deployMarker: DEPLOY_TIMESTAMP })
@@ -571,12 +567,21 @@ export default async function handler(
     }
 
     const requestBody = req.body as AnalyzeSceneRequest
-    const { sceneText, sceneNumber, totalScenes, customInstructions } = requestBody
+    const { userId, sceneText, sceneNumber, totalScenes, customInstructions } = requestBody
 
     logger.log("analyze-scene", `📊 [${invocationId}] Scene: ${sceneNumber}/${totalScenes}`)
     logger.log("analyze-scene", `📊 [${invocationId}] Text length: ${sceneText?.length || 0} chars`)
+    logger.log("analyze-scene", `👤 [${invocationId}] UserId: ${userId}`)
 
     // Validate required fields
+    if (!userId || typeof userId !== 'string') {
+      return res.status(400).json({
+        error: 'MISSING_USER_ID',
+        message: 'userId is required',
+        userMessage: 'User authentication failed',
+        deployMarker: DEPLOY_TIMESTAMP
+      })
+    }
     if (!sceneText || typeof sceneText !== 'string' || sceneText.trim().length < 5) {
       return res.status(400).json({
         error: 'MISSING_SCENE_TEXT',
@@ -609,6 +614,38 @@ export default async function handler(
 
     // Extract scene header (first line, usually INT/EXT line)
     const sceneHeader = sceneText.split('\n')[0] || ''
+
+    // ═══════════════════════════════════════════════════════════════
+    // CREDIT CHECK: Verify user has credits before analysis
+    // ═══════════════════════════════════════════════════════════════
+    const CREDITS_PER_SCENE = 1
+    
+    logger.log("analyze-scene", `💳 [${invocationId}] Checking credits for ${userId}...`)
+    
+    const hasCredits = await hasEnoughCredits(userId, CREDITS_PER_SCENE)
+    if (!hasCredits) {
+      logger.warn("analyze-scene", `❌ [${invocationId}] Insufficient credits for ${userId}`)
+      return res.status(402).json({
+        error: 'INSUFFICIENT_CREDITS',
+        message: 'Not enough credits to analyze this scene',
+        userMessage: 'You don\'t have enough credits to analyze this scene. Please purchase more credits to continue.',
+        deployMarker: DEPLOY_TIMESTAMP
+      })
+    }
+    
+    // Deduct credits BEFORE starting analysis
+    try {
+      await deductCredits(userId, CREDITS_PER_SCENE)
+      logger.log("analyze-scene", `💳 [${invocationId}] ${CREDITS_PER_SCENE} credit(s) deducted from ${userId}`)
+    } catch (error: any) {
+      logger.error("analyze-scene", `❌ [${invocationId}] Failed to deduct credits: ${error.message}`)
+      return res.status(500).json({
+        error: 'CREDIT_DEDUCTION_FAILED',
+        message: 'Failed to process credit transaction',
+        userMessage: 'An error occurred while processing credits. Please try again.',
+        deployMarker: DEPLOY_TIMESTAMP
+      })
+    }
 
     const startTime = Date.now()
 

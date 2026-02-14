@@ -15,10 +15,26 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // CORS headers for API routes
+const ALLOWED_ORIGINS = (() => {
+  const origins = [
+    process.env.ALLOWED_ORIGIN || 'https://shotlogic.studio',
+    'https://www.shotlogic.studio',
+    'https://shotlogic.studio'
+  ];
+  if (process.env.NODE_ENV !== 'production') {
+    origins.push('http://localhost:5173', 'http://localhost:3000');
+  }
+  return [...new Set(origins)];
+})();
+
 app.use('/api', (req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  const origin = req.headers.origin;
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-API-Key');
+  res.header('Access-Control-Allow-Credentials', 'true');
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
@@ -120,7 +136,7 @@ app.get("/api/admin/analysis-health", async (req, res) => {
   await apiHandler(req, res, join(__dirname, "api/admin/analysis-health.ts"));
 });
 // Use app.all to accept any HTTP method (GET for browser testing, DELETE for proper usage)
-app.all("/api/admin/delete-project", async (req, res) => {
+app.delete("/api/admin/delete-project", async (req, res) => {
   await apiHandler(req, res, join(__dirname, "api/admin/delete-project.ts"));
 });
 
@@ -130,7 +146,7 @@ app.post("/api/admin/reset-project-status", async (req, res) => {
 });
 
 // Admin: Reassign projects between users
-app.all("/api/admin/reassign-projects", async (req, res) => {
+app.post("/api/admin/reassign-projects", async (req, res) => {
   await apiHandler(req, res, join(__dirname, "api/admin/reassign-projects.ts"));
 });
 
@@ -142,6 +158,20 @@ app.get("/api/admin/list-all-projects", async (req, res) => {
 // Visual profile endpoint
 app.post("/api/visual-profile", async (req, res) => {
   await apiHandler(req, res, join(__dirname, "api/visual-profile.ts"));
+});
+
+// Credits endpoints
+app.get("/api/credits/get-balance", async (req, res) => {
+  await apiHandler(req, res, join(__dirname, "api/credits/get-balance.ts"));
+});
+
+app.post("/api/credits/create-checkout", async (req, res) => {
+  await apiHandler(req, res, join(__dirname, "api/credits/create-checkout.ts"));
+});
+
+// Stripe webhook (special handling - needs raw body)
+app.post("/api/webhook/stripe", express.raw({ type: 'application/json' }), async (req, res) => {
+  await apiHandler(req, res, join(__dirname, "api/webhook/stripe.ts"));
 });
 
 // Serve static files

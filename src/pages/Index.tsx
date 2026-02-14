@@ -109,7 +109,7 @@ export default function Index() {
         maxRetries: 2
       });
     } catch (err) {
-      logger.error('[DEBUG] Failed to save scene:', scene.number, err);
+      logger.error(`Failed to save scene ${scene.number}:`, err);
       // Don't throw - log and continue with other scenes
     }
   };
@@ -136,10 +136,10 @@ export default function Index() {
         maxRetries: 2
       });
 
-      logger.log('[DEBUG] Project created with ID:', result.id);
+
       return result.id;
     } catch (err) {
-      logger.error('[DEBUG] Failed to create project:', err);
+      logger.error('Failed to create project:', err);
       const errorMsg = (err as ApiError).userMessage || 'Failed to create project';
       setError(errorMsg);
       return null;
@@ -245,8 +245,7 @@ export default function Index() {
   };
 
   function processExtractedText(text: string): ParsedScene[] {
-    logger.log("[DEBUG] Text length:", text?.length);
-    logger.log("[DEBUG] First 1000 chars:", text?.substring(0, 1000));
+    logger.log(`[Parse] Processing extracted text (${text?.length} chars)`);
 
     // Server-side PDF parser already handles spaced-out text correctly
     // No client-side spacing fix needed
@@ -254,33 +253,29 @@ export default function Index() {
     text = text.replace(/  +/g, ' ');
     text = text.replace(/\s+(INT\.|EXT\.|I\/E\.|I\.E\.)\s+/gi, '\n$1 ');
 
-    logger.log("[DEBUG] After newline injection, first 500 chars:", text.substring(0, 500));
+
     
     const firstSceneMatch = text.match(/(?:^|\n)\s*\d*\s*(INT\.|EXT\.|I\/E|I\.E\.)\s+/i);
-    logger.log("[DEBUG] First scene match:", firstSceneMatch ? firstSceneMatch[0] : "NOT FOUND");
+
     
     if (!firstSceneMatch) {
-      logger.log("[DEBUG] No scene headers found!");
       return [];
     }
     
     const scriptText = text.substring(firstSceneMatch.index!);
-    logger.log("[DEBUG] Script text starts with:", scriptText.substring(0, 200));
+
     
     const scenePattern = /(?=(?:^|\n)[ \t]*\d*[ \t]*(?:INT\.|EXT\.|I\/E|I\.E\.)[ \t]+)/gim;
     const sceneBlocks = scriptText.split(scenePattern);
     
-    logger.log("[DEBUG] Found", sceneBlocks.length, "potential scene blocks");
+
     
     const scenes = sceneBlocks
       .map(block => block.trim())
       .filter(block => /^[ \t]*\d*[ \t]*(?:INT\.|EXT\.|I\/E|I\.E\.)[ \t]+/i.test(block.trim()))
       .map((block, index) => ({ number: index + 1, text: block.trim() }));
     
-    logger.log("[DEBUG] Extracted", scenes.length, "valid scenes");
-    if (scenes.length > 0) {
-      logger.log("[DEBUG] First scene header:", scenes[0].text.substring(0, 100));
-    }
+    logger.log(`[Parse] Extracted ${scenes.length} scenes`);
     
     return scenes;
   }
@@ -327,7 +322,7 @@ export default function Index() {
 
     const extractedName = file.name.replace(/\.(txt|pdf|fdx)$/i, '');
     setProjectName(extractedName);
-    logger.log('[DEBUG] Project name extracted:', extractedName);
+
 
     setIsParsing(true);
     setUploadStep('uploading');
@@ -358,18 +353,11 @@ export default function Index() {
 
       const { screenplayText } = parseResult;
 
-      // DEBUG: Log what we got from the API
-      logger.log('[Validation] API response received');
-      logger.log('[Validation] screenplayText type:', typeof screenplayText);
-      logger.log('[Validation] screenplayText length:', screenplayText?.length || 0);
-      logger.log('[Validation] screenplayText preview:', screenplayText?.substring(0, 200) || 'undefined');
+
 
       // STEP 2: Content validation (screenplay format, scene headers)
       logger.log('[Validation] Validating screenplay content...');
-      logger.log('[Validation] About to check for scanned PDF...');
-      logger.log('[Validation] fileType:', fileType);
-      logger.log('[Validation] file.size:', file.size);
-      logger.log('[Validation] screenplayText exists:', !!screenplayText);
+
 
       // Check for scanned PDF
       if (fileType === 'pdf' && checkForScannedPDF(screenplayText, file.size)) {

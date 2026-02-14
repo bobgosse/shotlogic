@@ -204,7 +204,7 @@ export const SceneNavigator = ({
           {filteredScenes.map((scene, index) => {
             const isActive = scene.id === currentSceneId;
             const isSelected = index === selectedIndex;
-            const hasEdits = false; // TODO: Track user edits
+            const hasEdits = false; // FIXME: Edit tracking not implemented - always returns false, so unsaved changes warnings never trigger
             const timeIcon = getTimeOfDayIcon(scene.header);
             const locationPrefix = getLocationPrefix(scene.header);
             const locationName = getLocationName(scene.header);

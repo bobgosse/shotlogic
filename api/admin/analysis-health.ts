@@ -1,6 +1,6 @@
 // api/admin/analysis-health.ts
 // Health check endpoint for monitoring analysis quality
-// Hit /api/admin/analysis-health?key=YOUR_API_KEY to see status of recent projects
+// Hit /api/admin/analysis-health with X-API-Key header to see status of recent projects
 // ADMIN ONLY: Requires ADMIN_API_KEY env var
 
 import { VercelRequest, VercelResponse } from '@vercel/node'
@@ -8,15 +8,11 @@ import { getDb } from '../lib/mongodb.js'
 import { logger } from "../lib/logger";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-API-Key')
-
-  if (req.method === 'OPTIONS') return res.status(200).end()
+  // CORS handled by server.mjs middleware
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
   // API key authentication
-  const apiKey = req.headers['x-api-key'] || req.query.key
+  const apiKey = req.headers['x-api-key']
   const expectedKey = process.env.ADMIN_API_KEY
 
   // If no key configured, endpoint is disabled for safety

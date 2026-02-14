@@ -23,6 +23,10 @@ dist-ssr
 *.sln
 *.sw?
 .vercel
+.env
 .env*.local
 .env.development
 .env.production
+
+# Dead Supabase functions (kept for reference)
+supabase/functions/

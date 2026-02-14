@@ -43,10 +43,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   logger.log("save-scene", `📅 Timestamp: ${new Date().toISOString()}`)
   logger.log("save-scene", `🏷️  Deploy: ${DEPLOY_TIMESTAMP}`)
 
-  // CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  // CORS handled by server.mjs middleware
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end()

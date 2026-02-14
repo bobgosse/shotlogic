@@ -24,10 +24,7 @@ export default async function handler(
   logger.log("get-all", `📍 Method: ${req.method}`)
   logger.log("get-all", `👤 UserId: ${userId || 'none (showing all)'}`)
 
-  // CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  // CORS handled by server.mjs middleware
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end()

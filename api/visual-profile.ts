@@ -48,15 +48,7 @@ export default async function handler(
 
   logger.log("visual-profile", `📸 [${invocationId}] Visual Profile API: ${req.method}`)
 
-  // CORS headers
-  res.setHeader('Access-Control-Allow-Credentials', 'true')
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization')
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end()
-  }
+  // CORS handled by server.mjs middleware
 
   let client: MongoClient | null = null
 
