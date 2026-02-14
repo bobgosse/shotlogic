@@ -8,6 +8,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import logo from "@/assets/shotlogic-logo-netflix.png";
+import { CreditsIndicator } from "./CreditsIndicator";
 
 interface NavigationProps {
   onSignOut: () => void;
@@ -34,17 +35,20 @@ export const Navigation = ({ onSignOut }: NavigationProps) => {
           </div>
         </div>
 
-        {/* User Menu */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button 
-              variant="ghost" 
-              size="icon"
-              className="h-9 w-9 rounded-full border border-border hover:border-netflix-red transition-colors"
-            >
-              <User className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
+        {/* Credits & User Menu */}
+        <div className="flex items-center gap-4">
+          <CreditsIndicator />
+          
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="icon"
+                className="h-9 w-9 rounded-full border border-border hover:border-netflix-red transition-colors"
+              >
+                <User className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56 bg-card border-border">
             <div className="px-2 py-1.5 text-sm text-muted-foreground">
               My Account
