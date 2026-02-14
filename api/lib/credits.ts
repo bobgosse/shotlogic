@@ -4,9 +4,20 @@
 import { getDb } from './mongodb.js'
 import { logger } from './logger.js'
 
+// Admin users get unlimited credits
+const ADMIN_USER_IDS = [
+  process.env.ADMIN_USER_ID || 'user_2qO5pItWiYNVb8X8Vqst4APDfHr', // Bob's Clerk user ID
+]
+
+function isAdmin(userId: string): boolean {
+  return ADMIN_USER_IDS.includes(userId)
+}
+
 export interface UserCredits {
   userId: string
   credits: number
+  isAdmin?: boolean
+  isTester?: boolean
   purchaseHistory: {
     amount: number
     credits: number
@@ -17,6 +28,18 @@ export interface UserCredits {
     sceneId?: string
     projectId?: string
     credits: number
+    timestamp: Date
+  }[]
+  adminGrants?: {
+    credits: number
+    reason: string
+    grantedBy: string
+    timestamp: Date
+  }[]
+  adminAdjustments?: {
+    credits: number
+    reason: string
+    adjustedBy: string
     timestamp: Date
   }[]
   createdAt: Date
@@ -97,6 +120,7 @@ export async function addCredits(
 
 /**
  * Deduct credits from user account (for scene analysis)
+ * Admin users don't have credits deducted but usage is still logged
  */
 export async function deductCredits(
   userId: string,
@@ -108,7 +132,34 @@ export async function deductCredits(
     const db = await getDb()
     const users = db.collection<UserCredits>('users')
     
-    // Check balance first
+    // Admin users bypass deduction but still log usage
+    if (isAdmin(userId)) {
+      await users.updateOne(
+        { userId },
+        {
+          $push: {
+            usageHistory: {
+              sceneId,
+              projectId,
+              credits: 0, // Admin usage tracked as 0 cost
+              timestamp: new Date(),
+            },
+          },
+          $set: { updatedAt: new Date() },
+          $setOnInsert: { 
+            createdAt: new Date(), 
+            credits: 999999, // Give admins a high balance for display
+            isAdmin: true,
+            purchaseHistory: [],
+          },
+        },
+        { upsert: true }
+      )
+      logger.log('credits', `Admin ${userId} used analysis (no charge). Usage logged.`)
+      return 999999 // Return high number for admins
+    }
+    
+    // Check balance first for regular users
     const user = await users.findOne({ userId })
     if (!user || user.credits < credits) {
       throw new Error('Insufficient credits')
@@ -146,10 +197,16 @@ export async function deductCredits(
 }
 
 /**
- * Check if user has enough credits
+ * Check if user has enough credits (admins always have unlimited)
  */
 export async function hasEnoughCredits(userId: string, required: number): Promise<boolean> {
   try {
+    // Admin users bypass credit checks
+    if (isAdmin(userId)) {
+      logger.log('credits', `Admin user ${userId} bypassing credit check`)
+      return true
+    }
+    
     const balance = await getUserCredits(userId)
     return balance >= required
   } catch (error) {
