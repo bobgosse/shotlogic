@@ -78,6 +78,11 @@ app.post('/api/analyze-scene', async (req, res) => {
   await apiHandler(req, res, join(__dirname, 'api/analyze-scene.ts'));
 });
 
+// Analyze scene status endpoint (polling)
+app.get('/api/analyze-scene-status', async (req, res) => {
+  await apiHandler(req, res, join(__dirname, 'api/analyze-scene-status.ts'));
+});
+
 // Project endpoints
 app.get('/api/projects/get-all', async (req, res) => {
   await apiHandler(req, res, join(__dirname, 'api/projects/get-all.ts'));
