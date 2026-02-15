@@ -194,9 +194,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         logger.warn("save-scene", `⚠️ [${invocationId}] Scene ${sceneNum} analysis saved as object (MongoDB auto-converted), will work with frontend`)
       }
 
-      // Check content is valid JSON with expected structure
+      // Check content has expected structure
       try {
-        const parsed = JSON.parse(savedScene.analysis)
+        // If it's already an object, use it directly; if string, parse it
+        const parsed = typeof savedScene.analysis === 'string' 
+          ? JSON.parse(savedScene.analysis)
+          : savedScene.analysis
         const issues: string[] = []
 
         if (!parsed.story_analysis?.the_turn || parsed.story_analysis.the_turn.length < 20) {
@@ -226,10 +229,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           logger.log("save-scene", `✅ [${invocationId}] VERIFICATION PASSED: Scene ${sceneNum} format and content OK`)
         }
       } catch (parseErr) {
-        logger.error("save-scene", `❌ [${invocationId}] VERIFICATION FAILED: Scene ${sceneNum} analysis is not valid JSON`)
+        logger.error("save-scene", `❌ [${invocationId}] VERIFICATION FAILED: Scene ${sceneNum} analysis validation error:`, parseErr)
         return res.status(500).json({
           error: 'Format verification failed',
-          details: `Scene ${sceneNum} analysis not parseable`,
+          details: `Scene ${sceneNum} analysis validation failed: ${parseErr instanceof Error ? parseErr.message : 'unknown error'}`,
           deployMarker: DEPLOY_TIMESTAMP
         })
       }
