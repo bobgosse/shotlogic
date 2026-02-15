@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { useUser } from "@clerk/clerk-react";
 import { api, ApiError } from "@/utils/apiClient";
-import { AnalysisData, Scene, ShotListItem, parseAnalysis } from "@/types/analysis";
+import { AnalysisData, Scene, ShotListItem, parseAnalysis} from "@/types/analysis";
 import { VisualProfile } from "@/types/visualProfile";
 import { logger } from "@/utils/logger";
 
@@ -23,6 +24,7 @@ export function useSceneAnalysis({
   projectCharacters,
   totalScenes,
 }: UseSceneAnalysisProps) {
+  const { user } = useUser();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -101,6 +103,7 @@ export function useSceneAnalysis({
 
       try {
         const analysisResult = await api.post('/api/analyze-scene', {
+          userId: user?.id,
           sceneText: scene.content,
           sceneNumber: scene.scene_number,
           totalScenes: scenes.length,
@@ -154,6 +157,7 @@ export function useSceneAnalysis({
 
       console.log('[handleReanalyzeScene] Calling /api/analyze-scene...');
       const analysisResult = await api.post("/api/analyze-scene", {
+        userId: user?.id,
         sceneText: sceneContent,
         sceneNumber: sceneNumber,
         totalScenes: totalScenes || 1,
