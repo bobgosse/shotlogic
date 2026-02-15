@@ -130,6 +130,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     for (const scene of updatedScenes) {
       if (scene.analysis) {
         logger.log("save-scene", `   💾 [${invocationId}] Scene ${scene.number} analysis type before save: ${typeof scene.analysis}`)
+        logger.log("save-scene", `       First 100 chars: ${typeof scene.analysis === 'string' ? scene.analysis.substring(0, 100) : JSON.stringify(scene.analysis).substring(0, 100)}`)
       }
     }
 
@@ -143,6 +144,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
     )
+    
+    logger.log("save-scene", `   📤 [${invocationId}] MongoDB updateOne result: matchedCount=${result.matchedCount}, modifiedCount=${result.modifiedCount}`)
 
     logger.log("save-scene", `✅ [${invocationId}] Updated ${result.modifiedCount} project(s)`)
 
@@ -161,12 +164,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         continue
       }
 
+      // Log what we got back from MongoDB
+      logger.log("save-scene", `   📥 [${invocationId}] Scene ${sceneNum} read back from MongoDB:`)
+      logger.log("save-scene", `       analysis type: ${typeof savedScene.analysis}`)
+      logger.log("save-scene", `       analysis value: ${savedScene.analysis === null ? 'null' : savedScene.analysis === undefined ? 'undefined' : 'exists'}`)
+      if (savedScene.analysis) {
+        const preview = typeof savedScene.analysis === 'string' ? savedScene.analysis.substring(0, 100) : JSON.stringify(savedScene.analysis).substring(0, 100)
+        logger.log("save-scene", `       first 100 chars: ${preview}`)
+      }
+
       // Check format - must be a string
       if (typeof savedScene.analysis !== 'string') {
-        logger.error("save-scene", `❌ [${invocationId}] VERIFICATION FAILED: Scene ${sceneNum} analysis is not a string`)
+        logger.error("save-scene", `❌ [${invocationId}] VERIFICATION FAILED: Scene ${sceneNum} analysis is not a string (type=${typeof savedScene.analysis})`)
         return res.status(500).json({
           error: 'Format verification failed',
-          details: `Scene ${sceneNum} saved in wrong format`,
+          details: `Scene ${sceneNum} saved in wrong format: expected string, got ${typeof savedScene.analysis}`,
           deployMarker: DEPLOY_TIMESTAMP
         })
       }
