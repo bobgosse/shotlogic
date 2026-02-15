@@ -148,6 +148,17 @@ export function useSceneAnalysis({
 
   const handleReanalyzeScene = async (_sceneId: string, sceneNumber: number, sceneContent: string, customInstructions?: string) => {
     console.log('[handleReanalyzeScene] Called for scene', sceneNumber, 'content length:', sceneContent?.length);
+    
+    if (!user?.id) {
+      toast({
+        title: "Authentication required",
+        description: "Please wait for authentication to load, then try again.",
+        variant: "destructive"
+      });
+      console.error('[handleReanalyzeScene] User not loaded yet');
+      return;
+    }
+    
     try {
       setReanalyzing(true);
       toast({
@@ -155,9 +166,9 @@ export function useSceneAnalysis({
         description: `Generating structured analysis for Scene ${sceneNumber}`
       });
 
-      console.log('[handleReanalyzeScene] Calling /api/analyze-scene...');
+      console.log('[handleReanalyzeScene] Calling /api/analyze-scene with userId:', user.id);
       const analysisResult = await api.post("/api/analyze-scene", {
-        userId: user?.id,
+        userId: user.id,
         sceneText: sceneContent,
         sceneNumber: sceneNumber,
         totalScenes: totalScenes || 1,
