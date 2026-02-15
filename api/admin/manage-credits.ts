@@ -8,7 +8,7 @@ import { getDb } from '../lib/mongodb.js'
 
 // Admin API key check (Bob's user ID or special admin key)
 const ADMIN_USER_IDS = [
-  process.env.ADMIN_USER_ID || 'user_2qO5pItWiYNVb8X8Vqst4APDfHr', // Bob's Clerk user ID
+  process.env.ADMIN_USER_ID || 'user_37UsTRYS4w4EQq21A2AHYpV6cf2', // Bob's Clerk user ID
 ]
 
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || 'shotlogic-admin-dev-key'
