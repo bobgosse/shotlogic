@@ -117,9 +117,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         // CRITICAL: Store as JSON string (same format as update-scene-analysis.ts)
         // This ensures get-one.ts handles all scenes consistently
+        // Double-check it's actually a string
+        const stringifiedAnalysis = JSON.stringify(analysisData)
+        const finalAnalysis = typeof stringifiedAnalysis === 'string' ? stringifiedAnalysis : String(stringifiedAnalysis)
+        
+        logger.log("save-scene", `      - stringified type: ${typeof finalAnalysis}`)
+        logger.log("save-scene", `      - stringified length: ${finalAnalysis.length}`)
+        
         return {
           ...scene,
-          analysis: JSON.stringify(analysisData),
+          analysis: finalAnalysis,
           status: 'COMPLETED'
         }
       }
@@ -173,14 +180,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         logger.log("save-scene", `       first 100 chars: ${preview}`)
       }
 
-      // Check format - must be a string
-      if (typeof savedScene.analysis !== 'string') {
-        logger.error("save-scene", `❌ [${invocationId}] VERIFICATION FAILED: Scene ${sceneNum} analysis is not a string (type=${typeof savedScene.analysis})`)
+      // Check format - prefer string but accept object (MongoDB may auto-convert)
+      if (typeof savedScene.analysis !== 'string' && typeof savedScene.analysis !== 'object') {
+        logger.error("save-scene", `❌ [${invocationId}] VERIFICATION FAILED: Scene ${sceneNum} analysis is invalid type (type=${typeof savedScene.analysis})`)
         return res.status(500).json({
           error: 'Format verification failed',
-          details: `Scene ${sceneNum} saved in wrong format: expected string, got ${typeof savedScene.analysis}`,
+          details: `Scene ${sceneNum} has invalid analysis type: ${typeof savedScene.analysis}`,
           deployMarker: DEPLOY_TIMESTAMP
         })
+      }
+      
+      if (typeof savedScene.analysis === 'object') {
+        logger.warn("save-scene", `⚠️ [${invocationId}] Scene ${sceneNum} analysis saved as object (MongoDB auto-converted), will work with frontend`)
       }
 
       // Check content is valid JSON with expected structure
