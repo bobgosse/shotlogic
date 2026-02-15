@@ -5,6 +5,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { logger } from "./lib/logger";
 import { hasEnoughCredits, deductCredits } from "./lib/credits.js";
+import { createAnalysisJob, updateJobStatus, completeJob, failJob } from "./lib/analysisJobs.js";
 
 const DEPLOY_TIMESTAMP = "2025-02-05T03:00:00Z_REQUIRED_FIELDS_PROMPT"
 
@@ -650,10 +651,59 @@ export default async function handler(
     const startTime = Date.now()
 
     // ═══════════════════════════════════════════════════════════════
+    // CREATE JOB: Track progress for frontend polling
+    // ═══════════════════════════════════════════════════════════════
+    let jobId: string | null = null;
+    try {
+      jobId = await createAnalysisJob({
+        userId,
+        sceneNumber,
+        sceneText,
+        totalScenes,
+        visualStyle: requestBody.visualStyle,
+        visualProfile: requestBody.visualProfile,
+        characters: requestBody.characters,
+        customInstructions,
+      });
+      logger.log("analyze-scene", `🎫 [${invocationId}] Created job ${jobId}`);
+      
+      // Send jobId immediately in response header so frontend can start polling
+      res.setHeader('X-Job-ID', jobId);
+      
+      // Update status to PROCESSING
+      await updateJobStatus(jobId, 'PROCESSING', {
+        phase: 'story',
+        message: 'Starting story analysis...'
+      });
+    } catch (error: any) {
+      logger.error("analyze-scene", `❌ [${invocationId}] Failed to create job: ${error.message}`);
+      // Continue anyway - job tracking is optional
+    }
+
+    // ═══════════════════════════════════════════════════════════════
     // CALL 1: Story Analysis
     // ═══════════════════════════════════════════════════════════════
     logger.log("analyze-scene", `\n📖 [${invocationId}] STEP 1/3: Story Analysis...`)
     const storyResult = await analyzeStory(anthropicKey, sceneText, characters, invocationId)
+
+    if (!storyResult.success) {
+      if (jobId) await failJob(jobId, storyResult.error || 'Story analysis failed');
+      logger.error("analyze-scene", `❌ [${invocationId}] Story analysis failed: ${storyResult.error}`)
+      return res.status(500).json({
+        error: 'STORY_ANALYSIS_FAILED',
+        message: storyResult.error,
+        userMessage: 'Failed to analyze story elements. Please try again.',
+        deployMarker: DEPLOY_TIMESTAMP
+      })
+    }
+    
+    // Update job progress
+    if (jobId) {
+      await updateJobStatus(jobId, 'PROCESSING', {
+        phase: 'producing',
+        message: 'Story complete, analyzing producing logistics...'
+      });
+    }
 
     if (!storyResult.success) {
       logger.error("analyze-scene", `❌ [${invocationId}] Story analysis failed: ${storyResult.error}`)
@@ -715,6 +765,14 @@ export default async function handler(
     logger.log("analyze-scene", `   - Est. screen time: ${producingResult.data.estimated_screen_time?.estimated_minutes || 'missing'}`)
     logger.log("analyze-scene", `   - Sound challenges: ${producingResult.data.sound_design?.production_sound_challenges?.length || 0}`)
     logger.log("analyze-scene", `   - Safety concerns: ${producingResult.data.safety_specifics?.concerns?.length || 0}`)
+    
+    // Update job progress
+    if (jobId) {
+      await updateJobStatus(jobId, 'PROCESSING', {
+        phase: 'directing',
+        message: 'Producing complete, generating shot list...'
+      });
+    }
 
     // Normalize new producing fields with safe defaults if Claude omitted them
     const emptyCarry = { costume: '', props: '', makeup: '', time_logic: '', emotional_state: '' }
@@ -910,8 +968,28 @@ export default async function handler(
       validationIssues.push('continuity carries_in/carries_out is missing')
     }
 
+    // Mark job as complete
+    if (jobId) {
+      await completeJob(jobId, {
+        analysis,
+        validation: {
+          quality: validationIssues.length === 0 ? 'good' : validationIssues.length <= 2 ? 'fair' : 'poor',
+          issues: validationIssues
+        },
+        meta: {
+          sceneNumber,
+          processingTime: totalDuration,
+          characters,
+          actualShots: analysis.shot_list.length,
+          model: MODEL,
+          architecture: '3-call-split',
+        }
+      });
+    }
+    
     return res.status(200).json({
       success: true,
+      jobId,  // Include jobId in response
       analysis,
       validation: {
         quality: validationIssues.length === 0 ? 'good' : validationIssues.length <= 2 ? 'fair' : 'poor',
@@ -935,6 +1013,12 @@ export default async function handler(
 
   } catch (error) {
     logger.error("analyze-scene", `❌ [${invocationId}] Unexpected error:`, error)
+    
+    // Mark job as failed
+    if (jobId) {
+      await failJob(jobId, error instanceof Error ? error.message : 'Unknown error occurred');
+    }
+    
     return res.status(500).json({
       error: 'UNEXPECTED_ERROR',
       message: error instanceof Error ? error.message : 'Unknown error occurred',

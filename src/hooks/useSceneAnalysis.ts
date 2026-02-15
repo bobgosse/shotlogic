@@ -162,12 +162,14 @@ export function useSceneAnalysis({
     try {
       setReanalyzing(true);
       toast({
-        title: customInstructions ? "Re-analyzing scene with custom instructions..." : "Analyzing scene...",
-        description: `Generating structured analysis for Scene ${sceneNumber}`
+        title: customInstructions ? "Re-analyzing scene with custom instructions..." : "Starting analysis...",
+        description: `Setting up analysis for Scene ${sceneNumber}...`
       });
 
       console.log('[handleReanalyzeScene] Calling /api/analyze-scene with userId:', user.id);
-      const analysisResult = await api.post("/api/analyze-scene", {
+      
+      // Start analysis (backend will process and track progress via jobId)
+      const startResponse = await api.post("/api/analyze-scene", {
         userId: user.id,
         sceneText: sceneContent,
         sceneNumber: sceneNumber,
@@ -177,27 +179,110 @@ export function useSceneAnalysis({
         characters: projectCharacters || [],
         customInstructions: customInstructions || undefined
       }, {
-        context: `Analyzing scene ${sceneNumber}`,
-        timeoutMs: 300000, // 300s to match backend timeout
-        maxRetries: 1
+        context: `Starting analysis for scene ${sceneNumber}`,
+        timeoutMs: 350000, // 5m50s - longer than backend to avoid premature timeout
+        maxRetries: 0  // Don't retry - polling will handle reconnection
       });
 
-      await api.post("/api/projects/update-scene-analysis", {
-        projectId: id,
-        sceneNumber: sceneNumber,
-        analysis: analysisResult.analysis || analysisResult
-      }, {
-        context: `Saving scene ${sceneNumber} analysis`,
-        timeoutMs: 30000,
-        maxRetries: 2
-      });
+      const jobId = startResponse.jobId;
+      console.log('[handleReanalyzeScene] Got jobId:', jobId);
 
-      await queryClient.invalidateQueries({ queryKey: ["project", id] });
+      // If we got the result directly (backend completed synchronously), use it
+      if (startResponse.analysis) {
+        await api.post("/api/projects/update-scene-analysis", {
+          projectId: id,
+          sceneNumber: sceneNumber,
+          analysis: startResponse.analysis
+        }, {
+          context: `Saving scene ${sceneNumber} analysis`,
+          timeoutMs: 30000,
+          maxRetries: 2
+        });
 
-      toast({
-        title: "Analysis complete!",
-        description: `Scene ${sceneNumber} has been analyzed`
-      });
+        await queryClient.invalidateQueries({ queryKey: ["project", id] });
+
+        toast({
+          title: "Analysis complete!",
+          description: `Scene ${sceneNumber} has been analyzed`
+        });
+        return;
+      }
+
+      // Poll for status updates if we only got a jobId
+      if (jobId) {
+        console.log('[handleReanalyzeScene] Polling for status updates...');
+        let attempts = 0;
+        const maxAttempts = 60; // 10 minutes max (60 * 10s intervals)
+        
+        const pollStatus = async (): Promise<void> => {
+          if (attempts >= maxAttempts) {
+            throw new Error('Analysis timed out after 10 minutes');
+          }
+          
+          attempts++;
+          
+          try {
+            const statusResponse = await api.get(`/api/analyze-scene-status?jobId=${jobId}`, {
+              context: `Checking status for scene ${sceneNumber}`,
+              timeoutMs: 10000,
+              maxRetries: 1
+            });
+
+            console.log(`[handleReanalyzeScene] Status poll #${attempts}:`, statusResponse.status, statusResponse.progress);
+
+            // Update toast with progress
+            if (statusResponse.progress) {
+              const phaseMessages: Record<string, string> = {
+                story: 'Analyzing story elements...',
+                producing: 'Analyzing production logistics...',
+                directing: 'Generating shot list...',
+                complete: 'Finalizing analysis...'
+              };
+              toast({
+                title: "Analyzing scene...",
+                description: phaseMessages[statusResponse.progress.phase] || statusResponse.progress.message
+              });
+            }
+
+            if (statusResponse.status === 'COMPLETED' && statusResponse.result) {
+              // Analysis complete! Save it
+              console.log('[handleReanalyzeScene] Analysis completed, saving result');
+              
+              await api.post("/api/projects/update-scene-analysis", {
+                projectId: id,
+                sceneNumber: sceneNumber,
+                analysis: statusResponse.result.analysis
+              }, {
+                context: `Saving scene ${sceneNumber} analysis`,
+                timeoutMs: 30000,
+                maxRetries: 2
+              });
+
+              await queryClient.invalidateQueries({ queryKey: ["project", id] });
+
+              toast({
+                title: "Analysis complete!",
+                description: `Scene ${sceneNumber} has been analyzed`
+              });
+              return;
+            } else if (statusResponse.status === 'ERROR') {
+              throw new Error(statusResponse.error || 'Analysis failed');
+            } else if (statusResponse.status === 'PROCESSING' || statusResponse.status === 'PENDING') {
+              // Still processing, poll again in 10 seconds
+              await new Promise(resolve => setTimeout(resolve, 10000));
+              return pollStatus();
+            }
+          } catch (pollError: any) {
+            // If polling fails, wait and retry
+            console.error('[handleReanalyzeScene] Poll error:', pollError);
+            await new Promise(resolve => setTimeout(resolve, 10000));
+            return pollStatus();
+          }
+        };
+
+        await pollStatus();
+      }
+
     } catch (error: any) {
       logger.error("[handleReanalyzeScene] Error:", error);
       const errorMsg = (error as ApiError).userMessage || error.message || "Failed to generate analysis";
