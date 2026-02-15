@@ -59,6 +59,7 @@ export default function Index() {
   const analyzeScene = async (scene: AnalyzedScene, totalScenes: number, projectIdForErrors?: string): Promise<AnalyzedScene> => {
     try {
       const result = await api.post('/api/analyze-scene', {
+        userId: user?.id,
         sceneText: scene.text,
         sceneNumber: scene.number,
         totalScenes: totalScenes
