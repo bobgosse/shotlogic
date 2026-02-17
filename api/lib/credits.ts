@@ -9,8 +9,19 @@ const ADMIN_USER_IDS = [
   process.env.ADMIN_USER_ID || 'user_37UsTRYS4w4EQq21A2AHYpV6cf2', // Bob's Clerk user ID
 ]
 
+// Admin emails as backup (Clerk sometimes sends email as ID)
+const ADMIN_EMAILS = [
+  'bobgosse@gmail.com',
+  'bob@shotlogic.studio'
+]
+
 function isAdmin(userId: string): boolean {
-  return ADMIN_USER_IDS.includes(userId)
+  const isAdminById = ADMIN_USER_IDS.includes(userId)
+  const isAdminByEmail = ADMIN_EMAILS.includes(userId)
+  
+  logger.log('credits', `🔍 Admin check for userId: ${userId} | byId: ${isAdminById} | byEmail: ${isAdminByEmail}`)
+  
+  return isAdminById || isAdminByEmail
 }
 
 export interface UserCredits {
@@ -201,16 +212,19 @@ export async function deductCredits(
  */
 export async function hasEnoughCredits(userId: string, required: number): Promise<boolean> {
   try {
+    logger.log('credits', `🔍 Checking if user "${userId}" has ${required} credits`)
+    
     // Admin users bypass credit checks
     if (isAdmin(userId)) {
-      logger.log('credits', `Admin user ${userId} bypassing credit check`)
+      logger.log('credits', `✅ Admin user ${userId} bypassing credit check - UNLIMITED CREDITS`)
       return true
     }
     
     const balance = await getUserCredits(userId)
+    logger.log('credits', `💰 User ${userId} balance: ${balance} credits (requires ${required})`)
     return balance >= required
   } catch (error) {
-    logger.error('credits', `Failed to check credits for ${userId}:`, error)
+    logger.error('credits', `❌ Failed to check credits for ${userId}:`, error)
     return false
   }
 }

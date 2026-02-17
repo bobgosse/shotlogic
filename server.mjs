@@ -165,6 +165,11 @@ app.post("/api/visual-profile", async (req, res) => {
   await apiHandler(req, res, join(__dirname, "api/visual-profile.ts"));
 });
 
+// Debug endpoint - whoami
+app.all("/api/debug/whoami", async (req, res) => {
+  await apiHandler(req, res, join(__dirname, "api/debug/whoami.ts"));
+});
+
 // Credits endpoints
 app.get("/api/credits/get-balance", async (req, res) => {
   await apiHandler(req, res, join(__dirname, "api/credits/get-balance.ts"));

@@ -621,11 +621,13 @@ export default async function handler(
     // ═══════════════════════════════════════════════════════════════
     const CREDITS_PER_SCENE = 1
     
-    logger.log("analyze-scene", `💳 [${invocationId}] Checking credits for ${userId}...`)
+    logger.log("analyze-scene", `💳 [${invocationId}] Checking credits for userId: "${userId}" (type: ${typeof userId})`)
     
     const hasCredits = await hasEnoughCredits(userId, CREDITS_PER_SCENE)
+    logger.log("analyze-scene", `💳 [${invocationId}] Credit check result: ${hasCredits}`)
+    
     if (!hasCredits) {
-      logger.warn("analyze-scene", `❌ [${invocationId}] Insufficient credits for ${userId}`)
+      logger.warn("analyze-scene", `❌ [${invocationId}] Insufficient credits for userId: "${userId}"`)
       return res.status(402).json({
         error: 'INSUFFICIENT_CREDITS',
         message: 'Not enough credits to analyze this scene',
@@ -633,6 +635,8 @@ export default async function handler(
         deployMarker: DEPLOY_TIMESTAMP
       })
     }
+    
+    logger.log("analyze-scene", `✅ [${invocationId}] Credit check passed for ${userId}`)
     
     // Deduct credits BEFORE starting analysis
     try {
