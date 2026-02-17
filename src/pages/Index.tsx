@@ -1,7 +1,7 @@
 import React from 'react';
 import { useState, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Upload, Loader2, Film, CheckCircle, XCircle } from 'lucide-react'
+import { Upload, Loader2, Film, CheckCircle, XCircle, CreditCard } from 'lucide-react'
 import { useUser } from '@clerk/clerk-react'
 import { ScreenplayUploadProgress, UploadStep } from '@/components/ScreenplayUploadProgress'
 import { api, ApiError } from '@/utils/apiClient'
@@ -12,6 +12,15 @@ import {
   checkForScannedPDF
 } from '@/utils/screenplayValidator'
 import { logger } from "@/utils/logger";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 interface ParsedScene {
   number: number;
@@ -43,6 +52,7 @@ export default function Index() {
   const [projectName, setProjectName] = useState<string>("");
   const [elapsedTime, setElapsedTime] = useState(0);
   const [batchTimes, setBatchTimes] = useState<number[]>([]);
+  const [showCreditError, setShowCreditError] = useState(false);
 
 
   // Timer effect for showing elapsed time during analysis
@@ -71,6 +81,14 @@ export default function Index() {
 
       return { ...scene, analysis: result.analysis, status: 'complete', error: null };
     } catch (err) {
+      // Check for 402 Payment Required (insufficient credits)
+      if ((err as any).status === 402 || (err as any).statusCode === 402) {
+        setShowCreditError(true);
+        setIsAnalyzing(false);
+        setIsParsing(false);
+        throw err; // Stop the analysis process
+      }
+
       const errorMsg = (err as ApiError).userMessage || 'Analysis failed';
       logger.error(`[Scene ${scene.number}] Analysis error:`, err);
 
@@ -598,6 +616,48 @@ export default function Index() {
           </div>
         )}
       </main>
+
+      {/* Credit Error Dialog */}
+      <Dialog open={showCreditError} onOpenChange={setShowCreditError}>
+        <DialogContent className="sm:max-w-md bg-[#141414] border-[#E50914]/30">
+          <DialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-12 h-12 rounded-full bg-[#E50914]/10 flex items-center justify-center">
+                <CreditCard className="w-6 h-6 text-[#E50914]" />
+              </div>
+              <DialogTitle className="text-xl text-white">Credits Required</DialogTitle>
+            </div>
+            <DialogDescription className="text-white/70 text-base">
+              You need credits to analyze scenes. Purchase a credit pack to get started with your screenplay analysis.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="bg-white/5 rounded-lg p-4 space-y-2">
+              <p className="text-sm text-white/60">📊 Each scene uses 1 credit</p>
+              <p className="text-sm text-white/60">💳 Credit packs start at just $15</p>
+              <p className="text-sm text-white/60">🎬 Get instant access to AI-powered scene analysis</p>
+            </div>
+          </div>
+
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowCreditError(false)}
+              className="w-full sm:w-auto bg-transparent border-white/20 text-white hover:bg-white/10"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => navigate('/buy-credits')}
+              className="w-full sm:w-auto bg-[#E50914] hover:bg-[#E50914]/90 text-white"
+            >
+              <CreditCard className="w-4 h-4 mr-2" />
+              Buy Credits
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
