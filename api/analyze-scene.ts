@@ -176,10 +176,10 @@ ${sceneText}
 ${characters.join(', ')}
 </characters>
 
-Return ONLY valid JSON (no markdown, no explanation). Fill in EVERY field:
+Return ONLY valid JSON (no markdown, no explanation). Fill in EVERY field - especially synopsis and scene_obligation are CRITICAL:
 {
   "the_core": "This scene exists to [REQUIRED: complete with specific purpose]",
-  "synopsis": "[REQUIRED: 2-3 sentences describing exactly what happens]",
+  "synopsis": "[REQUIRED: 2-3 complete sentences describing EXACTLY what happens in this scene from start to finish. Be specific and concrete.]",
   "the_turn": "[REQUIRED: Quote the exact line or describe the action where the scene pivots. If no clear turn: 'Scene maintains steady tension throughout']",
   "ownership": "[REQUIRED: CHARACTER NAME] drives this scene by [specific action]",
   "the_times": "[REQUIRED: Era, period, or contemporary setting details]",
@@ -717,12 +717,14 @@ export default async function handler(
 
     logger.log("analyze-scene", `✅ [${invocationId}] Story analysis complete`)
     logger.log("analyze-scene", `   - the_core: "${storyResult.data.the_core?.substring(0, 60)}..."`)
+    logger.log("analyze-scene", `   - synopsis: "${storyResult.data.synopsis?.substring(0, 60) || 'MISSING'}..."`)
     logger.log("analyze-scene", `   - the_turn: "${storyResult.data.the_turn?.substring(0, 60)}..."`)
-    logger.log("analyze-scene", `   - scene_obligation: "${storyResult.data.scene_obligation?.substring(0, 60)}..."`)
+    logger.log("analyze-scene", `   - scene_obligation: "${storyResult.data.scene_obligation?.substring(0, 60) || 'MISSING'}..."`)
     logger.log("analyze-scene", `   - the_one_thing: "${storyResult.data.the_one_thing?.substring(0, 60)}..."`)
     logger.log("analyze-scene", `   - alternative_readings: ${storyResult.data.alternative_readings?.length || 0} readings`)
 
     // Normalize new fields with safe defaults if Claude omitted them
+    if (!storyResult.data.synopsis) storyResult.data.synopsis = ''
     if (!storyResult.data.scene_obligation) storyResult.data.scene_obligation = ''
     if (!storyResult.data.the_one_thing) storyResult.data.the_one_thing = ''
     if (!storyResult.data.setup_payoff) storyResult.data.setup_payoff = { setups: [], payoffs: [] }
@@ -937,6 +939,9 @@ export default async function handler(
       }
     }
     // Validate new story analysis fields
+    if (!analysis.story_analysis.synopsis || analysis.story_analysis.synopsis.length < 30) {
+      validationIssues.push('synopsis is missing or too short (min 30 chars)')
+    }
     if (!analysis.story_analysis.scene_obligation || analysis.story_analysis.scene_obligation.length < 30) {
       validationIssues.push('scene_obligation is missing or too short (min 30 chars)')
     }
