@@ -11,8 +11,16 @@ const ADMIN_USER_IDS = [
   'bob@shotlogic.studio' // Bob's work email
 ]
 
+// Beta testers get initial free credits (renewable by admin)
+const BETA_TESTER_EMAILS = (process.env.BETA_TESTER_EMAILS || '').split(',').filter(e => e.trim())
+const BETA_TESTER_INITIAL_CREDITS = parseInt(process.env.BETA_TESTER_INITIAL_CREDITS || '50', 10)
+
 function isAdmin(userId: string): boolean {
   return ADMIN_USER_IDS.includes(userId)
+}
+
+function isBetaTester(userId: string): boolean {
+  return BETA_TESTER_EMAILS.some(email => email.trim().toLowerCase() === userId.toLowerCase())
 }
 
 export interface UserCredits {
@@ -59,17 +67,21 @@ export async function getUserCredits(userId: string): Promise<number> {
     let user = await users.findOne({ userId })
     
     if (!user) {
-      // Create new user with 0 credits
+      // Check if this is a beta tester - give them initial free credits
+      const isBeta = isBetaTester(userId)
+      const initialCredits = isBeta ? BETA_TESTER_INITIAL_CREDITS : 0
+      
       user = {
         userId,
-        credits: 0,
+        credits: initialCredits,
+        isTester: isBeta || undefined,
         purchaseHistory: [],
         usageHistory: [],
         createdAt: new Date(),
         updatedAt: new Date(),
       }
       await users.insertOne(user as any)
-      logger.log('credits', `Created new user: ${userId} with 0 credits`)
+      logger.log('credits', `Created new user: ${userId} with ${initialCredits} credits${isBeta ? ' (BETA TESTER)' : ''}`)
     }
     
     return user.credits
