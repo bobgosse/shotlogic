@@ -7,6 +7,8 @@ import { logger } from './logger.js'
 // Admin users get unlimited credits
 const ADMIN_USER_IDS = [
   process.env.ADMIN_USER_ID || 'user_37UsTRYS4w4EQq21A2AHYpV6cf2', // Bob's Clerk user ID
+  'bobgosse@gmail.com', // Bob's email (Clerk fallback)
+  'bob@shotlogic.studio' // Bob's work email
 ]
 
 function isAdmin(userId: string): boolean {
