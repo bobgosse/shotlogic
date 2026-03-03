@@ -221,7 +221,8 @@ export default async function handler(
         header: header,
         content: scene.text || '',
         analysis: analysisString,
-        status: scene.status === 'complete' || scene.status === 'COMPLETED' ? 'COMPLETED' : (scene.status || 'PENDING').toUpperCase()
+        status: scene.status === 'complete' || scene.status === 'COMPLETED' ? 'COMPLETED' : (scene.status || 'PENDING').toUpperCase(),
+        ...(scene.storyLogicContext ? { storyLogicContext: scene.storyLogicContext } : {})
       };
     });
 

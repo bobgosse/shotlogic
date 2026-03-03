@@ -55,6 +55,17 @@ interface VisualProfile {
   inspiration_notes?: string
 }
 
+interface StoryLogicContext {
+  synopsis: string
+  want: string
+  obstacle: string
+  conflict: string
+  turn: string
+  turnCause: string
+  stakes: string
+  change: string
+}
+
 interface AnalyzeSceneRequest {
   userId: string
   sceneText: string
@@ -64,6 +75,7 @@ interface AnalyzeSceneRequest {
   visualProfile?: VisualProfile
   characters?: Array<{ name: string; physical: string }>
   customInstructions?: string
+  storyLogicContext?: StoryLogicContext
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -161,10 +173,25 @@ async function analyzeStory(
   apiKey: string,
   sceneText: string,
   characters: string[],
-  invocationId: string
+  invocationId: string,
+  storyLogicContext?: StoryLogicContext
 ): Promise<{ success: boolean; data?: any; error?: string; usage?: any }> {
 
   const systemPrompt = `You are a professional script analyst and story consultant. Analyze the scene and return ONLY valid JSON with ALL 14 fields. CRITICAL: You must fill in EVERY field with specific, substantive content from THIS scene. Do NOT skip any fields. Do NOT use placeholder text. Do NOT truncate your response. Think deeply about what this scene MUST accomplish for the story to work.`
+
+  const storyLogicBlock = storyLogicContext ? `
+<story_logic_context>
+The following story elements have been pre-validated by StoryLogic (a screenplay construction tool). Use these as your foundation — build on them, don't contradict them:
+SYNOPSIS: ${storyLogicContext.synopsis}
+THE CORE (what the protagonist wants): ${storyLogicContext.want}
+OBSTACLE: ${storyLogicContext.obstacle}
+CONFLICT: ${storyLogicContext.conflict}
+THE TURN (direction): ${storyLogicContext.turn}
+TURN CAUSE: ${storyLogicContext.turnCause}
+STAKES: ${storyLogicContext.stakes}
+CHANGE (what shifts by scene end): ${storyLogicContext.change}
+</story_logic_context>
+` : ''
 
   const userPrompt = `Analyze this scene and return JSON with ALL 14 fields. Every field is REQUIRED - do not skip any.
 
@@ -175,6 +202,7 @@ ${sceneText}
 <characters>
 ${characters.join(', ')}
 </characters>
+${storyLogicBlock}
 
 Return ONLY valid JSON (no markdown, no explanation). Fill in EVERY field - especially synopsis and scene_obligation are CRITICAL:
 {
@@ -568,11 +596,14 @@ export default async function handler(
     }
 
     const requestBody = req.body as AnalyzeSceneRequest
-    const { userId, sceneText, sceneNumber, totalScenes, customInstructions } = requestBody
+    const { userId, sceneText, sceneNumber, totalScenes, customInstructions, storyLogicContext } = requestBody
 
     logger.log("analyze-scene", `📊 [${invocationId}] Scene: ${sceneNumber}/${totalScenes}`)
     logger.log("analyze-scene", `📊 [${invocationId}] Text length: ${sceneText?.length || 0} chars`)
     logger.log("analyze-scene", `👤 [${invocationId}] UserId: ${userId}`)
+    if (storyLogicContext) {
+      logger.log("analyze-scene", `📖 [${invocationId}] StoryLogic context present — will inform analysis`)
+    }
 
     // Validate required fields
     if (!userId || typeof userId !== 'string') {
@@ -684,7 +715,7 @@ export default async function handler(
     // CALL 1: Story Analysis
     // ═══════════════════════════════════════════════════════════════
     logger.log("analyze-scene", `\n📖 [${invocationId}] STEP 1/3: Story Analysis...`)
-    const storyResult = await analyzeStory(anthropicKey, sceneText, characters, invocationId)
+    const storyResult = await analyzeStory(anthropicKey, sceneText, characters, invocationId, storyLogicContext)
 
     if (!storyResult.success) {
       if (jobId) await failJob(jobId, storyResult.error || 'Story analysis failed');

@@ -24,6 +24,17 @@ export interface ShotListItem {
   coverage?: string;
 }
 
+export interface StoryLogicContext {
+  synopsis: string;
+  want: string;
+  obstacle: string;
+  conflict: string;
+  turn: string;
+  turnCause: string;
+  stakes: string;
+  change: string;
+}
+
 export interface Scene {
   id: string;
   scene_number: number;
@@ -31,6 +42,7 @@ export interface Scene {
   content: string;
   analysis: string | null;
   status: string;
+  storyLogicContext?: StoryLogicContext;
 }
 
 export interface AnalysisData {

@@ -136,6 +136,11 @@ app.post("/api/projects/update-scene-status", async (req, res) => {
   await apiHandler(req, res, join(__dirname, "api/projects/update-scene-status.ts"));
 });
 
+// Import StoryLogic JSON
+app.post("/api/projects/import-storylogic", async (req, res) => {
+  await apiHandler(req, res, join(__dirname, "api/projects/import-storylogic.ts"));
+});
+
 // Admin endpoints
 app.get("/api/admin/analysis-health", async (req, res) => {
   await apiHandler(req, res, join(__dirname, "api/admin/analysis-health.ts"));

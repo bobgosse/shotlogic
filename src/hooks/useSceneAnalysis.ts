@@ -109,7 +109,8 @@ export function useSceneAnalysis({
           totalScenes: scenes.length,
           visualStyle: projectVisualStyle || null,
           visualProfile: projectVisualProfile || null,
-          characters: projectCharacters || []
+          characters: projectCharacters || [],
+          storyLogicContext: scene.storyLogicContext || undefined
         }, {
           context: `Regenerating scene ${scene.scene_number}`,
           timeoutMs: 150000,
@@ -168,6 +169,9 @@ export function useSceneAnalysis({
 
       console.log('[handleReanalyzeScene] Calling /api/analyze-scene with userId:', user.id);
       
+      // Look up storyLogicContext from the scene data
+      const sceneData = scenes.find(s => s.scene_number === sceneNumber);
+
       // Start analysis (backend will process and track progress via jobId)
       const startResponse = await api.post("/api/analyze-scene", {
         userId: user.id,
@@ -177,7 +181,8 @@ export function useSceneAnalysis({
         visualStyle: projectVisualStyle || null,
         visualProfile: projectVisualProfile || null,
         characters: projectCharacters || [],
-        customInstructions: customInstructions || undefined
+        customInstructions: customInstructions || undefined,
+        storyLogicContext: sceneData?.storyLogicContext || undefined
       }, {
         context: `Starting analysis for scene ${sceneNumber}`,
         timeoutMs: 350000, // 5m50s - longer than backend to avoid premature timeout

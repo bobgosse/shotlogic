@@ -27,12 +27,13 @@ const MIN_SCENE_HEADERS = 1; // At least one scene
 const RECOMMENDED_MIN_SCENES = 3; // Warning if fewer
 
 // Supported file types
-const SUPPORTED_EXTENSIONS = ['.txt', '.pdf', '.fdx'];
+const SUPPORTED_EXTENSIONS = ['.txt', '.pdf', '.fdx', '.json'];
 const SUPPORTED_MIME_TYPES = [
   'text/plain',
   'application/pdf',
   'application/xml',
   'text/xml',
+  'application/json',
   'application/octet-stream' // FDX files sometimes use this
 ];
 

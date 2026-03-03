@@ -327,17 +327,69 @@ export default function Index() {
     }
 
     const fileName = file.name.toLowerCase();
-    let fileType: 'txt' | 'pdf' | 'fdx' | null = null;
+    let fileType: 'txt' | 'pdf' | 'fdx' | 'json' | null = null;
     if (fileName.endsWith('.txt')) fileType = 'txt';
     else if (fileName.endsWith('.pdf')) fileType = 'pdf';
     else if (fileName.endsWith('.fdx')) fileType = 'fdx';
+    else if (fileName.endsWith('.json')) fileType = 'json';
 
     if (!fileType) {
-      setError('Please upload a .txt, .pdf, or .fdx file');
+      setError('Please upload a .txt, .pdf, .fdx, or .json file');
       return;
     }
 
     setFileInfo({ name: file.name, type: fileType });
+
+    // Handle StoryLogic JSON import
+    if (fileType === 'json') {
+      setIsParsing(true);
+      setUploadStep('uploading');
+      try {
+        const text = await file.text();
+        let jsonData: any;
+        try {
+          jsonData = JSON.parse(text);
+        } catch {
+          setError('Invalid JSON file. Please check the file format.');
+          setIsParsing(false);
+          setUploadStep(null);
+          return;
+        }
+
+        if (jsonData.importedFrom !== 'StoryLogic') {
+          setError('This JSON file is not a StoryLogic export. Please export from StoryLogic first.');
+          setIsParsing(false);
+          setUploadStep(null);
+          return;
+        }
+
+        setUploadStep('detecting');
+        const extractedName = jsonData.title || file.name.replace(/\.json$/i, '');
+        setProjectName(extractedName);
+
+        const result = await api.post('/api/projects/import-storylogic', {
+          storyLogicData: jsonData,
+          userId: user?.id,
+        }, {
+          context: 'Importing StoryLogic project',
+          timeoutMs: 30000,
+          maxRetries: 2
+        });
+
+        setIsParsing(false);
+        setProjectId(result.id);
+        navigate('/project/' + result.id);
+        return;
+      } catch (err) {
+        const errorMsg = (err as ApiError).userMessage ||
+                        (err instanceof Error ? err.message : 'Failed to import StoryLogic file');
+        logger.error('[Import] Error:', err);
+        setError(errorMsg);
+        setIsParsing(false);
+        setUploadStep(null);
+        return;
+      }
+    }
 
     const extractedName = file.name.replace(/\.(txt|pdf|fdx)$/i, '');
     setProjectName(extractedName);
@@ -518,11 +570,11 @@ export default function Index() {
             >
               <Upload className="w-12 h-12 text-white/40 mx-auto mb-4" />
               <p className="text-lg font-medium mb-2">Drag & drop or click to browse</p>
-              <p className="text-white/50 text-sm">Supports .pdf, .fdx, .txt</p>
+              <p className="text-white/50 text-sm">Supports .pdf, .fdx, .txt, .json (StoryLogic)</p>
               <input
                 id="file-input"
                 type="file"
-                accept=".pdf,.fdx,.txt"
+                accept=".pdf,.fdx,.txt,.json"
                 onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
                 className="hidden"
               />
