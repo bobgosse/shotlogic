@@ -305,27 +305,7 @@ export default function Index() {
     setProjectId(null);
     setUploadStep(null);
 
-    // STEP 1: Pre-upload validation (file type, size)
-    logger.log('[Validation] Starting pre-upload validation...');
-    const preValidation = validateFileBeforeUpload(file);
-
-    if (!preValidation.valid) {
-      setError(formatValidationError(preValidation));
-      return;
-    }
-
-    // Show warnings if any
-    if (preValidation.warnings && preValidation.warnings.length > 0) {
-      logger.warn('[Validation] Warnings:', preValidation.warnings);
-      const proceed = window.confirm(
-        `⚠️ Upload Warning:\n\n${preValidation.warnings.join('\n')}\n\nContinue anyway?`
-      );
-      if (!proceed) {
-        setError('Upload cancelled by user');
-        return;
-      }
-    }
-
+    // Check file type first — JSON files skip screenplay validation
     const fileName = file.name.toLowerCase();
     let fileType: 'txt' | 'pdf' | 'fdx' | 'json' | null = null;
     if (fileName.endsWith('.txt')) fileType = 'txt';
@@ -340,7 +320,7 @@ export default function Index() {
 
     setFileInfo({ name: file.name, type: fileType });
 
-    // Handle StoryLogic JSON import
+    // Handle StoryLogic JSON import (skip screenplay validation)
     if (fileType === 'json') {
       setIsParsing(true);
       setUploadStep('uploading');
@@ -387,6 +367,27 @@ export default function Index() {
         setError(errorMsg);
         setIsParsing(false);
         setUploadStep(null);
+        return;
+      }
+    }
+
+    // STEP 1: Pre-upload validation (file type, size) — screenplay files only
+    logger.log('[Validation] Starting pre-upload validation...');
+    const preValidation = validateFileBeforeUpload(file);
+
+    if (!preValidation.valid) {
+      setError(formatValidationError(preValidation));
+      return;
+    }
+
+    // Show warnings if any
+    if (preValidation.warnings && preValidation.warnings.length > 0) {
+      logger.warn('[Validation] Warnings:', preValidation.warnings);
+      const proceed = window.confirm(
+        `⚠️ Upload Warning:\n\n${preValidation.warnings.join('\n')}\n\nContinue anyway?`
+      );
+      if (!proceed) {
+        setError('Upload cancelled by user');
         return;
       }
     }
