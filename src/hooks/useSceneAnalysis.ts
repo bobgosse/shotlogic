@@ -172,6 +172,9 @@ export function useSceneAnalysis({
       // Look up storyLogicContext from the scene data
       const sceneData = scenes.find(s => s.scene_number === sceneNumber);
 
+      // Check if this is a retry of a failed scene (free retry — don't charge again)
+      const isRetry = sceneData?.status === 'ERROR';
+
       // Start analysis (backend will process and track progress via jobId)
       const startResponse = await api.post("/api/analyze-scene", {
         userId: user.id,
@@ -182,7 +185,8 @@ export function useSceneAnalysis({
         visualProfile: projectVisualProfile || null,
         characters: projectCharacters || [],
         customInstructions: customInstructions || undefined,
-        storyLogicContext: sceneData?.storyLogicContext || undefined
+        storyLogicContext: sceneData?.storyLogicContext || undefined,
+        isRetry,
       }, {
         context: `Starting analysis for scene ${sceneNumber}`,
         timeoutMs: 350000, // 5m50s - longer than backend to avoid premature timeout

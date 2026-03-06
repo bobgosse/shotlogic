@@ -211,6 +211,45 @@ export async function deductCredits(
 }
 
 /**
+ * Refund credits to user account (auto-refund on analysis failure)
+ * Uses adminGrants array so refunds are visible in user history
+ */
+export async function refundCredits(
+  userId: string,
+  credits: number,
+  reason: string
+): Promise<void> {
+  try {
+    // Admin users don't need refunds (they aren't charged)
+    if (isAdmin(userId)) return
+
+    const db = await getDb()
+    const users = db.collection<UserCredits>('users')
+
+    await users.updateOne(
+      { userId },
+      {
+        $inc: { credits },
+        $push: {
+          adminGrants: {
+            credits,
+            reason: `Auto-refund: ${reason}`,
+            grantedBy: 'system',
+            timestamp: new Date(),
+          } as any,
+        },
+        $set: { updatedAt: new Date() },
+      }
+    )
+
+    logger.log('credits', `Refunded ${credits} credit(s) to ${userId}: ${reason}`)
+  } catch (error) {
+    logger.error('credits', `Failed to refund credits for ${userId}:`, error)
+    throw error
+  }
+}
+
+/**
  * Check if user has enough credits (admins always have unlimited)
  */
 export async function hasEnoughCredits(userId: string, required: number): Promise<boolean> {

@@ -4,7 +4,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { logger } from "./lib/logger";
-import { hasEnoughCredits, deductCredits } from "./lib/credits.js";
+import { hasEnoughCredits, deductCredits, refundCredits } from "./lib/credits.js";
 import { createAnalysisJob, updateJobStatus, completeJob, failJob } from "./lib/analysisJobs.js";
 
 const DEPLOY_TIMESTAMP = "2025-02-05T03:00:00Z_REQUIRED_FIELDS_PROMPT"
@@ -87,83 +87,111 @@ async function callClaude(
   userPrompt: string,
   invocationId: string,
   callName: string,
-  maxTokens: number = 8000
+  maxTokens: number = 8000,
+  timeoutMs: number = 300000
 ): Promise<{ success: boolean; data?: any; error?: string; usage?: any }> {
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 300000) // 300s (5 min) per call
+  const MAX_RETRIES = 2 // 3 total attempts
+  let lastError = ''
 
-  try {
-    logger.log("analyze-scene", `🤖 [${invocationId}] Calling ${MODEL} for ${callName}...`)
-    const startTime = Date.now()
-
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: maxTokens,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: userPrompt }]
-      }),
-      signal: controller.signal
-    })
-
-    clearTimeout(timeoutId)
-    const duration = Date.now() - startTime
-    logger.log("analyze-scene", `⏱️  [${invocationId}] ${callName} responded in ${duration}ms`)
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      logger.error("analyze-scene", `❌ [${invocationId}] ${callName} API error (${response.status}): ${errorText}`)
-      return { success: false, error: `API error ${response.status}: ${errorText}` }
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    if (attempt > 0) {
+      const backoffMs = Math.pow(3, attempt) * 1000 // 3s, 9s
+      logger.log("analyze-scene", `⏳ [${invocationId}] ${callName} retry ${attempt}/${MAX_RETRIES} after ${backoffMs}ms backoff...`)
+      await new Promise(r => setTimeout(r, backoffMs))
     }
 
-    const data = await response.json()
-    const content = data.content?.[0]?.text
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
 
-    if (!content) {
-      return { success: false, error: 'Empty response from Claude' }
+    try {
+      logger.log("analyze-scene", `🤖 [${invocationId}] Calling ${MODEL} for ${callName} (attempt ${attempt + 1}/${MAX_RETRIES + 1}, timeout ${Math.round(timeoutMs / 1000)}s)...`)
+      const startTime = Date.now()
+
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: MODEL,
+          max_tokens: maxTokens,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userPrompt }]
+        }),
+        signal: controller.signal
+      })
+
+      clearTimeout(timeoutId)
+      const duration = Date.now() - startTime
+      logger.log("analyze-scene", `⏱️  [${invocationId}] ${callName} responded in ${duration}ms`)
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        lastError = `API error ${response.status}: ${errorText}`
+        logger.error("analyze-scene", `❌ [${invocationId}] ${callName} API error (${response.status}): ${errorText}`)
+        // Retry on 5xx server errors and 429 rate limits
+        if ((response.status >= 500 || response.status === 429) && attempt < MAX_RETRIES) {
+          continue
+        }
+        return { success: false, error: lastError }
+      }
+
+      const data = await response.json()
+      const content = data.content?.[0]?.text
+
+      if (!content) {
+        lastError = 'Empty response from Claude'
+        if (attempt < MAX_RETRIES) continue
+        return { success: false, error: lastError }
+      }
+
+      // Log token usage
+      const usage = data.usage || {}
+      const inputTokens = usage.input_tokens || 0
+      const outputTokens = usage.output_tokens || 0
+
+      // Cost calculation for Sonnet: $3 input / $15 output per million tokens
+      const estimatedCost = (
+        (inputTokens * 3 / 1_000_000) +
+        (outputTokens * 15 / 1_000_000)
+      ).toFixed(4)
+
+      logger.log("analyze-scene", `💰 [${invocationId}] ${callName} usage: input=${inputTokens}, output=${outputTokens}, cost=$${estimatedCost}`)
+
+      // Extract JSON from response
+      let jsonStr = content
+      const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/)
+      if (jsonMatch) {
+        jsonStr = jsonMatch[1]
+      }
+      const rawJsonMatch = content.match(/\{[\s\S]*\}/)
+      if (rawJsonMatch && !jsonMatch) {
+        jsonStr = rawJsonMatch[0]
+      }
+
+      const parsed = JSON.parse(jsonStr.trim())
+      logger.log("analyze-scene", `✅ [${invocationId}] ${callName} parsed successfully${attempt > 0 ? ` (after ${attempt} retries)` : ''}`)
+      return { success: true, data: parsed, usage: { inputTokens, outputTokens, estimatedCost } }
+
+    } catch (error: any) {
+      clearTimeout(timeoutId)
+      if (error.name === 'AbortError') {
+        lastError = `${callName} timed out after ${Math.round(timeoutMs / 1000)}s`
+      } else {
+        lastError = error.message || 'Unknown error'
+      }
+
+      if (attempt < MAX_RETRIES) {
+        logger.warn("analyze-scene", `⚠️ [${invocationId}] ${callName} attempt ${attempt + 1} failed: ${lastError}`)
+        continue
+      }
+      return { success: false, error: lastError }
     }
-
-    // Log token usage
-    const usage = data.usage || {}
-    const inputTokens = usage.input_tokens || 0
-    const outputTokens = usage.output_tokens || 0
-
-    // Cost calculation for Sonnet: $3 input / $15 output per million tokens
-    const estimatedCost = (
-      (inputTokens * 3 / 1_000_000) +
-      (outputTokens * 15 / 1_000_000)
-    ).toFixed(4)
-
-    logger.log("analyze-scene", `💰 [${invocationId}] ${callName} usage: input=${inputTokens}, output=${outputTokens}, cost=$${estimatedCost}`)
-
-    // Extract JSON from response
-    let jsonStr = content
-    const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/)
-    if (jsonMatch) {
-      jsonStr = jsonMatch[1]
-    }
-    const rawJsonMatch = content.match(/\{[\s\S]*\}/)
-    if (rawJsonMatch && !jsonMatch) {
-      jsonStr = rawJsonMatch[0]
-    }
-
-    const parsed = JSON.parse(jsonStr.trim())
-    logger.log("analyze-scene", `✅ [${invocationId}] ${callName} parsed successfully`)
-    return { success: true, data: parsed, usage: { inputTokens, outputTokens, estimatedCost } }
-
-  } catch (error: any) {
-    clearTimeout(timeoutId)
-    if (error.name === 'AbortError') {
-      return { success: false, error: `${callName} timed out after 300s` }
-    }
-    return { success: false, error: error.message || 'Unknown error' }
   }
+
+  return { success: false, error: `${callName} failed after ${MAX_RETRIES + 1} attempts` }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -174,7 +202,8 @@ async function analyzeStory(
   sceneText: string,
   characters: string[],
   invocationId: string,
-  storyLogicContext?: StoryLogicContext
+  storyLogicContext?: StoryLogicContext,
+  timeoutMs: number = 300000
 ): Promise<{ success: boolean; data?: any; error?: string; usage?: any }> {
 
   const systemPrompt = `You are a professional script analyst and story consultant. Analyze the scene and return ONLY valid JSON with ALL 14 fields. CRITICAL: You must fill in EVERY field with specific, substantive content from THIS scene. Do NOT skip any fields. Do NOT use placeholder text. Do NOT truncate your response. Think deeply about what this scene MUST accomplish for the story to work.`
@@ -227,7 +256,7 @@ Return ONLY valid JSON (no markdown, no explanation). Fill in EVERY field - espe
 
 IMPORTANT: Your response must include ALL 14 fields with substantive content. Do not skip scene_obligation or the_one_thing.`
 
-  return callClaude(apiKey, systemPrompt, userPrompt, invocationId, 'STORY_ANALYSIS', 8000)
+  return callClaude(apiKey, systemPrompt, userPrompt, invocationId, 'STORY_ANALYSIS', 8000, timeoutMs)
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -238,7 +267,8 @@ async function analyzeProducing(
   sceneText: string,
   sceneHeader: string,
   characters: string[],
-  invocationId: string
+  invocationId: string,
+  timeoutMs: number = 300000
 ): Promise<{ success: boolean; data?: any; error?: string; usage?: any }> {
 
   const systemPrompt = `You are a professional 1st AD, line producer, and UPM doing a comprehensive script breakdown. Extract production information, continuity details, scheduling considerations, and department-specific notes from the scene. Return ONLY valid JSON.`
@@ -339,7 +369,7 @@ Return ONLY this JSON (no markdown):
   }
 }`
 
-  return callClaude(apiKey, systemPrompt, userPrompt, invocationId, 'PRODUCING_LOGISTICS', 8000)
+  return callClaude(apiKey, systemPrompt, userPrompt, invocationId, 'PRODUCING_LOGISTICS', 8000, timeoutMs)
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -351,7 +381,8 @@ async function analyzeDirecting(
   characters: string[],
   storyAnalysis: any,
   customInstructions: string | undefined,
-  invocationId: string
+  invocationId: string,
+  timeoutMs: number = 300000
 ): Promise<{ success: boolean; data?: any; error?: string; usage?: any }> {
 
   const systemPrompt = `You are a professional director, acting coach, and DP planning coverage for a scene. Use the provided story analysis to inform your shot choices and performance guidance. Every shot must serve a story purpose. Frame actor objectives as actable verbs, not emotions.
@@ -550,7 +581,7 @@ Return ONLY this JSON (no markdown):
   "shot_list_rationale": "ONLY include if shot_list has 10+ shots. Explain why this scene genuinely requires more coverage than typical. Empty string if under 10 shots."
 }`
 
-  return callClaude(apiKey, systemPrompt, userPrompt, invocationId, 'DIRECTING_SHOTS', 16000)
+  return callClaude(apiKey, systemPrompt, userPrompt, invocationId, 'DIRECTING_SHOTS', 16000, timeoutMs)
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -597,6 +628,7 @@ export default async function handler(
 
     const requestBody = req.body as AnalyzeSceneRequest
     const { userId, sceneText, sceneNumber, totalScenes, customInstructions, storyLogicContext } = requestBody
+    const isRetry = (requestBody as any).isRetry === true
 
     logger.log("analyze-scene", `📊 [${invocationId}] Scene: ${sceneNumber}/${totalScenes}`)
     logger.log("analyze-scene", `📊 [${invocationId}] Text length: ${sceneText?.length || 0} chars`)
@@ -649,37 +681,51 @@ export default async function handler(
 
     // ═══════════════════════════════════════════════════════════════
     // CREDIT CHECK: Verify user has credits before analysis
+    // Free retries skip credit deduction (user already paid)
     // ═══════════════════════════════════════════════════════════════
     const CREDITS_PER_SCENE = 1
-    
-    logger.log("analyze-scene", `💳 [${invocationId}] Checking credits for ${userId}...`)
-    
-    const hasCredits = await hasEnoughCredits(userId, CREDITS_PER_SCENE)
-    if (!hasCredits) {
-      logger.warn("analyze-scene", `❌ [${invocationId}] Insufficient credits for ${userId}`)
-      return res.status(402).json({
-        error: 'INSUFFICIENT_CREDITS',
-        message: 'Not enough credits to analyze this scene',
-        userMessage: 'You don\'t have enough credits to analyze this scene. Please purchase more credits to continue.',
-        deployMarker: DEPLOY_TIMESTAMP
-      })
-    }
-    
-    // Deduct credits BEFORE starting analysis
-    try {
-      await deductCredits(userId, CREDITS_PER_SCENE)
-      logger.log("analyze-scene", `💳 [${invocationId}] ${CREDITS_PER_SCENE} credit(s) deducted from ${userId}`)
-    } catch (error: any) {
-      logger.error("analyze-scene", `❌ [${invocationId}] Failed to deduct credits: ${error.message}`)
-      return res.status(500).json({
-        error: 'CREDIT_DEDUCTION_FAILED',
-        message: 'Failed to process credit transaction',
-        userMessage: 'An error occurred while processing credits. Please try again.',
-        deployMarker: DEPLOY_TIMESTAMP
-      })
+
+    if (isRetry) {
+      logger.log("analyze-scene", `💳 [${invocationId}] Free retry — skipping credit deduction for ${userId}`)
+    } else {
+      logger.log("analyze-scene", `💳 [${invocationId}] Checking credits for ${userId}...`)
+
+      const hasCredits = await hasEnoughCredits(userId, CREDITS_PER_SCENE)
+      if (!hasCredits) {
+        logger.warn("analyze-scene", `❌ [${invocationId}] Insufficient credits for ${userId}`)
+        return res.status(402).json({
+          error: 'INSUFFICIENT_CREDITS',
+          message: 'Not enough credits to analyze this scene',
+          userMessage: 'You don\'t have enough credits to analyze this scene. Please purchase more credits to continue.',
+          deployMarker: DEPLOY_TIMESTAMP
+        })
+      }
+
+      // Deduct credits BEFORE starting analysis
+      try {
+        await deductCredits(userId, CREDITS_PER_SCENE)
+        logger.log("analyze-scene", `💳 [${invocationId}] ${CREDITS_PER_SCENE} credit(s) deducted from ${userId}`)
+      } catch (error: any) {
+        logger.error("analyze-scene", `❌ [${invocationId}] Failed to deduct credits: ${error.message}`)
+        return res.status(500).json({
+          error: 'CREDIT_DEDUCTION_FAILED',
+          message: 'Failed to process credit transaction',
+          userMessage: 'An error occurred while processing credits. Please try again.',
+          deployMarker: DEPLOY_TIMESTAMP
+        })
+      }
     }
 
     const startTime = Date.now()
+
+    // ═══════════════════════════════════════════════════════════════
+    // DYNAMIC TIMEOUT: Scale based on scene length
+    // Base: 300s for scenes under 4000 chars. +60s per 2000 chars above. Cap: 540s (9 min).
+    // ═══════════════════════════════════════════════════════════════
+    const baseTimeoutMs = 300_000
+    const extraTimeoutMs = Math.max(0, sceneText.length - 4000) / 2000 * 60_000
+    const callTimeoutMs = Math.min(baseTimeoutMs + extraTimeoutMs, 540_000)
+    logger.log("analyze-scene", `⏱️  [${invocationId}] Dynamic timeout: ${Math.round(callTimeoutMs / 1000)}s (scene length: ${sceneText.length} chars)`)
 
     // ═══════════════════════════════════════════════════════════════
     // CREATE JOB: Track progress for frontend polling
@@ -715,35 +761,34 @@ export default async function handler(
     // CALL 1: Story Analysis
     // ═══════════════════════════════════════════════════════════════
     logger.log("analyze-scene", `\n📖 [${invocationId}] STEP 1/3: Story Analysis...`)
-    const storyResult = await analyzeStory(anthropicKey, sceneText, characters, invocationId, storyLogicContext)
+    const storyResult = await analyzeStory(anthropicKey, sceneText, characters, invocationId, storyLogicContext, callTimeoutMs)
 
     if (!storyResult.success) {
       if (jobId) await failJob(jobId, storyResult.error || 'Story analysis failed');
       logger.error("analyze-scene", `❌ [${invocationId}] Story analysis failed: ${storyResult.error}`)
+      // Refund the credit — user got nothing
+      if (!isRetry) {
+        try {
+          await refundCredits(userId, CREDITS_PER_SCENE, `Story analysis failed for scene ${sceneNumber}`)
+          logger.log("analyze-scene", `💳 [${invocationId}] Credit refunded to ${userId} (story analysis failed)`)
+        } catch (refundErr: any) {
+          logger.error("analyze-scene", `❌ [${invocationId}] Refund failed: ${refundErr.message}`)
+        }
+      }
       return res.status(500).json({
         error: 'STORY_ANALYSIS_FAILED',
         message: storyResult.error,
-        userMessage: 'Failed to analyze story elements. Please try again.',
+        userMessage: 'Failed to analyze story elements. Your credit has been refunded. Please try again.',
         deployMarker: DEPLOY_TIMESTAMP
       })
     }
-    
+
     // Update job progress
     if (jobId) {
       await updateJobStatus(jobId, 'PROCESSING', {
         phase: 'producing',
         message: 'Story complete, analyzing producing logistics...'
       });
-    }
-
-    if (!storyResult.success) {
-      logger.error("analyze-scene", `❌ [${invocationId}] Story analysis failed: ${storyResult.error}`)
-      return res.status(500).json({
-        error: 'STORY_ANALYSIS_FAILED',
-        message: storyResult.error,
-        userMessage: 'Failed to analyze story elements. Please try again.',
-        deployMarker: DEPLOY_TIMESTAMP
-      })
     }
 
     logger.log("analyze-scene", `✅ [${invocationId}] Story analysis complete`)
@@ -769,7 +814,7 @@ export default async function handler(
     // CALL 2: Producing Logistics
     // ═══════════════════════════════════════════════════════════════
     logger.log("analyze-scene", `\n🎬 [${invocationId}] STEP 2/3: Producing Logistics...`)
-    const producingResult = await analyzeProducing(anthropicKey, sceneText, sceneHeader, characters, invocationId)
+    const producingResult = await analyzeProducing(anthropicKey, sceneText, sceneHeader, characters, invocationId, callTimeoutMs)
 
     if (!producingResult.success) {
       logger.error("analyze-scene", `❌ [${invocationId}] Producing analysis failed: ${producingResult.error}`)
@@ -839,17 +884,36 @@ export default async function handler(
       characters,
       storyResult.data,
       customInstructions,
-      invocationId
+      invocationId,
+      callTimeoutMs
     )
+
+    // Track validation issues (declared here so directing degradation can push to it)
+    const validationIssues: string[] = []
 
     if (!directingResult.success) {
       logger.error("analyze-scene", `❌ [${invocationId}] Directing analysis failed: ${directingResult.error}`)
-      return res.status(500).json({
-        error: 'DIRECTING_ANALYSIS_FAILED',
-        message: directingResult.error,
-        userMessage: 'Failed to generate directing notes and shot list. Please try again.',
-        deployMarker: DEPLOY_TIMESTAMP
-      })
+      // GRACEFUL DEGRADATION: Return story + producing with empty directing
+      // instead of failing the entire analysis
+      directingResult.data = {
+        subtext: { what_they_say_vs_want: '', power_dynamic: '', emotional_turn: '', revelation_or_realization: '' },
+        conflict: { type: [], what_characters_want: [], obstacles: [], tactics: [], winner: '' },
+        tone_and_mood: { opening: '', shift: '', closing: '', energy: '' },
+        visual_strategy: { approach: '', camera_personality: '', lighting_mood: '' },
+        visual_metaphor: '',
+        editorial_intent: '',
+        key_moments: [],
+        blocking: { geography: '', movement: '', eyelines: '' },
+        actor_objectives: {},
+        scene_rhythm: { tempo: '', breaths: '', acceleration_points: '', holds: '' },
+        what_not_to_do: [],
+        tone_reference: '',
+        creative_questions: [],
+        performance_notes: {},
+        shot_list: [],
+        shot_list_rationale: ''
+      }
+      validationIssues.push('DIRECTING_DEGRADED: Shot list and directing vision could not be generated. Retry to complete analysis.')
     }
 
     logger.log("analyze-scene", `✅ [${invocationId}] Directing analysis complete`)
@@ -931,8 +995,7 @@ export default async function handler(
     logger.log("analyze-scene", `   - directing_vision fields: ${Object.keys(analysis.directing_vision).length}`)
     logger.log("analyze-scene", `💰 [${invocationId}] TOTAL COST: $${totalCost} (input=${totalInputTokens}, output=${totalOutputTokens})`)
 
-    // Quick validation
-    const validationIssues: string[] = []
+    // Quick validation (validationIssues declared above directing call for graceful degradation)
     if (!analysis.story_analysis.the_core || analysis.story_analysis.the_core.length < 20) {
       validationIssues.push('the_core is too short')
     }
