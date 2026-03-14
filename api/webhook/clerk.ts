@@ -16,6 +16,9 @@ function createTransport() {
       user: process.env.NOTIFICATION_EMAIL_USER,
       pass: process.env.NOTIFICATION_EMAIL_PASS, // Gmail App Password
     },
+    connectionTimeout: 10000, // 10s to connect
+    greetingTimeout: 10000,   // 10s for SMTP greeting
+    socketTimeout: 10000,     // 10s for socket inactivity
   })
 }
 
@@ -115,16 +118,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     logger.log('clerk-webhook', `[${invocationId}] Event: ${event.type}`)
 
-    if (event.type === 'user.created') {
-      try {
-        await sendSignupEmail(event.data)
-      } catch (emailErr: any) {
-        // Log but don't fail the webhook — Clerk will retry otherwise
-        logger.error('clerk-webhook', `[${invocationId}] Failed to send notification email:`, emailErr.message)
-      }
-    }
-
+    // Respond immediately — Clerk requires a response within 30s
     res.status(200).json({ received: true })
+
+    // Send notification email in the background (don't block the response)
+    if (event.type === 'user.created') {
+      sendSignupEmail(event.data).catch((emailErr: any) => {
+        logger.error('clerk-webhook', `[${invocationId}] Failed to send notification email:`, emailErr.message)
+      })
+    }
   } catch (error: any) {
     logger.error('clerk-webhook', `[${invocationId}] Error:`, error)
     res.status(500).json({ error: error.message || 'Webhook processing failed' })
