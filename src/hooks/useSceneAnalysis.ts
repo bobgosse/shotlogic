@@ -282,7 +282,13 @@ export function useSceneAnalysis({
               return pollStatus();
             }
           } catch (pollError: any) {
-            // If polling fails, wait and retry
+            // Don't retry on credit errors — bubble up immediately
+            if ((pollError as any).status === 402 ||
+                (pollError as any).code === 'INSUFFICIENT_CREDITS' ||
+                pollError.message?.includes('Insufficient credits')) {
+              throw pollError;
+            }
+            // If polling fails for other reasons, wait and retry
             console.error('[handleReanalyzeScene] Poll error:', pollError);
             await new Promise(resolve => setTimeout(resolve, 10000));
             return pollStatus();
@@ -294,10 +300,18 @@ export function useSceneAnalysis({
 
     } catch (error: any) {
       logger.error("[handleReanalyzeScene] Error:", error);
-      const errorMsg = (error as ApiError).userMessage || error.message || "Failed to generate analysis";
+
+      // Check for insufficient credits (402 or error code)
+      const isCreditsError = (error as any).status === 402 ||
+        (error as any).code === 'INSUFFICIENT_CREDITS' ||
+        error.message?.includes('Insufficient credits');
+
+      const errorMsg = isCreditsError
+        ? "You've used all your analysis credits. Please contact us to get more."
+        : (error as ApiError).userMessage || error.message || "Failed to generate analysis";
 
       // Save ERROR status so the scene shows "click to retry"
-      if (id) {
+      if (id && !isCreditsError) {
         try {
           await api.post('/api/projects/update-scene-status', {
             projectId: id,

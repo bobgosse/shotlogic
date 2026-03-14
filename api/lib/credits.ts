@@ -69,7 +69,7 @@ export async function getUserCredits(userId: string): Promise<number> {
     if (!user) {
       // Check if this is a beta tester - give them initial free credits
       const isBeta = isBetaTester(userId)
-      const initialCredits = isBeta ? BETA_TESTER_INITIAL_CREDITS : 0
+      const initialCredits = isBeta ? BETA_TESTER_INITIAL_CREDITS : 100
       
       user = {
         userId,
