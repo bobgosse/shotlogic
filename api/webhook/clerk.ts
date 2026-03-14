@@ -16,9 +16,10 @@ function createTransport() {
       user: process.env.NOTIFICATION_EMAIL_USER,
       pass: process.env.NOTIFICATION_EMAIL_PASS, // Gmail App Password
     },
-    connectionTimeout: 10000, // 10s to connect
-    greetingTimeout: 10000,   // 10s for SMTP greeting
-    socketTimeout: 10000,     // 10s for socket inactivity
+    family: 4,                // Force IPv4 — Railway doesn't support IPv6
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 10000,
   })
 }
 
