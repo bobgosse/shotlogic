@@ -3,25 +3,11 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { Webhook } from 'svix'
-import nodemailer from 'nodemailer'
+import { Resend } from 'resend'
 import { logger } from '../lib/logger.js'
 
 const webhookSecret = process.env.CLERK_WEBHOOK_SECRET
-
-// Configure email transport (Gmail SMTP via app password)
-function createTransport() {
-  return nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.NOTIFICATION_EMAIL_USER,
-      pass: process.env.NOTIFICATION_EMAIL_PASS, // Gmail App Password
-    },
-    family: 4,                // Force IPv4 — Railway doesn't support IPv6
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 10000,
-  })
-}
+const resend = new Resend(process.env.RESEND_API_KEY)
 
 interface ClerkUserEvent {
   data: {
@@ -47,10 +33,8 @@ async function sendSignupEmail(userData: ClerkUserEvent['data']) {
     timeStyle: 'short',
   })
 
-  const transporter = createTransport()
-
-  await transporter.sendMail({
-    from: process.env.NOTIFICATION_EMAIL_USER,
+  await resend.emails.send({
+    from: 'ShotLogic <notifications@shotlogic.studio>',
     to: 'bobgosse@gmail.com',
     subject: `🎬 New ShotLogic signup: ${name}`,
     html: `
