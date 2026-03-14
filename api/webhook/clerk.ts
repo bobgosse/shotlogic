@@ -102,9 +102,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       'svix-signature': req.headers['svix-signature'] as string,
     }
 
+    // req.body is a raw Buffer from express.raw() middleware
+    const payload = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : JSON.stringify(req.body)
+
     let event: ClerkUserEvent
     try {
-      event = wh.verify(JSON.stringify(req.body), headers) as ClerkUserEvent
+      event = wh.verify(payload, headers) as ClerkUserEvent
     } catch (err: any) {
       logger.error('clerk-webhook', `[${invocationId}] Signature verification failed:`, err.message)
       return res.status(400).json({ error: 'Invalid webhook signature' })

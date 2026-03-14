@@ -10,7 +10,16 @@ const __dirname = dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Body parser for API routes
+// Webhook routes MUST be registered before global body parsers
+// so the raw body is available for signature verification
+app.post("/api/webhook/stripe", express.raw({ type: 'application/json' }), async (req, res) => {
+  await apiHandler(req, res, join(__dirname, "api/webhook/stripe.ts"));
+});
+app.post("/api/webhook/clerk", express.raw({ type: 'application/json' }), async (req, res) => {
+  await apiHandler(req, res, join(__dirname, "api/webhook/clerk.ts"));
+});
+
+// Body parser for API routes (runs after webhook routes are matched)
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
@@ -179,15 +188,7 @@ app.post("/api/credits/create-checkout", async (req, res) => {
   await apiHandler(req, res, join(__dirname, "api/credits/create-checkout.ts"));
 });
 
-// Stripe webhook (special handling - needs raw body)
-app.post("/api/webhook/stripe", express.raw({ type: 'application/json' }), async (req, res) => {
-  await apiHandler(req, res, join(__dirname, "api/webhook/stripe.ts"));
-});
-
-// Clerk webhook (user.created notifications)
-app.post("/api/webhook/clerk", async (req, res) => {
-  await apiHandler(req, res, join(__dirname, "api/webhook/clerk.ts"));
-});
+// Webhook routes registered at top of file (before body parsers)
 
 // Serve static files
 app.use(express.static(join(__dirname, 'dist')));
