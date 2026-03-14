@@ -10,19 +10,16 @@ const __dirname = dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Capture raw body for webhook routes (needed for signature verification)
-// Must run before express.json() so the stream hasn't been consumed yet
-app.use('/api/webhook', (req, res, next) => {
-  const chunks = [];
-  req.on('data', chunk => chunks.push(chunk));
-  req.on('end', () => {
-    req.rawBody = Buffer.concat(chunks).toString('utf8');
-    next();
-  });
-});
-
 // Body parser for API routes
-app.use(express.json({ limit: '50mb' }));
+// The verify callback preserves the raw body for webhook signature verification
+app.use(express.json({
+  limit: '50mb',
+  verify: (req, _res, buf) => {
+    if (req.url.startsWith('/api/webhook/')) {
+      req.rawBody = buf.toString('utf8');
+    }
+  }
+}));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // CORS headers for API routes
