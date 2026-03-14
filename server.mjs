@@ -184,6 +184,11 @@ app.post("/api/webhook/stripe", express.raw({ type: 'application/json' }), async
   await apiHandler(req, res, join(__dirname, "api/webhook/stripe.ts"));
 });
 
+// Clerk webhook (user.created notifications)
+app.post("/api/webhook/clerk", async (req, res) => {
+  await apiHandler(req, res, join(__dirname, "api/webhook/clerk.ts"));
+});
+
 // Serve static files
 app.use(express.static(join(__dirname, 'dist')));
 

@@ -1,0 +1,129 @@
+// api/webhook/clerk.ts
+// Handle Clerk webhook events (new user signup notifications)
+
+import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { Webhook } from 'svix'
+import nodemailer from 'nodemailer'
+import { logger } from '../lib/logger.js'
+
+const webhookSecret = process.env.CLERK_WEBHOOK_SECRET
+
+// Configure email transport (Gmail SMTP via app password)
+function createTransport() {
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.NOTIFICATION_EMAIL_USER,
+      pass: process.env.NOTIFICATION_EMAIL_PASS, // Gmail App Password
+    },
+  })
+}
+
+interface ClerkUserEvent {
+  data: {
+    id: string
+    first_name: string | null
+    last_name: string | null
+    email_addresses: Array<{
+      email_address: string
+      id: string
+    }>
+    created_at: number
+    image_url: string | null
+  }
+  type: string
+}
+
+async function sendSignupEmail(userData: ClerkUserEvent['data']) {
+  const name = [userData.first_name, userData.last_name].filter(Boolean).join(' ') || 'Unknown'
+  const email = userData.email_addresses?.[0]?.email_address || 'No email'
+  const signupDate = new Date(userData.created_at).toLocaleString('en-US', {
+    timeZone: 'America/New_York',
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  })
+
+  const transporter = createTransport()
+
+  await transporter.sendMail({
+    from: process.env.NOTIFICATION_EMAIL_USER,
+    to: 'bobgosse@gmail.com',
+    subject: `🎬 New ShotLogic signup: ${name}`,
+    html: `
+      <div style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto;">
+        <h2 style="color: #E50914; margin-bottom: 4px;">New User Signed Up</h2>
+        <table style="border-collapse: collapse; width: 100%;">
+          <tr>
+            <td style="padding: 8px 12px; color: #888; width: 80px;">Name</td>
+            <td style="padding: 8px 12px; font-weight: 600;">${name}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 12px; color: #888;">Email</td>
+            <td style="padding: 8px 12px;">${email}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 12px; color: #888;">Clerk ID</td>
+            <td style="padding: 8px 12px; font-family: monospace; font-size: 13px;">${userData.id}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 12px; color: #888;">Signed up</td>
+            <td style="padding: 8px 12px;">${signupDate}</td>
+          </tr>
+        </table>
+        <p style="color: #666; font-size: 13px; margin-top: 16px;">
+          They received 100 free credits. Manage their account at
+          <a href="https://shotlogic.studio/admin/credits">Admin Dashboard</a>.
+        </p>
+      </div>
+    `,
+  })
+
+  logger.log('clerk-webhook', `Signup notification email sent for ${name} (${email})`)
+}
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  const invocationId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method Not Allowed' })
+  }
+
+  if (!webhookSecret) {
+    logger.error('clerk-webhook', `[${invocationId}] CLERK_WEBHOOK_SECRET not configured`)
+    return res.status(500).json({ error: 'Webhook secret not configured' })
+  }
+
+  try {
+    // Verify webhook signature using svix
+    const wh = new Webhook(webhookSecret)
+    const headers = {
+      'svix-id': req.headers['svix-id'] as string,
+      'svix-timestamp': req.headers['svix-timestamp'] as string,
+      'svix-signature': req.headers['svix-signature'] as string,
+    }
+
+    let event: ClerkUserEvent
+    try {
+      event = wh.verify(JSON.stringify(req.body), headers) as ClerkUserEvent
+    } catch (err: any) {
+      logger.error('clerk-webhook', `[${invocationId}] Signature verification failed:`, err.message)
+      return res.status(400).json({ error: 'Invalid webhook signature' })
+    }
+
+    logger.log('clerk-webhook', `[${invocationId}] Event: ${event.type}`)
+
+    if (event.type === 'user.created') {
+      try {
+        await sendSignupEmail(event.data)
+      } catch (emailErr: any) {
+        // Log but don't fail the webhook — Clerk will retry otherwise
+        logger.error('clerk-webhook', `[${invocationId}] Failed to send notification email:`, emailErr.message)
+      }
+    }
+
+    res.status(200).json({ received: true })
+  } catch (error: any) {
+    logger.error('clerk-webhook', `[${invocationId}] Error:`, error)
+    res.status(500).json({ error: error.message || 'Webhook processing failed' })
+  }
+}

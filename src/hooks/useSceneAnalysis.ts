@@ -1,7 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, createElement } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 import { useUser } from "@clerk/clerk-react";
+import { useNavigate } from "react-router-dom";
 import { api, ApiError } from "@/utils/apiClient";
 import { AnalysisData, Scene, ShotListItem, parseAnalysis} from "@/types/analysis";
 import { VisualProfile } from "@/types/visualProfile";
@@ -26,6 +28,7 @@ export function useSceneAnalysis({
 }: UseSceneAnalysisProps) {
   const { user } = useUser();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
@@ -330,9 +333,15 @@ export function useSceneAnalysis({
       }
 
       toast({
-        title: "Analysis failed",
+        title: isCreditsError ? "No credits remaining" : "Analysis failed",
         description: errorMsg,
-        variant: "destructive"
+        variant: "destructive",
+        ...(isCreditsError && {
+          action: createElement(ToastAction, {
+            altText: "Buy Credits",
+            onClick: () => navigate("/buy-credits"),
+          }, "Buy Credits"),
+        }),
       });
     } finally {
       setReanalyzing(false);
