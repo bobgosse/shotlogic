@@ -39,8 +39,8 @@ export default async function handler(
   }
   
   try {
-    // req.body is a raw Buffer from express.raw() middleware
-    const buf = Buffer.isBuffer(req.body) ? req.body : await buffer(req)
+    // Use rawBody captured by middleware before express.json() parsed the stream
+    const buf = (req as any).rawBody ? Buffer.from((req as any).rawBody) : await buffer(req)
     const sig = req.headers['stripe-signature']
     
     if (!sig) {

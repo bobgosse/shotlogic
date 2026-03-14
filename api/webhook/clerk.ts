@@ -102,8 +102,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       'svix-signature': req.headers['svix-signature'] as string,
     }
 
-    // req.body is a raw Buffer from express.raw() middleware
-    const payload = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : JSON.stringify(req.body)
+    // Use rawBody captured before express.json() parsed the stream
+    const payload = (req as any).rawBody || JSON.stringify(req.body)
 
     let event: ClerkUserEvent
     try {
