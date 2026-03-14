@@ -34,7 +34,7 @@ async function sendSignupEmail(userData: ClerkUserEvent['data']) {
   })
 
   await resend.emails.send({
-    from: 'ShotLogic <notifications@shotlogic.studio>',
+    from: 'ShotLogic <onboarding@resend.dev>',
     to: 'bobgosse@gmail.com',
     subject: `🎬 New ShotLogic signup: ${name}`,
     html: `
