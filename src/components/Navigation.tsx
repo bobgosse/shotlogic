@@ -31,7 +31,12 @@ export const Navigation = ({ onSignOut }: NavigationProps) => {
             >
               Dashboard
             </a>
-            {/* Future nav items: Projects, Analytics, etc. */}
+            <a 
+              href="/guide" 
+              className="text-sm font-medium text-foreground hover:text-netflix-red transition-colors"
+            >
+              Guide
+            </a>
           </div>
         </div>
 

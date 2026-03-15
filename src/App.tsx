@@ -9,6 +9,7 @@ import Landing from './pages/Landing'
 import AccessRestricted from './pages/AccessRestricted'
 import BuyCredits from './pages/BuyCredits'
 import AdminCredits from './pages/AdminCredits'
+import UserGuide from './pages/UserGuide'
 import { useAccessControl } from './hooks/useAccessControl'
 import { ErrorBoundary } from './components/ErrorBoundary'
 
@@ -74,6 +75,7 @@ function App() {
             <Route path="/project/:id" element={<ProtectedRoute><ProjectDetails /></ProtectedRoute>} />
             <Route path="/buy-credits" element={<ProtectedRoute><BuyCredits /></ProtectedRoute>} />
             <Route path="/admin/credits" element={<ProtectedRoute><AdminCredits /></ProtectedRoute>} />
+            <Route path="/guide" element={<ProtectedRoute><UserGuide /></ProtectedRoute>} />
 
             {/* Access restricted page - accessible when signed in but not allowed */}
             <Route path="/access-restricted" element={
