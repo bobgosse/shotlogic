@@ -13,6 +13,7 @@ import { AnalysisProgressPanel } from "@/components/AnalysisProgressPanel";
 import { SceneNavigator } from "@/components/SceneNavigator";
 import { MobileSceneView } from "@/components/MobileSceneView";
 import { RetryAnalysisDialog } from "@/components/RetryAnalysisDialog";
+import { ProductionSummary } from "@/components/ProductionSummary";
 import { AnalysisData, Scene, ShotListItem, parseAnalysis } from "@/types/analysis";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -79,6 +80,7 @@ const ProjectDetails = () => {
   const [storyboardScene, setStoryboardScene] = useState<{ scene: Scene; analysis: AnalysisData } | null>(null);
   const [showExportModal, setShowExportModal] = useState(false);
   const [showNavigator, setShowNavigator] = useState(true); // Always visible by default
+  const [showProductionSummary, setShowProductionSummary] = useState(false);
   const [forceMobileView, setForceMobileView] = useState(false);
   const [forceDesktopView, setForceDesktopView] = useState(false);
   const isMobile = useMediaQuery("(max-width: 768px)");
@@ -359,8 +361,17 @@ const ProjectDetails = () => {
                   <Sparkles className={`w-4 h-4 mr-1 ${reanalyzing ? 'animate-pulse' : ''}`} />
                   Regenerate All
                 </Button>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant={showProductionSummary ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setShowProductionSummary(!showProductionSummary)}
+                  className={showProductionSummary ? "bg-primary text-primary-foreground" : ""}
+                >
+                  <Printer className="w-4 h-4 mr-1" />
+                  Production Summary
+                </Button>
+                <Button
+                  variant="outline"
                   size="sm"
                   onClick={handleExportModalOpen}
                 >
@@ -429,8 +440,23 @@ const ProjectDetails = () => {
           ) : null;
         })()}
 
+        {/* Production Summary View */}
+        {showProductionSummary && (
+          <div className="max-w-5xl mx-auto p-4">
+            <div className="bg-[#0a0a0a] border border-border rounded-lg p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-lg font-bold text-foreground">Production Summary</h2>
+                <Badge variant="outline" className="text-xs">
+                  {scenes.filter(s => parseAnalysis(s.analysis)).length} of {scenes.length} scenes analyzed
+                </Badge>
+              </div>
+              <ProductionSummary scenes={scenes} />
+            </div>
+          </div>
+        )}
+
         {/* Selected Scene Content */}
-        <div className="max-w-5xl mx-auto p-4">
+        <div className={`max-w-5xl mx-auto p-4 ${showProductionSummary ? 'hidden' : ''}`}>
           {!selectedScene ? (
             <div className="bg-card border border-border rounded-lg p-12 text-center text-muted-foreground">
               Select a scene from the navigator
