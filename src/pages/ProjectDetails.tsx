@@ -1,5 +1,5 @@
 import React from 'react';
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -83,9 +83,21 @@ const ProjectDetails = () => {
   const [showProductionSummary, setShowProductionSummary] = useState(false);
   const [forceMobileView, setForceMobileView] = useState(false);
   const [forceDesktopView, setForceDesktopView] = useState(false);
+  const [showTabGuide, setShowTabGuide] = useState(false);
+  const [tabGuideDismissed, setTabGuideDismissed] = useState(false);
   const isMobile = useMediaQuery("(max-width: 768px)");
   const isTablet = useMediaQuery("(max-width: 1024px)");
 
+
+  // Show tab guide when the first scene analysis completes
+  const analyzedCount = scenes.filter(s => parseAnalysis(s.analysis)).length;
+  useEffect(() => {
+    if (analyzedCount === 1 && !tabGuideDismissed && selectedAnalysis) {
+      setShowTabGuide(true);
+      const timer = setTimeout(() => setShowTabGuide(false), 15000);
+      return () => clearTimeout(timer);
+    }
+  }, [analyzedCount, tabGuideDismissed, selectedAnalysis]);
 
   // Keyboard shortcuts for scene navigation
   useKeyboardShortcut({ key: "j" }, () => {
@@ -549,6 +561,18 @@ const ProjectDetails = () => {
                   </div>
                 </div>
               </div>
+
+              {/* First-scene tab guide */}
+              {showTabGuide && selectedAnalysis && (
+                <div className="mx-4 mt-4 bg-gradient-to-r from-[#D4A843]/20 to-primary/10 border border-[#D4A843]/40 rounded-lg px-4 py-3 flex items-center justify-between">
+                  <p className="text-sm text-foreground">
+                    Your first scene is ready! Explore the <span className="font-bold text-[#D4A843]">Story</span>, <span className="font-bold text-[#D4A843]">Producing</span>, <span className="font-bold text-[#D4A843]">Directing</span>, and <span className="font-bold text-[#D4A843]">Shots</span> tabs below.
+                  </p>
+                  <Button variant="ghost" size="sm" onClick={() => { setShowTabGuide(false); setTabGuideDismissed(true); }} className="text-muted-foreground ml-2 flex-shrink-0">
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              )}
 
               {/* Tabs */}
               <div className="p-4">

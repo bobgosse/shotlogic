@@ -49,6 +49,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { logger } from "@/utils/logger";
+import { WelcomeModal } from "@/components/WelcomeModal";
 
 interface Project {
   _id: string;
@@ -89,6 +90,26 @@ const Dashboard = () => {
   const [renameProject, setRenameProject] = useState<Project | null>(null);
   const [newTitle, setNewTitle] = useState("");
   const [showAllProjects, setShowAllProjects] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(false);
+
+  // Check onboarding status for new users
+  useEffect(() => {
+    if (!user?.id) return;
+    api.get(`/api/user/onboarding?userId=${user.id}`, { context: 'Check onboarding', timeoutMs: 10000, maxRetries: 1 })
+      .then((data: any) => {
+        if (!data.onboardingCompleted) setShowWelcome(true);
+      })
+      .catch(() => {}); // Silently fail — don't block the dashboard
+  }, [user?.id]);
+
+  const handleWelcomeClose = async () => {
+    setShowWelcome(false);
+    if (user?.id) {
+      try {
+        await api.post('/api/user/onboarding', { userId: user.id }, { context: 'Complete onboarding', timeoutMs: 10000, maxRetries: 1 });
+      } catch {} // Non-critical
+    }
+  };
 
   // Load Google Font
   useEffect(() => {
@@ -218,6 +239,9 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Welcome Modal (first-time users only) */}
+      <WelcomeModal open={showWelcome} onClose={handleWelcomeClose} />
+
       {/* Header */}
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">

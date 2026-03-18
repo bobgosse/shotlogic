@@ -102,14 +102,19 @@ export const AnalysisProgressPanel: React.FC<AnalysisProgressPanelProps> = ({
         </div>
       </div>
 
-      {/* Currently analyzing */}
-      {currentlyAnalyzing && (
-        <div className="px-4 pb-2">
+      {/* Status message */}
+      <div className="px-4 pb-2">
+        {currentlyAnalyzing ? (
           <p className="text-xs text-white/50">
             Currently analyzing: <span className="text-white/70">{getSceneLabel(currentlyAnalyzing)}</span>
+            <span className="text-white/30"> — scenes complete one at a time (~90s each)</span>
           </p>
-        </div>
-      )}
+        ) : remainingScenes > 0 ? (
+          <p className="text-xs text-white/50">
+            Waiting for next scene to start...
+          </p>
+        ) : null}
+      </div>
 
       {/* Expanded scene list */}
       {isExpanded && (

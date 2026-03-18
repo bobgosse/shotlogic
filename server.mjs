@@ -197,6 +197,14 @@ app.post("/api/webhook/clerk", async (req, res) => {
   await apiHandler(req, res, join(__dirname, "api/webhook/clerk.ts"));
 });
 
+// User onboarding
+app.get("/api/user/onboarding", async (req, res) => {
+  await apiHandler(req, res, join(__dirname, "api/user/onboarding.ts"));
+});
+app.post("/api/user/onboarding", async (req, res) => {
+  await apiHandler(req, res, join(__dirname, "api/user/onboarding.ts"));
+});
+
 // Serve static files
 app.use(express.static(join(__dirname, 'dist')));
 

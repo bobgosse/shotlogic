@@ -580,6 +580,15 @@ export default function Index() {
                 className="hidden"
               />
             </div>
+
+            {/* Upload guidance */}
+            <div className="mt-6 bg-white/5 rounded-lg p-5 space-y-3">
+              <h3 className="text-sm font-semibold text-white/80">What happens next</h3>
+              <div className="grid gap-2 text-sm text-white/50">
+                <p>ShotLogic detects your scenes automatically, then analyzes each one for story logic, production logistics, directing vision, and shot lists.</p>
+                <p>Each scene takes about <span className="text-white/70 font-medium">60–90 seconds</span>. A 10-scene script takes roughly 15 minutes. You can review scenes as they finish — no need to wait for the whole script.</p>
+              </div>
+            </div>
           </>
         )}
 
