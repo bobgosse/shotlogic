@@ -412,6 +412,23 @@ const ProjectDetails = () => {
           </div>
         )}
 
+        {/* Pending scenes banner */}
+        {(() => {
+          const pendingCount = scenes.filter(s => !parseAnalysis(s.analysis)).length;
+          return pendingCount > 0 && project.status === 'COMPLETED' ? (
+            <div className="max-w-5xl mx-auto px-4 pt-4">
+              <div className="bg-gradient-to-r from-netflix-red/20 to-primary/20 border border-netflix-red/40 rounded-lg px-5 py-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Sparkles className="w-5 h-5 text-netflix-red flex-shrink-0" />
+                  <p className="text-sm font-medium text-foreground">
+                    <span className="text-netflix-red font-bold">{pendingCount} scene{pendingCount !== 1 ? 's' : ''}</span> ready to analyze — select a scene and click <span className="font-bold">Analyze Scene</span> to run it
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : null;
+        })()}
+
         {/* Selected Scene Content */}
         <div className="max-w-5xl mx-auto p-4">
           {!selectedScene ? (
@@ -450,15 +467,27 @@ const ProjectDetails = () => {
                   </div>
 
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleReanalyzeScene(selectedScene.id, selectedScene.scene_number, selectedScene.content)}
-                      disabled={reanalyzing}
-                    >
-                      <RefreshCw className={`w-4 h-4 mr-1 ${reanalyzing ? 'animate-spin' : ''}`} />
-                      {reanalyzing ? 'Analyzing...' : 'Re-analyze'}
-                    </Button>
+                    {!parseAnalysis(selectedScene.analysis) ? (
+                      <Button
+                        size="default"
+                        onClick={() => handleReanalyzeScene(selectedScene.id, selectedScene.scene_number, selectedScene.content)}
+                        disabled={reanalyzing}
+                        className="bg-netflix-red hover:bg-netflix-red/90 text-white font-bold px-6 animate-pulse hover:animate-none"
+                      >
+                        <Sparkles className={`w-4 h-4 mr-2 ${reanalyzing ? 'animate-spin' : ''}`} />
+                        {reanalyzing ? 'Analyzing...' : 'Analyze Scene'}
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleReanalyzeScene(selectedScene.id, selectedScene.scene_number, selectedScene.content)}
+                        disabled={reanalyzing}
+                      >
+                        <RefreshCw className={`w-4 h-4 mr-1 ${reanalyzing ? 'animate-spin' : ''}`} />
+                        {reanalyzing ? 'Analyzing...' : 'Re-analyze'}
+                      </Button>
+                    )}
                     {selectedAnalysis && (
                       <Button
                         variant="outline"
