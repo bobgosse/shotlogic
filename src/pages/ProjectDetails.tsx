@@ -17,7 +17,7 @@ import { ProductionSummary } from "@/components/ProductionSummary";
 import { AnalysisData, Scene, ShotListItem, parseAnalysis } from "@/types/analysis";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, ArrowLeft, Film, Camera, Printer, Download, RefreshCw, FileText, Save, Menu, Sparkles, ImageIcon, Palette, X, Check, ChevronLeft, ChevronRight, Users, Plus, ArrowUp, ArrowDown, Copy, Pencil } from "lucide-react";
+import { Trash2, ArrowLeft, Film, Camera, Printer, Download, RefreshCw, FileText, Save, Menu, Sparkles, ImageIcon, Palette, X, Check, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Users, Plus, ArrowUp, ArrowDown, Copy, Pencil } from "lucide-react";
 import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { exportShotListPDF, exportShotListCSV, exportStoryboardPDF, exportAnalysisOnlyPDF } from "@/utils/shotListExporter";
@@ -85,6 +85,9 @@ const ProjectDetails = () => {
   const [forceDesktopView, setForceDesktopView] = useState(false);
   const [showTabGuide, setShowTabGuide] = useState(false);
   const [tabGuideDismissed, setTabGuideDismissed] = useState(false);
+  const [showFullStory, setShowFullStory] = useState(false);
+  const [showFullProducing, setShowFullProducing] = useState(false);
+  const [showFullDirecting, setShowFullDirecting] = useState(false);
   const isMobile = useMediaQuery("(max-width: 768px)");
   const isTablet = useMediaQuery("(max-width: 1024px)");
 
@@ -644,210 +647,284 @@ const ProjectDetails = () => {
                           <div className="md:col-span-2"><EditableArrayField label="Alternative Readings" items={editedStoryData.alternative_readings || []} onChange={(items) => setEditedStoryData({...editedStoryData, alternative_readings: items})} /></div>
                         </div>
                       ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* The Core - Most Important */}
-                        <div className="space-y-2 md:col-span-2">
-                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🎯 The Core</h3>
-                          <div className="bg-primary/10 border border-primary/30 rounded-lg p-4">
-                            <p className="text-base text-foreground font-medium italic">
-                              "{selectedAnalysis.story_analysis?.the_core || selectedAnalysis.story_analysis?.stakes || 'What MUST this scene accomplish?'}"
+                      <div className="space-y-4">
+                        {/* ── Layer 1: The One Thing (always visible) ── */}
+                        <div className="space-y-2">
+                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🔑 The One Thing</h3>
+                          <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
+                            <p className="text-base text-foreground leading-relaxed font-medium">
+                              {selectedAnalysis.story_analysis?.the_one_thing || 'Not analyzed - click Re-analyze to generate'}
                             </p>
                           </div>
                         </div>
 
-                        {/* Scene Obligation - Prominent styling */}
-                        <div className="space-y-2 md:col-span-2">
-                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">📋 Scene Obligation</h3>
-                          <div className="bg-primary/5 border-l-4 border-primary rounded-r-lg p-4">
-                            {selectedAnalysis.story_analysis?.scene_obligation ? (
-                              <p className="text-sm text-foreground leading-relaxed font-medium">
-                                {selectedAnalysis.story_analysis.scene_obligation}
-                              </p>
-                            ) : (
-                              <p className="text-sm text-muted-foreground italic">Not analyzed - click Re-analyze to generate</p>
-                            )}
+                        {/* ── Layer 2: Summary (expanded by default) ── */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Synopsis */}
+                          <div className="space-y-2 md:col-span-2">
+                            <h3 className="text-sm font-semibold text-primary flex items-center gap-2">📝 Synopsis</h3>
+                            <p className="text-sm text-foreground leading-relaxed bg-muted/30 rounded-lg p-3">
+                              {selectedAnalysis.story_analysis?.synopsis || 'No synopsis available'}
+                            </p>
                           </div>
-                        </div>
 
-                        {/* The One Thing - Highlighted box */}
-                        <div className="space-y-2 md:col-span-2">
-                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🔑 The One Thing</h3>
-                          <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
-                            {selectedAnalysis.story_analysis?.the_one_thing ? (
-                              <p className="text-sm text-foreground leading-relaxed font-medium">
-                                {selectedAnalysis.story_analysis.the_one_thing}
-                              </p>
-                            ) : (
-                              <p className="text-sm text-muted-foreground italic">Not analyzed - click Re-analyze to generate</p>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Synopsis */}
-                        <div className="space-y-2 md:col-span-2">
-                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">📝 Synopsis</h3>
-                          <p className="text-sm text-foreground leading-relaxed bg-muted/30 rounded-lg p-3">
-                            {selectedAnalysis.story_analysis?.synopsis || 'No synopsis available'}
-                          </p>
-                        </div>
-
-                        {/* Essential Exposition */}
-                        <div className="space-y-2 md:col-span-2">
-                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">💡 Essential Exposition</h3>
-                          <div className="bg-muted/30 rounded-lg p-3">
-                            {selectedAnalysis.story_analysis?.essential_exposition ? (
-                              <p className="text-sm text-foreground leading-relaxed">{selectedAnalysis.story_analysis.essential_exposition}</p>
-                            ) : (
-                              <p className="text-sm text-muted-foreground italic">None identified</p>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* The Turn */}
-                        <div className="space-y-2">
-                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">⚡ The Turn</h3>
-                          <div className="bg-accent/20 border border-accent/30 rounded-lg p-3">
-                            {selectedAnalysis.story_analysis?.the_turn || selectedAnalysis.story_analysis?.breaking_point ? (
-                              <p className="text-sm text-foreground">
-                                {selectedAnalysis.story_analysis?.the_turn || selectedAnalysis.story_analysis?.breaking_point}
-                              </p>
-                            ) : (
-                              <p className="text-sm text-muted-foreground italic">Not analyzed - click Re-analyze</p>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Setup & Payoff */}
-                        <div className="space-y-2 md:col-span-2">
-                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🔗 Setup & Payoff</h3>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
-                              <h4 className="text-xs font-semibold text-blue-400 uppercase tracking-wide mb-2">Setups</h4>
-                              {selectedAnalysis.story_analysis?.setup_payoff?.setups && selectedAnalysis.story_analysis.setup_payoff.setups.length > 0 ? (
-                                <ul className="space-y-1">
-                                  {selectedAnalysis.story_analysis.setup_payoff.setups.map((setup: string, idx: number) => (
-                                    <li key={idx} className="text-sm text-foreground flex items-start gap-2">
-                                      <span className="text-blue-400 mt-0.5">•</span>
-                                      <span>{setup}</span>
-                                    </li>
-                                  ))}
-                                </ul>
+                          {/* The Turn */}
+                          <div className="space-y-2">
+                            <h3 className="text-sm font-semibold text-primary flex items-center gap-2">⚡ The Turn</h3>
+                            <div className="bg-accent/20 border border-accent/30 rounded-lg p-3">
+                              {selectedAnalysis.story_analysis?.the_turn || selectedAnalysis.story_analysis?.breaking_point ? (
+                                <p className="text-sm text-foreground">
+                                  {selectedAnalysis.story_analysis?.the_turn || selectedAnalysis.story_analysis?.breaking_point}
+                                </p>
                               ) : (
-                                <p className="text-sm text-muted-foreground italic">No setups identified</p>
+                                <p className="text-sm text-muted-foreground italic">Not analyzed</p>
                               )}
                             </div>
-                            <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
-                              <h4 className="text-xs font-semibold text-green-400 uppercase tracking-wide mb-2">Payoffs</h4>
-                              {selectedAnalysis.story_analysis?.setup_payoff?.payoffs && selectedAnalysis.story_analysis.setup_payoff.payoffs.length > 0 ? (
-                                <ul className="space-y-1">
-                                  {selectedAnalysis.story_analysis.setup_payoff.payoffs.map((payoff: string, idx: number) => (
-                                    <li key={idx} className="text-sm text-foreground flex items-start gap-2">
-                                      <span className="text-green-400 mt-0.5">•</span>
-                                      <span>{payoff}</span>
-                                    </li>
-                                  ))}
-                                </ul>
+                          </div>
+
+                          {/* Ownership */}
+                          <div className="space-y-2">
+                            <h3 className="text-sm font-semibold text-primary flex items-center gap-2">👤 Ownership</h3>
+                            <div className="bg-muted/30 rounded-lg p-3">
+                              {selectedAnalysis.story_analysis?.ownership ? (
+                                <p className="text-sm text-foreground">{selectedAnalysis.story_analysis.ownership}</p>
                               ) : (
-                                <p className="text-sm text-muted-foreground italic">No payoffs identified</p>
+                                <p className="text-sm text-muted-foreground italic">Not analyzed</p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Stakes */}
+                          <div className="space-y-2 md:col-span-2">
+                            <h3 className="text-sm font-semibold text-primary flex items-center gap-2">⚔️ Stakes</h3>
+                            <div className="bg-muted/30 rounded-lg p-3">
+                              {selectedAnalysis.story_analysis?.stakes ? (
+                                <p className="text-sm text-foreground leading-relaxed">{selectedAnalysis.story_analysis.stakes}</p>
+                              ) : (
+                                <p className="text-sm text-muted-foreground italic">Not analyzed</p>
                               )}
                             </div>
                           </div>
                         </div>
 
-                        {/* Ownership */}
-                        <div className="space-y-2">
-                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">👤 Ownership</h3>
-                          <div className="bg-muted/30 rounded-lg p-3">
-                            {selectedAnalysis.story_analysis?.ownership ? (
-                              <p className="text-sm text-foreground">{selectedAnalysis.story_analysis.ownership}</p>
-                            ) : (
-                              <p className="text-sm text-muted-foreground italic">Not analyzed - click Re-analyze</p>
-                            )}
-                          </div>
-                        </div>
+                        {/* ── Layer 3: Full Detail (collapsed by default) ── */}
+                        {(() => {
+                          const storyDetailSections = [
+                            selectedAnalysis.story_analysis?.the_core && 'The Core',
+                            selectedAnalysis.story_analysis?.scene_obligation && 'Scene Obligation',
+                            selectedAnalysis.story_analysis?.essential_exposition && 'Essential Exposition',
+                            selectedAnalysis.story_analysis?.setup_payoff && 'Setup & Payoff',
+                            selectedAnalysis.story_analysis?.the_times && 'The Times',
+                            (selectedAnalysis.story_analysis?.imagery_and_tone || selectedAnalysis.story_analysis?.tone) && 'Imagery & Tone',
+                            selectedAnalysis.story_analysis?.if_this_scene_fails && 'If This Scene Fails',
+                            selectedAnalysis.story_analysis?.pitfalls?.length && 'Pitfalls',
+                            selectedAnalysis.story_analysis?.alternative_readings?.length && 'Alternative Readings',
+                            selectedAnalysis.story_analysis?.subtext && 'Subtext',
+                            selectedAnalysis.story_analysis?.conflict && 'Conflict',
+                          ].filter(Boolean);
+                          if (storyDetailSections.length === 0) return null;
+                          return (
+                            <>
+                              <button
+                                onClick={() => setShowFullStory(!showFullStory)}
+                                className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-border bg-muted/20 hover:bg-muted/40 transition-colors text-sm text-muted-foreground"
+                              >
+                                {showFullStory ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                {showFullStory ? 'Hide full analysis' : `Show full analysis (${storyDetailSections.length} more sections)`}
+                              </button>
+                              {showFullStory && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  {/* The Core */}
+                                  {selectedAnalysis.story_analysis?.the_core && (
+                                    <div className="space-y-2 md:col-span-2">
+                                      <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🎯 The Core</h3>
+                                      <div className="bg-primary/10 border border-primary/30 rounded-lg p-4">
+                                        <p className="text-base text-foreground font-medium italic">
+                                          "{selectedAnalysis.story_analysis.the_core}"
+                                        </p>
+                                      </div>
+                                    </div>
+                                  )}
 
-                        {/* The Times */}
-                        <div className="space-y-2">
-                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🕰️ The Times</h3>
-                          <div className="bg-muted/30 rounded-lg p-3">
-                            {selectedAnalysis.story_analysis?.the_times ? (
-                              <p className="text-sm text-foreground">{selectedAnalysis.story_analysis.the_times}</p>
-                            ) : (
-                              <p className="text-sm text-muted-foreground italic">Not analyzed - click Re-analyze</p>
-                            )}
-                          </div>
-                        </div>
+                                  {/* Scene Obligation */}
+                                  {selectedAnalysis.story_analysis?.scene_obligation && (
+                                    <div className="space-y-2 md:col-span-2">
+                                      <h3 className="text-sm font-semibold text-primary flex items-center gap-2">📋 Scene Obligation</h3>
+                                      <div className="bg-primary/5 border-l-4 border-primary rounded-r-lg p-4">
+                                        <p className="text-sm text-foreground leading-relaxed font-medium">
+                                          {selectedAnalysis.story_analysis.scene_obligation}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  )}
 
-                        {/* Imagery & Tone */}
-                        <div className="space-y-2">
-                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🎨 Imagery & Tone</h3>
-                          <div className="bg-muted/30 rounded-lg p-3">
-                            {selectedAnalysis.story_analysis?.imagery_and_tone || selectedAnalysis.story_analysis?.tone ? (
-                              <p className="text-sm text-foreground">{selectedAnalysis.story_analysis?.imagery_and_tone || selectedAnalysis.story_analysis?.tone}</p>
-                            ) : (
-                              <p className="text-sm text-muted-foreground italic">Not analyzed - click Re-analyze</p>
-                            )}
-                          </div>
-                        </div>
+                                  {/* Essential Exposition */}
+                                  {selectedAnalysis.story_analysis?.essential_exposition && (
+                                    <div className="space-y-2 md:col-span-2">
+                                      <h3 className="text-sm font-semibold text-primary flex items-center gap-2">💡 Essential Exposition</h3>
+                                      <div className="bg-muted/30 rounded-lg p-3">
+                                        <p className="text-sm text-foreground leading-relaxed">{selectedAnalysis.story_analysis.essential_exposition}</p>
+                                      </div>
+                                    </div>
+                                  )}
 
-                        {/* Stakes */}
-                        <div className="space-y-2 md:col-span-2">
-                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">⚔️ Stakes</h3>
-                          <div className="bg-muted/30 rounded-lg p-3">
-                            {selectedAnalysis.story_analysis?.stakes ? (
-                              <p className="text-sm text-foreground leading-relaxed">{selectedAnalysis.story_analysis.stakes}</p>
-                            ) : (
-                              <p className="text-sm text-muted-foreground italic">Not analyzed - click Re-analyze</p>
-                            )}
-                          </div>
-                        </div>
+                                  {/* Setup & Payoff */}
+                                  {selectedAnalysis.story_analysis?.setup_payoff && (
+                                    <div className="space-y-2 md:col-span-2">
+                                      <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🔗 Setup & Payoff</h3>
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+                                          <h4 className="text-xs font-semibold text-blue-400 uppercase tracking-wide mb-2">Setups</h4>
+                                          {selectedAnalysis.story_analysis.setup_payoff.setups?.length > 0 ? (
+                                            <ul className="space-y-1">
+                                              {selectedAnalysis.story_analysis.setup_payoff.setups.map((setup: string, idx: number) => (
+                                                <li key={idx} className="text-sm text-foreground flex items-start gap-2">
+                                                  <span className="text-blue-400 mt-0.5">•</span>
+                                                  <span>{setup}</span>
+                                                </li>
+                                              ))}
+                                            </ul>
+                                          ) : (
+                                            <p className="text-sm text-muted-foreground italic">No setups identified</p>
+                                          )}
+                                        </div>
+                                        <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
+                                          <h4 className="text-xs font-semibold text-green-400 uppercase tracking-wide mb-2">Payoffs</h4>
+                                          {selectedAnalysis.story_analysis.setup_payoff.payoffs?.length > 0 ? (
+                                            <ul className="space-y-1">
+                                              {selectedAnalysis.story_analysis.setup_payoff.payoffs.map((payoff: string, idx: number) => (
+                                                <li key={idx} className="text-sm text-foreground flex items-start gap-2">
+                                                  <span className="text-green-400 mt-0.5">•</span>
+                                                  <span>{payoff}</span>
+                                                </li>
+                                              ))}
+                                            </ul>
+                                          ) : (
+                                            <p className="text-sm text-muted-foreground italic">No payoffs identified</p>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
 
-                        {/* If This Scene Fails */}
-                        <div className="space-y-2 md:col-span-2">
-                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">💥 If This Scene Fails</h3>
-                          <div className="bg-red-500/5 border border-red-500/20 rounded-lg p-3">
-                            {selectedAnalysis.story_analysis?.if_this_scene_fails ? (
-                              <p className="text-sm text-foreground leading-relaxed">{selectedAnalysis.story_analysis.if_this_scene_fails}</p>
-                            ) : (
-                              <p className="text-sm text-muted-foreground italic">Not analyzed - click Re-analyze to generate</p>
-                            )}
-                          </div>
-                        </div>
+                                  {/* The Times */}
+                                  {selectedAnalysis.story_analysis?.the_times && (
+                                    <div className="space-y-2">
+                                      <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🕰️ The Times</h3>
+                                      <div className="bg-muted/30 rounded-lg p-3">
+                                        <p className="text-sm text-foreground">{selectedAnalysis.story_analysis.the_times}</p>
+                                      </div>
+                                    </div>
+                                  )}
 
-                        {/* Pitfalls */}
-                        <div className="space-y-2 md:col-span-2">
-                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">⚠️ Pitfalls</h3>
-                          <div className="flex flex-wrap gap-2">
-                            {(selectedAnalysis.story_analysis?.pitfalls || []).map((pitfall: string, idx: number) => (
-                              <span key={idx} className="px-3 py-1 bg-red-500/10 border border-red-500/30 rounded-full text-xs text-red-400">
-                                {pitfall}
-                              </span>
-                            ))}
-                            {(!selectedAnalysis.story_analysis?.pitfalls || selectedAnalysis.story_analysis.pitfalls.length === 0) && (
-                              <p className="text-sm text-muted-foreground italic">No pitfalls identified</p>
-                            )}
-                          </div>
-                        </div>
+                                  {/* Imagery & Tone */}
+                                  {(selectedAnalysis.story_analysis?.imagery_and_tone || selectedAnalysis.story_analysis?.tone) && (
+                                    <div className="space-y-2">
+                                      <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🎨 Imagery & Tone</h3>
+                                      <div className="bg-muted/30 rounded-lg p-3">
+                                        <p className="text-sm text-foreground">{selectedAnalysis.story_analysis?.imagery_and_tone || selectedAnalysis.story_analysis?.tone}</p>
+                                      </div>
+                                    </div>
+                                  )}
 
-                        {/* Alternative Readings */}
-                        <div className="space-y-2 md:col-span-2">
-                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🎭 Alternative Readings</h3>
-                          <p className="text-xs text-muted-foreground -mt-1">Discussion points for the creative team</p>
-                          <div className="bg-purple-500/5 border border-purple-500/20 rounded-lg p-4">
-                            {selectedAnalysis.story_analysis?.alternative_readings && selectedAnalysis.story_analysis.alternative_readings.length > 0 ? (
-                              <ol className="space-y-2">
-                                {selectedAnalysis.story_analysis.alternative_readings.map((reading: string, idx: number) => (
-                                  <li key={idx} className="text-sm text-foreground flex items-start gap-3">
-                                    <span className="text-purple-400 font-semibold text-xs mt-0.5 shrink-0">{idx + 1}.</span>
-                                    <span className="leading-relaxed">{reading}</span>
-                                  </li>
-                                ))}
-                              </ol>
-                            ) : (
-                              <p className="text-sm text-muted-foreground italic">No alternative readings identified</p>
-                            )}
-                          </div>
-                        </div>
+                                  {/* If This Scene Fails */}
+                                  {selectedAnalysis.story_analysis?.if_this_scene_fails && (
+                                    <div className="space-y-2 md:col-span-2">
+                                      <h3 className="text-sm font-semibold text-primary flex items-center gap-2">💥 If This Scene Fails</h3>
+                                      <div className="bg-red-500/5 border border-red-500/20 rounded-lg p-3">
+                                        <p className="text-sm text-foreground leading-relaxed">{selectedAnalysis.story_analysis.if_this_scene_fails}</p>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Pitfalls */}
+                                  {(selectedAnalysis.story_analysis?.pitfalls?.length ?? 0) > 0 && (
+                                    <div className="space-y-2 md:col-span-2">
+                                      <h3 className="text-sm font-semibold text-primary flex items-center gap-2">⚠️ Pitfalls</h3>
+                                      <div className="flex flex-wrap gap-2">
+                                        {selectedAnalysis.story_analysis!.pitfalls!.map((pitfall: string, idx: number) => (
+                                          <span key={idx} className="px-3 py-1 bg-red-500/10 border border-red-500/30 rounded-full text-xs text-red-400">
+                                            {pitfall}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Alternative Readings */}
+                                  {(selectedAnalysis.story_analysis?.alternative_readings?.length ?? 0) > 0 && (
+                                    <div className="space-y-2 md:col-span-2">
+                                      <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🎭 Alternative Readings</h3>
+                                      <p className="text-xs text-muted-foreground -mt-1">Discussion points for the creative team</p>
+                                      <div className="bg-purple-500/5 border border-purple-500/20 rounded-lg p-4">
+                                        <ol className="space-y-2">
+                                          {selectedAnalysis.story_analysis!.alternative_readings!.map((reading: string, idx: number) => (
+                                            <li key={idx} className="text-sm text-foreground flex items-start gap-3">
+                                              <span className="text-purple-400 font-semibold text-xs mt-0.5 shrink-0">{idx + 1}.</span>
+                                              <span className="leading-relaxed">{reading}</span>
+                                            </li>
+                                          ))}
+                                        </ol>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Subtext */}
+                                  {selectedAnalysis.story_analysis?.subtext && (
+                                    <div className="space-y-2">
+                                      <h3 className="text-sm font-semibold text-primary flex items-center gap-2">💭 Subtext</h3>
+                                      <div className="bg-muted/30 rounded-lg p-3 text-sm space-y-2">
+                                        {selectedAnalysis.story_analysis.subtext.what_they_say_vs_want && (
+                                          <p><span className="text-muted-foreground">Say vs Want:</span> {selectedAnalysis.story_analysis.subtext.what_they_say_vs_want}</p>
+                                        )}
+                                        {selectedAnalysis.story_analysis.subtext.power_dynamic && (
+                                          <p><span className="text-muted-foreground">Power:</span> {selectedAnalysis.story_analysis.subtext.power_dynamic}</p>
+                                        )}
+                                        {selectedAnalysis.story_analysis.subtext.emotional_turn && (
+                                          <p><span className="text-muted-foreground">Emotional Arc:</span> {selectedAnalysis.story_analysis.subtext.emotional_turn}</p>
+                                        )}
+                                        {selectedAnalysis.story_analysis.subtext.revelation_or_realization && (
+                                          <p><span className="text-muted-foreground">Revelation:</span> {selectedAnalysis.story_analysis.subtext.revelation_or_realization}</p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Conflict */}
+                                  {selectedAnalysis.story_analysis?.conflict && (
+                                    <div className="space-y-2">
+                                      <h3 className="text-sm font-semibold text-primary flex items-center gap-2">⚔️ Conflict</h3>
+                                      <div className="bg-muted/30 rounded-lg p-3 text-sm space-y-2">
+                                        {selectedAnalysis.story_analysis.conflict.type && (
+                                          <div className="flex flex-wrap gap-1 mb-2">
+                                            {(Array.isArray(selectedAnalysis.story_analysis.conflict.type)
+                                              ? selectedAnalysis.story_analysis.conflict.type
+                                              : String(selectedAnalysis.story_analysis.conflict.type).split('|')
+                                            ).map((t: string, i: number) => (
+                                              <Badge key={i} variant="outline" className="text-xs">{String(t).trim()}</Badge>
+                                            ))}
+                                          </div>
+                                        )}
+                                        {(selectedAnalysis.story_analysis.conflict.what_characters_want?.length ?? 0) > 0 && (
+                                          <p><span className="text-muted-foreground">Wants:</span> {selectedAnalysis.story_analysis.conflict.what_characters_want!.join('; ')}</p>
+                                        )}
+                                        {(selectedAnalysis.story_analysis.conflict.obstacles?.length ?? 0) > 0 && (
+                                          <p><span className="text-muted-foreground">Obstacles:</span> {selectedAnalysis.story_analysis.conflict.obstacles!.join('; ')}</p>
+                                        )}
+                                        {(selectedAnalysis.story_analysis.conflict.tactics?.length ?? 0) > 0 && (
+                                          <p><span className="text-muted-foreground">Tactics:</span> {selectedAnalysis.story_analysis.conflict.tactics!.join('; ')}</p>
+                                        )}
+                                        {selectedAnalysis.story_analysis.conflict.winner && (
+                                          <p><span className="text-muted-foreground">Outcome:</span> {selectedAnalysis.story_analysis.conflict.winner}</p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
                       )}
                       </>
@@ -952,268 +1029,309 @@ const ProjectDetails = () => {
                           </div>
                         </div>
                       ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Locations */}
-                        <div className="space-y-2">
-                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">📍 Locations</h3>
-                          <div className="text-sm text-foreground bg-muted/30 rounded-lg p-3">
-                            {selectedAnalysis.producing_logistics?.locations?.primary || 
-                             selectedAnalysis.producing_logistics?.locations?.setting || 
-                             'No location specified'}
-                            {selectedAnalysis.producing_logistics?.locations?.timeOfDay && (
-                              <Badge variant="outline" className="ml-2">{selectedAnalysis.producing_logistics.locations.timeOfDay}</Badge>
-                            )}
+                      <div className="space-y-4">
+                        {/* ── Layer 1: At-a-glance metrics (always visible) ── */}
+                        <div className="flex flex-wrap gap-4 items-center bg-muted/30 rounded-lg p-4">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Impact</span>
+                            <Badge variant={selectedAnalysis.producing_logistics?.resource_impact === 'High' ? 'destructive' : selectedAnalysis.producing_logistics?.resource_impact === 'Medium' ? 'default' : 'secondary'} className="text-xs">
+                              {selectedAnalysis.producing_logistics?.resource_impact || 'N/A'}
+                            </Badge>
                           </div>
-                        </div>
-
-                        {/* Cast */}
-                        <div className="space-y-2">
-                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🎭 Cast</h3>
-                          <div className="text-sm text-foreground bg-muted/30 rounded-lg p-3 space-y-1">
-                            {selectedAnalysis.producing_logistics?.cast?.principal?.length > 0 && (
-                              <p><span className="text-muted-foreground">Principal:</span> {selectedAnalysis.producing_logistics.cast.principal.join(', ')}</p>
-                            )}
-                            {selectedAnalysis.producing_logistics?.cast?.speaking?.length > 0 && (
-                              <p><span className="text-muted-foreground">Speaking:</span> {selectedAnalysis.producing_logistics.cast.speaking.join(', ')}</p>
-                            )}
-                            {selectedAnalysis.producing_logistics?.cast?.silent?.length > 0 && (
-                              <p><span className="text-muted-foreground">Silent:</span> {selectedAnalysis.producing_logistics.cast.silent.join(', ')}</p>
-                            )}
-                            {selectedAnalysis.producing_logistics?.cast?.extras && selectedAnalysis.producing_logistics.cast.extras !== 'None' && (
-                              <p><span className="text-muted-foreground">Extras:</span> {safeExtrasString(selectedAnalysis.producing_logistics.cast.extras)}</p>
-                            )}
-                            {!selectedAnalysis.producing_logistics?.cast?.principal?.length &&
-                             !selectedAnalysis.producing_logistics?.cast?.speaking?.length &&
-                             <p className="text-muted-foreground italic">No cast listed</p>}
-                          </div>
-                        </div>
-
-                        {/* Key Props */}
-                        <div className="space-y-2">
-                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🎬 Key Props</h3>
-                          <div className="flex flex-wrap gap-1">
-                            {(selectedAnalysis.producing_logistics?.key_props || []).map((prop: string, idx: number) => (
-                              <Badge key={idx} variant="secondary" className="text-xs">{prop}</Badge>
-                            ))}
-                            {(!selectedAnalysis.producing_logistics?.key_props || selectedAnalysis.producing_logistics.key_props.length === 0) && 
-                              <p className="text-sm text-muted-foreground italic">No props listed</p>}
-                          </div>
-                        </div>
-
-                        {/* SFX */}
-                        <div className="space-y-2">
-                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">✨ SFX / VFX</h3>
-                          <div className="text-sm text-foreground bg-muted/30 rounded-lg p-3 space-y-1">
-                            {selectedAnalysis.producing_logistics?.sfx?.practical?.length > 0 && (
-                              <p><span className="text-muted-foreground">Practical:</span> {selectedAnalysis.producing_logistics.sfx.practical.join(', ')}</p>
-                            )}
-                            {selectedAnalysis.producing_logistics?.sfx?.vfx?.length > 0 && (
-                              <p><span className="text-muted-foreground">VFX:</span> {selectedAnalysis.producing_logistics.sfx.vfx.join(', ')}</p>
-                            )}
-                            {!selectedAnalysis.producing_logistics?.sfx?.practical?.length && 
-                             !selectedAnalysis.producing_logistics?.sfx?.vfx?.length && 
-                             <p className="text-muted-foreground italic">No special effects</p>}
-                          </div>
-                        </div>
-
-                        {/* Budget Flags */}
-                        <div className="space-y-2 md:col-span-2">
-                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">💰 Budget Flags</h3>
-                          <div className="space-y-1">
-                            {(selectedAnalysis.producing_logistics?.budget_flags || selectedAnalysis.producing_logistics?.red_flags || []).map((flag: string, idx: number) => (
-                              <div key={idx} className="flex items-start gap-2 text-sm">
-                                <span className="text-red-400">⚠️</span>
-                                <span className="text-foreground">{flag}</span>
-                              </div>
-                            ))}
-                            {(!selectedAnalysis.producing_logistics?.budget_flags?.length &&
-                              !selectedAnalysis.producing_logistics?.red_flags?.length) &&
-                              <p className="text-sm text-muted-foreground italic">No budget concerns</p>}
-                          </div>
-                        </div>
-
-                        {/* Scene Complexity */}
-                        <div className="space-y-2">
-                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">📊 Scene Complexity</h3>
-                          <div className="text-sm text-foreground bg-muted/30 rounded-lg p-3 flex items-center gap-3">
-                            <span className="font-medium">{selectedAnalysis.producing_logistics?.scene_complexity?.rating || 'Not rated'}/5</span>
-                            <div className="flex gap-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Complexity</span>
+                            <span className="font-medium text-sm">{selectedAnalysis.producing_logistics?.scene_complexity?.rating || '?'}/5</span>
+                            <div className="flex gap-0.5">
                               {[1, 2, 3, 4, 5].map((level) => (
-                                <div
-                                  key={level}
-                                  className={`w-3 h-3 rounded-full ${
-                                    (selectedAnalysis.producing_logistics?.scene_complexity?.rating || 0) >= level
-                                      ? level <= 2 ? 'bg-green-500' : level <= 3 ? 'bg-amber-500' : 'bg-red-500'
-                                      : 'bg-muted-foreground/20'
-                                  }`}
-                                />
+                                <div key={level} className={`w-2.5 h-2.5 rounded-full ${
+                                  (selectedAnalysis.producing_logistics?.scene_complexity?.rating || 0) >= level
+                                    ? level <= 2 ? 'bg-green-500' : level <= 3 ? 'bg-amber-500' : 'bg-red-500'
+                                    : 'bg-muted-foreground/20'
+                                }`} />
                               ))}
                             </div>
                           </div>
-                          {selectedAnalysis.producing_logistics?.scene_complexity?.justification && (
-                            <p className="text-xs text-muted-foreground italic px-1">{selectedAnalysis.producing_logistics.scene_complexity.justification}</p>
-                          )}
-                        </div>
-
-                        {/* Estimated Screen Time */}
-                        <div className="space-y-2">
-                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">⏱️ Estimated Screen Time</h3>
-                          <div className="text-sm text-foreground bg-muted/30 rounded-lg p-3 space-y-1">
-                            <p><span className="font-medium">{selectedAnalysis.producing_logistics?.estimated_screen_time?.estimated_minutes || 'Not estimated'}</span>
-                            {selectedAnalysis.producing_logistics?.estimated_screen_time?.pages ? (
-                              <span className="text-muted-foreground ml-2">({selectedAnalysis.producing_logistics.estimated_screen_time.pages} pages)</span>
-                            ) : null}</p>
-                            {selectedAnalysis.producing_logistics?.estimated_screen_time?.pacing_note && (
-                              <p className="text-xs text-muted-foreground italic">{selectedAnalysis.producing_logistics.estimated_screen_time.pacing_note}</p>
-                            )}
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Screen Time</span>
+                            <span className="font-medium text-sm">{selectedAnalysis.producing_logistics?.estimated_screen_time?.estimated_minutes || 'N/A'}</span>
                           </div>
                         </div>
 
-                        {/* Continuity */}
-                        <div className="space-y-2 md:col-span-2">
-                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🔗 Continuity</h3>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
-                              <p className="text-xs font-semibold text-blue-400 mb-2">Carries In</p>
-                              <div className="space-y-1 text-sm">
-                                {selectedAnalysis.producing_logistics?.continuity?.carries_in ? (
-                                  Object.entries(selectedAnalysis.producing_logistics.continuity.carries_in)
-                                    .filter(([, val]) => val && String(val).trim())
-                                    .map(([key, val]) => (
-                                      <p key={key} className="text-foreground">
-                                        <span className="text-muted-foreground capitalize">{key.replace(/_/g, ' ')}:</span> {String(val)}
-                                      </p>
-                                    ))
-                                ) : (
-                                  <p className="text-muted-foreground italic">None noted</p>
-                                )}
-                              </div>
-                            </div>
-                            <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
-                              <p className="text-xs font-semibold text-green-400 mb-2">Carries Out</p>
-                              <div className="space-y-1 text-sm">
-                                {selectedAnalysis.producing_logistics?.continuity?.carries_out ? (
-                                  Object.entries(selectedAnalysis.producing_logistics.continuity.carries_out)
-                                    .filter(([, val]) => val && String(val).trim())
-                                    .map(([key, val]) => (
-                                      <p key={key} className="text-foreground">
-                                        <span className="text-muted-foreground capitalize">{key.replace(/_/g, ' ')}:</span> {String(val)}
-                                      </p>
-                                    ))
-                                ) : (
-                                  <p className="text-muted-foreground italic">None noted</p>
-                                )}
-                              </div>
+                        {/* ── Layer 2: Summary (expanded by default) ── */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Locations */}
+                          <div className="space-y-2">
+                            <h3 className="text-sm font-semibold text-primary flex items-center gap-2">📍 Locations</h3>
+                            <div className="text-sm text-foreground bg-muted/30 rounded-lg p-3">
+                              {selectedAnalysis.producing_logistics?.locations?.primary ||
+                               selectedAnalysis.producing_logistics?.locations?.setting ||
+                               'No location specified'}
+                              {selectedAnalysis.producing_logistics?.locations?.timeOfDay && (
+                                <Badge variant="outline" className="ml-2">{selectedAnalysis.producing_logistics.locations.timeOfDay}</Badge>
+                              )}
                             </div>
                           </div>
-                        </div>
 
-                        {/* Scheduling Notes */}
-                        <div className="space-y-2 md:col-span-2">
-                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">📅 Scheduling Notes</h3>
-                          <div className="bg-muted/30 rounded-lg p-3 space-y-2 text-sm">
-                            {selectedAnalysis.producing_logistics?.scheduling_notes?.time_of_day_requirement && (
-                              <p><span className="text-muted-foreground font-medium">Time of Day:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics.scheduling_notes.time_of_day_requirement}</span></p>
-                            )}
-                            {selectedAnalysis.producing_logistics?.scheduling_notes?.weather_dependency && (
-                              <p><span className="text-muted-foreground font-medium">Weather:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics.scheduling_notes.weather_dependency}</span></p>
-                            )}
-                            {selectedAnalysis.producing_logistics?.scheduling_notes?.actor_availability_note && (
-                              <p><span className="text-muted-foreground font-medium">Cast Notes:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics.scheduling_notes.actor_availability_note}</span></p>
-                            )}
-                            {(selectedAnalysis.producing_logistics?.scheduling_notes?.combinable_with?.length ?? 0) > 0 && (
-                              <p><span className="text-muted-foreground font-medium">Combinable With:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics?.scheduling_notes?.combinable_with?.join(', ')}</span></p>
-                            )}
-                            {(selectedAnalysis.producing_logistics?.scheduling_notes?.must_schedule_before?.length ?? 0) > 0 && (
-                              <p><span className="text-muted-foreground font-medium">Must Schedule Before:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics?.scheduling_notes?.must_schedule_before?.join(', ')}</span></p>
-                            )}
-                            {(selectedAnalysis.producing_logistics?.scheduling_notes?.must_schedule_after?.length ?? 0) > 0 && (
-                              <p><span className="text-muted-foreground font-medium">Must Schedule After:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics?.scheduling_notes?.must_schedule_after?.join(', ')}</span></p>
-                            )}
-                            {!selectedAnalysis.producing_logistics?.scheduling_notes?.time_of_day_requirement &&
-                             !selectedAnalysis.producing_logistics?.scheduling_notes?.weather_dependency &&
-                             !selectedAnalysis.producing_logistics?.scheduling_notes?.actor_availability_note &&
-                             !(selectedAnalysis.producing_logistics?.scheduling_notes?.combinable_with?.length) &&
-                              <p className="text-muted-foreground italic">No scheduling notes</p>}
+                          {/* Cast */}
+                          <div className="space-y-2">
+                            <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🎭 Cast</h3>
+                            <div className="text-sm text-foreground bg-muted/30 rounded-lg p-3 space-y-1">
+                              {selectedAnalysis.producing_logistics?.cast?.principal?.length > 0 && (
+                                <p><span className="text-muted-foreground">Principal:</span> {selectedAnalysis.producing_logistics.cast.principal.join(', ')}</p>
+                              )}
+                              {selectedAnalysis.producing_logistics?.cast?.speaking?.length > 0 && (
+                                <p><span className="text-muted-foreground">Speaking:</span> {selectedAnalysis.producing_logistics.cast.speaking.join(', ')}</p>
+                              )}
+                              {selectedAnalysis.producing_logistics?.cast?.silent?.length > 0 && (
+                                <p><span className="text-muted-foreground">Silent:</span> {selectedAnalysis.producing_logistics.cast.silent.join(', ')}</p>
+                              )}
+                              {selectedAnalysis.producing_logistics?.cast?.extras && selectedAnalysis.producing_logistics.cast.extras !== 'None' && (
+                                <p><span className="text-muted-foreground">Extras:</span> {safeExtrasString(selectedAnalysis.producing_logistics.cast.extras)}</p>
+                              )}
+                              {!selectedAnalysis.producing_logistics?.cast?.principal?.length &&
+                               !selectedAnalysis.producing_logistics?.cast?.speaking?.length &&
+                               <p className="text-muted-foreground italic">No cast listed</p>}
+                            </div>
+                          </div>
+
+                          {/* Key Props */}
+                          <div className="space-y-2">
+                            <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🎬 Key Props</h3>
+                            <div className="flex flex-wrap gap-1">
+                              {(selectedAnalysis.producing_logistics?.key_props || []).map((prop: string, idx: number) => (
+                                <Badge key={idx} variant="secondary" className="text-xs">{prop}</Badge>
+                              ))}
+                              {(!selectedAnalysis.producing_logistics?.key_props || selectedAnalysis.producing_logistics.key_props.length === 0) &&
+                                <p className="text-sm text-muted-foreground italic">No props listed</p>}
+                            </div>
+                          </div>
+
+                          {/* Budget Flags / Red Flags */}
+                          <div className="space-y-2">
+                            <h3 className="text-sm font-semibold text-primary flex items-center gap-2">💰 Red Flags</h3>
+                            <div className="space-y-1">
+                              {(selectedAnalysis.producing_logistics?.budget_flags || selectedAnalysis.producing_logistics?.red_flags || []).map((flag: string, idx: number) => (
+                                <div key={idx} className="flex items-start gap-2 text-sm">
+                                  <span className="text-red-400">⚠️</span>
+                                  <span className="text-foreground">{flag}</span>
+                                </div>
+                              ))}
+                              {(!selectedAnalysis.producing_logistics?.budget_flags?.length &&
+                                !selectedAnalysis.producing_logistics?.red_flags?.length) &&
+                                <p className="text-sm text-muted-foreground italic">No budget concerns</p>}
+                            </div>
                           </div>
                         </div>
 
-                        {/* Sound Design */}
-                        <div className="space-y-2 md:col-span-2">
-                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🔊 Sound Design</h3>
-                          <div className="bg-muted/30 rounded-lg p-3 space-y-2 text-sm">
-                            {(selectedAnalysis.producing_logistics?.sound_design?.production_sound_challenges?.length ?? 0) > 0 && (
-                              <p><span className="text-muted-foreground font-medium">Challenges:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics?.sound_design?.production_sound_challenges?.join(', ')}</span></p>
-                            )}
-                            {(selectedAnalysis.producing_logistics?.sound_design?.ambient_requirements?.length ?? 0) > 0 && (
-                              <p><span className="text-muted-foreground font-medium">Ambient:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics?.sound_design?.ambient_requirements?.join(', ')}</span></p>
-                            )}
-                            {(selectedAnalysis.producing_logistics?.sound_design?.silence_moments?.length ?? 0) > 0 && (
-                              <p><span className="text-muted-foreground font-medium">Silence Moments:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics?.sound_design?.silence_moments?.join(', ')}</span></p>
-                            )}
-                            {(selectedAnalysis.producing_logistics?.sound_design?.sound_effects_needed?.length ?? 0) > 0 && (
-                              <p><span className="text-muted-foreground font-medium">SFX Needed:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics?.sound_design?.sound_effects_needed?.join(', ')}</span></p>
-                            )}
-                            {selectedAnalysis.producing_logistics?.sound_design?.music_notes && (
-                              <p><span className="text-muted-foreground font-medium">Music:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics.sound_design.music_notes}</span></p>
-                            )}
-                            {!selectedAnalysis.producing_logistics?.sound_design?.production_sound_challenges?.length &&
-                             !selectedAnalysis.producing_logistics?.sound_design?.ambient_requirements?.length &&
-                             !selectedAnalysis.producing_logistics?.sound_design?.sound_effects_needed?.length &&
-                             !selectedAnalysis.producing_logistics?.sound_design?.music_notes &&
-                              <p className="text-muted-foreground italic">No sound design notes</p>}
-                          </div>
-                        </div>
-
-                        {/* Safety Specifics - conditional */}
-                        {((selectedAnalysis.producing_logistics?.safety_specifics?.concerns?.length ?? 0) > 0 ||
-                          (selectedAnalysis.producing_logistics?.safety_specifics?.protocols_required?.length ?? 0) > 0 ||
-                          (selectedAnalysis.producing_logistics?.safety_specifics?.personnel_needed?.length ?? 0) > 0) && (
-                          <div className="space-y-2 md:col-span-2">
-                            <h3 className="text-sm font-semibold text-red-400 flex items-center gap-2">🛡️ Safety Specifics</h3>
-                            <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 space-y-2 text-sm">
-                              {(selectedAnalysis.producing_logistics?.safety_specifics?.concerns?.length ?? 0) > 0 && (
-                                <div>
-                                  <span className="text-red-400 font-medium">Concerns:</span>
-                                  {selectedAnalysis.producing_logistics?.safety_specifics?.concerns?.map((item: string, idx: number) => (
-                                    <div key={idx} className="flex items-start gap-2 ml-2 mt-1">
-                                      <span className="text-red-400">⚠️</span>
-                                      <span className="text-foreground">{item}</span>
+                        {/* ── Layer 3: Full Detail (collapsed by default) ── */}
+                        {(() => {
+                          const prodDetailSections = [
+                            (selectedAnalysis.producing_logistics?.sfx?.practical?.length || selectedAnalysis.producing_logistics?.sfx?.vfx?.length) && 'SFX/VFX',
+                            selectedAnalysis.producing_logistics?.scene_complexity?.justification && 'Complexity Details',
+                            selectedAnalysis.producing_logistics?.estimated_screen_time?.pacing_note && 'Screen Time Details',
+                            selectedAnalysis.producing_logistics?.continuity && 'Continuity',
+                            selectedAnalysis.producing_logistics?.scheduling_notes && 'Scheduling',
+                            selectedAnalysis.producing_logistics?.sound_design && 'Sound Design',
+                            ((selectedAnalysis.producing_logistics?.safety_specifics?.concerns?.length ?? 0) > 0 ||
+                             (selectedAnalysis.producing_logistics?.safety_specifics?.protocols_required?.length ?? 0) > 0) && 'Safety',
+                            selectedAnalysis.producing_logistics?.department_specific_notes && 'Department Notes',
+                          ].filter(Boolean);
+                          if (prodDetailSections.length === 0) return null;
+                          return (
+                            <>
+                              <button
+                                onClick={() => setShowFullProducing(!showFullProducing)}
+                                className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-border bg-muted/20 hover:bg-muted/40 transition-colors text-sm text-muted-foreground"
+                              >
+                                {showFullProducing ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                {showFullProducing ? 'Hide full analysis' : `Show full analysis (${prodDetailSections.length} more sections)`}
+                              </button>
+                              {showFullProducing && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  {/* SFX */}
+                                  {(selectedAnalysis.producing_logistics?.sfx?.practical?.length > 0 || selectedAnalysis.producing_logistics?.sfx?.vfx?.length > 0) && (
+                                    <div className="space-y-2 md:col-span-2">
+                                      <h3 className="text-sm font-semibold text-primary flex items-center gap-2">✨ SFX / VFX</h3>
+                                      <div className="text-sm text-foreground bg-muted/30 rounded-lg p-3 space-y-1">
+                                        {selectedAnalysis.producing_logistics?.sfx?.practical?.length > 0 && (
+                                          <p><span className="text-muted-foreground">Practical:</span> {selectedAnalysis.producing_logistics.sfx.practical.join(', ')}</p>
+                                        )}
+                                        {selectedAnalysis.producing_logistics?.sfx?.vfx?.length > 0 && (
+                                          <p><span className="text-muted-foreground">VFX:</span> {selectedAnalysis.producing_logistics.sfx.vfx.join(', ')}</p>
+                                        )}
+                                      </div>
                                     </div>
-                                  ))}
+                                  )}
+
+                                  {/* Scene Complexity Detail */}
+                                  {selectedAnalysis.producing_logistics?.scene_complexity?.justification && (
+                                    <div className="space-y-2">
+                                      <h3 className="text-sm font-semibold text-primary flex items-center gap-2">📊 Complexity Details</h3>
+                                      <p className="text-sm text-muted-foreground bg-muted/30 rounded-lg p-3">{selectedAnalysis.producing_logistics.scene_complexity.justification}</p>
+                                    </div>
+                                  )}
+
+                                  {/* Screen Time Detail */}
+                                  {selectedAnalysis.producing_logistics?.estimated_screen_time && (
+                                    <div className="space-y-2">
+                                      <h3 className="text-sm font-semibold text-primary flex items-center gap-2">⏱️ Screen Time Details</h3>
+                                      <div className="text-sm text-foreground bg-muted/30 rounded-lg p-3 space-y-1">
+                                        {selectedAnalysis.producing_logistics.estimated_screen_time.pages && (
+                                          <p><span className="text-muted-foreground">Pages:</span> {selectedAnalysis.producing_logistics.estimated_screen_time.pages}</p>
+                                        )}
+                                        {selectedAnalysis.producing_logistics.estimated_screen_time.pacing_note && (
+                                          <p className="text-xs text-muted-foreground italic">{selectedAnalysis.producing_logistics.estimated_screen_time.pacing_note}</p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Continuity */}
+                                  {selectedAnalysis.producing_logistics?.continuity && (
+                                    <div className="space-y-2 md:col-span-2">
+                                      <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🔗 Continuity</h3>
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+                                          <p className="text-xs font-semibold text-blue-400 mb-2">Carries In</p>
+                                          <div className="space-y-1 text-sm">
+                                            {selectedAnalysis.producing_logistics.continuity.carries_in ? (
+                                              Object.entries(selectedAnalysis.producing_logistics.continuity.carries_in)
+                                                .filter(([, val]) => val && String(val).trim())
+                                                .map(([key, val]) => (
+                                                  <p key={key} className="text-foreground">
+                                                    <span className="text-muted-foreground capitalize">{key.replace(/_/g, ' ')}:</span> {String(val)}
+                                                  </p>
+                                                ))
+                                            ) : (
+                                              <p className="text-muted-foreground italic">None noted</p>
+                                            )}
+                                          </div>
+                                        </div>
+                                        <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
+                                          <p className="text-xs font-semibold text-green-400 mb-2">Carries Out</p>
+                                          <div className="space-y-1 text-sm">
+                                            {selectedAnalysis.producing_logistics.continuity.carries_out ? (
+                                              Object.entries(selectedAnalysis.producing_logistics.continuity.carries_out)
+                                                .filter(([, val]) => val && String(val).trim())
+                                                .map(([key, val]) => (
+                                                  <p key={key} className="text-foreground">
+                                                    <span className="text-muted-foreground capitalize">{key.replace(/_/g, ' ')}:</span> {String(val)}
+                                                  </p>
+                                                ))
+                                            ) : (
+                                              <p className="text-muted-foreground italic">None noted</p>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Scheduling Notes */}
+                                  {selectedAnalysis.producing_logistics?.scheduling_notes && (
+                                    <div className="space-y-2 md:col-span-2">
+                                      <h3 className="text-sm font-semibold text-primary flex items-center gap-2">📅 Scheduling Notes</h3>
+                                      <div className="bg-muted/30 rounded-lg p-3 space-y-2 text-sm">
+                                        {selectedAnalysis.producing_logistics.scheduling_notes.time_of_day_requirement && (
+                                          <p><span className="text-muted-foreground font-medium">Time of Day:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics.scheduling_notes.time_of_day_requirement}</span></p>
+                                        )}
+                                        {selectedAnalysis.producing_logistics.scheduling_notes.weather_dependency && (
+                                          <p><span className="text-muted-foreground font-medium">Weather:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics.scheduling_notes.weather_dependency}</span></p>
+                                        )}
+                                        {selectedAnalysis.producing_logistics.scheduling_notes.actor_availability_note && (
+                                          <p><span className="text-muted-foreground font-medium">Cast Notes:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics.scheduling_notes.actor_availability_note}</span></p>
+                                        )}
+                                        {(selectedAnalysis.producing_logistics.scheduling_notes.combinable_with?.length ?? 0) > 0 && (
+                                          <p><span className="text-muted-foreground font-medium">Combinable With:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics.scheduling_notes.combinable_with?.join(', ')}</span></p>
+                                        )}
+                                        {(selectedAnalysis.producing_logistics.scheduling_notes.must_schedule_before?.length ?? 0) > 0 && (
+                                          <p><span className="text-muted-foreground font-medium">Must Schedule Before:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics.scheduling_notes.must_schedule_before?.join(', ')}</span></p>
+                                        )}
+                                        {(selectedAnalysis.producing_logistics.scheduling_notes.must_schedule_after?.length ?? 0) > 0 && (
+                                          <p><span className="text-muted-foreground font-medium">Must Schedule After:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics.scheduling_notes.must_schedule_after?.join(', ')}</span></p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Sound Design */}
+                                  {selectedAnalysis.producing_logistics?.sound_design && (
+                                    <div className="space-y-2 md:col-span-2">
+                                      <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🔊 Sound Design</h3>
+                                      <div className="bg-muted/30 rounded-lg p-3 space-y-2 text-sm">
+                                        {(selectedAnalysis.producing_logistics.sound_design.production_sound_challenges?.length ?? 0) > 0 && (
+                                          <p><span className="text-muted-foreground font-medium">Challenges:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics.sound_design.production_sound_challenges?.join(', ')}</span></p>
+                                        )}
+                                        {(selectedAnalysis.producing_logistics.sound_design.ambient_requirements?.length ?? 0) > 0 && (
+                                          <p><span className="text-muted-foreground font-medium">Ambient:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics.sound_design.ambient_requirements?.join(', ')}</span></p>
+                                        )}
+                                        {(selectedAnalysis.producing_logistics.sound_design.silence_moments?.length ?? 0) > 0 && (
+                                          <p><span className="text-muted-foreground font-medium">Silence Moments:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics.sound_design.silence_moments?.join(', ')}</span></p>
+                                        )}
+                                        {(selectedAnalysis.producing_logistics.sound_design.sound_effects_needed?.length ?? 0) > 0 && (
+                                          <p><span className="text-muted-foreground font-medium">SFX Needed:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics.sound_design.sound_effects_needed?.join(', ')}</span></p>
+                                        )}
+                                        {selectedAnalysis.producing_logistics.sound_design.music_notes && (
+                                          <p><span className="text-muted-foreground font-medium">Music:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics.sound_design.music_notes}</span></p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Safety Specifics */}
+                                  {((selectedAnalysis.producing_logistics?.safety_specifics?.concerns?.length ?? 0) > 0 ||
+                                    (selectedAnalysis.producing_logistics?.safety_specifics?.protocols_required?.length ?? 0) > 0 ||
+                                    (selectedAnalysis.producing_logistics?.safety_specifics?.personnel_needed?.length ?? 0) > 0) && (
+                                    <div className="space-y-2 md:col-span-2">
+                                      <h3 className="text-sm font-semibold text-red-400 flex items-center gap-2">🛡️ Safety Specifics</h3>
+                                      <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 space-y-2 text-sm">
+                                        {(selectedAnalysis.producing_logistics?.safety_specifics?.concerns?.length ?? 0) > 0 && (
+                                          <div>
+                                            <span className="text-red-400 font-medium">Concerns:</span>
+                                            {selectedAnalysis.producing_logistics?.safety_specifics?.concerns?.map((item: string, idx: number) => (
+                                              <div key={idx} className="flex items-start gap-2 ml-2 mt-1">
+                                                <span className="text-red-400">⚠️</span>
+                                                <span className="text-foreground">{item}</span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
+                                        {(selectedAnalysis.producing_logistics?.safety_specifics?.protocols_required?.length ?? 0) > 0 && (
+                                          <p><span className="text-red-400 font-medium">Protocols:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics?.safety_specifics?.protocols_required?.join(', ')}</span></p>
+                                        )}
+                                        {(selectedAnalysis.producing_logistics?.safety_specifics?.personnel_needed?.length ?? 0) > 0 && (
+                                          <p><span className="text-red-400 font-medium">Personnel Needed:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics?.safety_specifics?.personnel_needed?.join(', ')}</span></p>
+                                        )}
+                                        {selectedAnalysis.producing_logistics?.safety_specifics?.actor_prep_required && (
+                                          <p><span className="text-red-400 font-medium">Actor Prep:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics.safety_specifics.actor_prep_required}</span></p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Department-Specific Notes */}
+                                  {selectedAnalysis.producing_logistics?.department_specific_notes &&
+                                   Object.entries(selectedAnalysis.producing_logistics.department_specific_notes)
+                                     .filter(([, value]) => value && (value as string).toLowerCase() !== 'none required' && (value as string).toLowerCase() !== 'none').length > 0 && (
+                                    <div className="space-y-2 md:col-span-2">
+                                      <h3 className="text-sm font-semibold text-primary flex items-center gap-2">📋 Department Notes</h3>
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                        {Object.entries(selectedAnalysis.producing_logistics.department_specific_notes)
+                                          .filter(([, value]) => value && (value as string).toLowerCase() !== 'none required' && (value as string).toLowerCase() !== 'none')
+                                          .map(([dept, note]) => (
+                                            <div key={dept} className="bg-muted/30 rounded-lg p-3">
+                                              <p className="text-xs font-semibold text-primary capitalize mb-1">{dept.replace(/_/g, ' ')}</p>
+                                              <p className="text-sm text-foreground">{note as string}</p>
+                                            </div>
+                                          ))}
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
                               )}
-                              {(selectedAnalysis.producing_logistics?.safety_specifics?.protocols_required?.length ?? 0) > 0 && (
-                                <p><span className="text-red-400 font-medium">Protocols:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics?.safety_specifics?.protocols_required?.join(', ')}</span></p>
-                              )}
-                              {(selectedAnalysis.producing_logistics?.safety_specifics?.personnel_needed?.length ?? 0) > 0 && (
-                                <p><span className="text-red-400 font-medium">Personnel Needed:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics?.safety_specifics?.personnel_needed?.join(', ')}</span></p>
-                              )}
-                              {selectedAnalysis.producing_logistics?.safety_specifics?.actor_prep_required && (
-                                <p><span className="text-red-400 font-medium">Actor Prep:</span> <span className="text-foreground">{selectedAnalysis.producing_logistics.safety_specifics.actor_prep_required}</span></p>
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Department-Specific Notes */}
-                        {selectedAnalysis.producing_logistics?.department_specific_notes &&
-                         Object.entries(selectedAnalysis.producing_logistics.department_specific_notes)
-                           .filter(([, value]) => value && (value as string).toLowerCase() !== 'none required' && (value as string).toLowerCase() !== 'none').length > 0 && (
-                          <div className="space-y-2 md:col-span-2">
-                            <h3 className="text-sm font-semibold text-primary flex items-center gap-2">📋 Department Notes</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                              {Object.entries(selectedAnalysis.producing_logistics.department_specific_notes)
-                                .filter(([, value]) => value && (value as string).toLowerCase() !== 'none required' && (value as string).toLowerCase() !== 'none')
-                                .map(([dept, note]) => (
-                                  <div key={dept} className="bg-muted/30 rounded-lg p-3">
-                                    <p className="text-xs font-semibold text-primary capitalize mb-1">{dept.replace(/_/g, ' ')}</p>
-                                    <p className="text-sm text-foreground">{note as string}</p>
-                                  </div>
-                                ))}
-                            </div>
-                          </div>
-                        )}
+                            </>
+                          );
+                        })()}
                       </div>
                       )}
                       </>
@@ -1300,245 +1418,282 @@ const ProjectDetails = () => {
                           <div className="md:col-span-2"><EditableArrayField label="Creative Questions" items={editedDirectingData.creative_questions || []} onChange={(items) => setEditedDirectingData({...editedDirectingData, creative_questions: items})} /></div>
                         </div>
                       ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Tone & Mood */}
+                      <div className="space-y-4">
+                        {/* ── Layer 1: Opening tone (always visible) ── */}
                         <div className="space-y-2">
                           <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🎨 Tone & Mood</h3>
-                          <div className="bg-muted/30 rounded-lg p-3 text-sm space-y-1">
-                            {selectedAnalysis.directing_vision?.tone_and_mood?.opening && (
-                              <p><span className="text-muted-foreground">Opens:</span> {selectedAnalysis.directing_vision.tone_and_mood.opening}</p>
-                            )}
-                            {selectedAnalysis.directing_vision?.tone_and_mood?.shift && (
-                              <p><span className="text-muted-foreground">Shifts:</span> {selectedAnalysis.directing_vision.tone_and_mood.shift}</p>
-                            )}
-                            {selectedAnalysis.directing_vision?.tone_and_mood?.closing && (
-                              <p><span className="text-muted-foreground">Closes:</span> {selectedAnalysis.directing_vision.tone_and_mood.closing}</p>
-                            )}
-                            {!selectedAnalysis.directing_vision?.tone_and_mood?.opening && 
-                             selectedAnalysis.directing_vision?.visual_metaphor && (
-                              <p>{selectedAnalysis.directing_vision.visual_metaphor}</p>
-                            )}
+                          <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
+                            <p className="text-base text-foreground leading-relaxed font-medium">
+                              {selectedAnalysis.directing_vision?.tone_and_mood?.opening || selectedAnalysis.directing_vision?.visual_metaphor || 'Not analyzed'}
+                            </p>
                           </div>
                         </div>
 
-                        {/* Scene Rhythm */}
-                        <div className="space-y-2">
-                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🥁 Scene Rhythm</h3>
-                          {selectedAnalysis.directing_vision?.scene_rhythm?.tempo ? (
-                            <div className="bg-muted/30 rounded-lg p-3 text-sm space-y-2">
-                              <div className="flex items-center gap-2">
-                                <span className="text-muted-foreground">Tempo:</span>
-                                <span className="px-2 py-0.5 bg-primary/20 border border-primary/30 rounded-full text-xs font-semibold text-primary">
-                                  {selectedAnalysis.directing_vision.scene_rhythm.tempo}
-                                </span>
-                              </div>
-                              {selectedAnalysis.directing_vision.scene_rhythm.breaths && (
-                                <p><span className="text-muted-foreground">Breaths:</span> {selectedAnalysis.directing_vision.scene_rhythm.breaths}</p>
-                              )}
-                              {selectedAnalysis.directing_vision.scene_rhythm.acceleration_points && (
-                                <p><span className="text-muted-foreground">Accelerates:</span> {selectedAnalysis.directing_vision.scene_rhythm.acceleration_points}</p>
-                              )}
-                              {selectedAnalysis.directing_vision.scene_rhythm.holds && (
-                                <p><span className="text-muted-foreground">Holds:</span> {selectedAnalysis.directing_vision.scene_rhythm.holds}</p>
-                              )}
-                            </div>
-                          ) : (
-                            <div className="bg-muted/30 rounded-lg p-3">
-                              <p className="text-sm text-muted-foreground italic">Not analyzed - click Re-analyze to generate</p>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Tone Reference - only show if non-empty */}
-                        {selectedAnalysis.directing_vision?.tone_reference && (
+                        {/* ── Layer 2: Summary (expanded by default) ── */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Key Moments */}
                           <div className="space-y-2 md:col-span-2">
-                            <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🎬 Tone Reference</h3>
-                            <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg p-3">
-                              <p className="text-sm text-foreground italic">"{selectedAnalysis.directing_vision.tone_reference}"</p>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Visual Strategy */}
-                        <div className="space-y-2">
-                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">📷 Visual Strategy</h3>
-                          <div className="bg-muted/30 rounded-lg p-3 text-sm space-y-1">
-                            <p><span className="text-muted-foreground">Approach:</span> {selectedAnalysis.directing_vision?.visual_strategy?.approach || selectedAnalysis.directing_vision?.visual_approach || 'Not specified'}</p>
-                            {selectedAnalysis.directing_vision?.visual_strategy?.cameraPersonality && (
-                              <p><span className="text-muted-foreground">Camera:</span> {selectedAnalysis.directing_vision.visual_strategy.cameraPersonality}</p>
-                            )}
-                            {selectedAnalysis.directing_vision?.visual_strategy?.lightingMood && (
-                              <p><span className="text-muted-foreground">Lighting:</span> {selectedAnalysis.directing_vision.visual_strategy.lightingMood}</p>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Actor Objectives */}
-                        <div className="space-y-2 md:col-span-2">
-                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🎭 Actor Objectives</h3>
-                          <p className="text-xs text-muted-foreground -mt-1">What each character is trying to DO — actable goals</p>
-                          {selectedAnalysis.directing_vision?.actor_objectives && Object.keys(selectedAnalysis.directing_vision.actor_objectives).length > 0 ? (
+                            <h3 className="text-sm font-semibold text-primary flex items-center gap-2">⭐ Key Moments</h3>
                             <div className="space-y-2">
-                              {Object.entries(selectedAnalysis.directing_vision.actor_objectives).map(([character, objective]) => (
-                                <div key={character} className="bg-muted/30 rounded-lg p-3 text-sm flex items-start gap-3">
-                                  <span className="font-bold text-primary uppercase shrink-0">{character}:</span>
-                                  <span className="text-foreground">{objective as string}</span>
+                              {(selectedAnalysis.directing_vision?.key_moments || []).map((moment: any, idx: number) => (
+                                <div key={idx} className="bg-accent/20 border border-accent/30 rounded-lg p-3 text-sm">
+                                  <p className="font-medium text-accent">"{moment.beat}"</p>
+                                  <p className="text-foreground mt-1">{moment.emphasis}</p>
                                 </div>
                               ))}
+                              {(!selectedAnalysis.directing_vision?.key_moments || selectedAnalysis.directing_vision.key_moments.length === 0) &&
+                                <p className="text-sm text-muted-foreground italic">No key moments identified</p>}
                             </div>
-                          ) : (
-                            <div className="bg-muted/30 rounded-lg p-3">
-                              <p className="text-sm text-muted-foreground italic">Not analyzed - click Re-analyze to generate</p>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Performance Notes */}
-                        <div className="space-y-2 md:col-span-2">
-                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🎬 Performance Notes</h3>
-                          {selectedAnalysis.directing_vision?.performance_notes && Object.keys(selectedAnalysis.directing_vision.performance_notes).length > 0 ? (
-                            <div className="space-y-3">
-                              {Object.entries(selectedAnalysis.directing_vision.performance_notes).map(([character, notes]) => {
-                                const n = notes as { physical_state?: string; emotional_undercurrent?: string; arc_in_scene?: string };
-                                return (
-                                  <div key={character} className="bg-muted/30 border border-border rounded-lg p-3">
-                                    <h4 className="text-sm font-bold text-primary uppercase mb-2">{character}</h4>
-                                    <div className="text-sm space-y-1">
-                                      {n.physical_state && (
-                                        <p><span className="text-muted-foreground">Physical State:</span> {n.physical_state}</p>
-                                      )}
-                                      {n.emotional_undercurrent && (
-                                        <p><span className="text-muted-foreground">Undercurrent:</span> {n.emotional_undercurrent}</p>
-                                      )}
-                                      {n.arc_in_scene && (
-                                        <p><span className="text-muted-foreground">Arc:</span> {n.arc_in_scene}</p>
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          ) : (
-                            <div className="bg-muted/30 rounded-lg p-3">
-                              <p className="text-sm text-muted-foreground italic">Not analyzed - click Re-analyze to generate</p>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Subtext - from story_analysis */}
-                        <div className="space-y-2">
-                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">💭 Subtext</h3>
-                          <div className="bg-muted/30 rounded-lg p-3 text-sm space-y-2">
-                            {selectedAnalysis.story_analysis?.subtext ? (
-                              <>
-                                {selectedAnalysis.story_analysis.subtext.what_they_say_vs_want && (
-                                  <p><span className="text-muted-foreground">Say vs Want:</span> {selectedAnalysis.story_analysis.subtext.what_they_say_vs_want}</p>
-                                )}
-                                {selectedAnalysis.story_analysis.subtext.power_dynamic && (
-                                  <p><span className="text-muted-foreground">Power:</span> {selectedAnalysis.story_analysis.subtext.power_dynamic}</p>
-                                )}
-                                {selectedAnalysis.story_analysis.subtext.emotional_turn && (
-                                  <p><span className="text-muted-foreground">Emotional Arc:</span> {selectedAnalysis.story_analysis.subtext.emotional_turn}</p>
-                                )}
-                                {selectedAnalysis.story_analysis.subtext.revelation_or_realization && (
-                                  <p><span className="text-muted-foreground">Revelation:</span> {selectedAnalysis.story_analysis.subtext.revelation_or_realization}</p>
-                                )}
-                              </>
-                            ) : (
-                              <p className="italic text-muted-foreground">Subtext not analyzed - click Re-analyze</p>
-                            )}
                           </div>
-                        </div>
 
-                        {/* Conflict - from story_analysis */}
-                        <div className="space-y-2">
-                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">⚔️ Conflict</h3>
-                          <div className="bg-muted/30 rounded-lg p-3 text-sm space-y-2">
-                            {selectedAnalysis.story_analysis?.conflict ? (
-                              <>
-                                {selectedAnalysis.story_analysis.conflict.type && (
-                                  <div className="flex flex-wrap gap-1 mb-2">
-                                    {(Array.isArray(selectedAnalysis.story_analysis.conflict.type)
-                                      ? selectedAnalysis.story_analysis.conflict.type
-                                      : String(selectedAnalysis.story_analysis.conflict.type).split('|')
-                                    ).map((t: string, i: number) => (
-                                      <Badge key={i} variant="outline" className="text-xs">{String(t).trim()}</Badge>
-                                    ))}
-                                  </div>
+                          {/* Blocking */}
+                          {selectedAnalysis.directing_vision?.blocking && (
+                            <div className="space-y-2 md:col-span-2">
+                              <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🎬 Blocking</h3>
+                              <div className="bg-muted/30 rounded-lg p-3 text-sm space-y-1">
+                                {selectedAnalysis.directing_vision.blocking.geography && (
+                                  <p><span className="text-muted-foreground">Geography:</span> {selectedAnalysis.directing_vision.blocking.geography}</p>
                                 )}
-                                {(selectedAnalysis.story_analysis.conflict.what_characters_want?.length ?? 0) > 0 && (
-                                  <p><span className="text-muted-foreground">Wants:</span> {selectedAnalysis.story_analysis.conflict.what_characters_want!.join('; ')}</p>
+                                {selectedAnalysis.directing_vision.blocking.movement && (
+                                  <p><span className="text-muted-foreground">Movement:</span> {selectedAnalysis.directing_vision.blocking.movement}</p>
                                 )}
-                                {(selectedAnalysis.story_analysis.conflict.obstacles?.length ?? 0) > 0 && (
-                                  <p><span className="text-muted-foreground">Obstacles:</span> {selectedAnalysis.story_analysis.conflict.obstacles!.join('; ')}</p>
+                                {selectedAnalysis.directing_vision.blocking.eyelines && (
+                                  <p><span className="text-muted-foreground">Eyelines:</span> {selectedAnalysis.directing_vision.blocking.eyelines}</p>
                                 )}
-                                {(selectedAnalysis.story_analysis.conflict.tactics?.length ?? 0) > 0 && (
-                                  <p><span className="text-muted-foreground">Tactics:</span> {selectedAnalysis.story_analysis.conflict.tactics!.join('; ')}</p>
-                                )}
-                                {selectedAnalysis.story_analysis.conflict.winner && (
-                                  <p><span className="text-muted-foreground">Outcome:</span> {selectedAnalysis.story_analysis.conflict.winner}</p>
-                                )}
-                              </>
-                            ) : (
-                              <p className="italic text-muted-foreground">Conflict not analyzed - click Re-analyze</p>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Key Moments */}
-                        <div className="space-y-2 md:col-span-2">
-                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">⭐ Key Moments</h3>
-                          <div className="space-y-2">
-                            {(selectedAnalysis.directing_vision?.key_moments || []).map((moment: any, idx: number) => (
-                              <div key={idx} className="bg-accent/20 border border-accent/30 rounded-lg p-3 text-sm">
-                                <p className="font-medium text-accent">"{moment.beat}"</p>
-                                <p className="text-foreground mt-1">{moment.emphasis}</p>
                               </div>
-                            ))}
-                            {(!selectedAnalysis.directing_vision?.key_moments || selectedAnalysis.directing_vision.key_moments.length === 0) &&
-                              <p className="text-sm text-muted-foreground italic">No key moments identified</p>}
-                          </div>
-                        </div>
+                            </div>
+                          )}
 
-                        {/* What NOT To Do */}
-                        <div className="space-y-2 md:col-span-2">
-                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🚫 What NOT To Do</h3>
-                          <p className="text-xs text-muted-foreground -mt-1">Common pitfalls to avoid</p>
-                          <div className="bg-red-500/5 border border-red-500/20 rounded-lg p-4">
-                            {selectedAnalysis.directing_vision?.what_not_to_do && selectedAnalysis.directing_vision.what_not_to_do.length > 0 ? (
-                              <ul className="space-y-2">
-                                {selectedAnalysis.directing_vision.what_not_to_do.map((item: string, idx: number) => (
-                                  <li key={idx} className="text-sm text-foreground flex items-start gap-2">
-                                    <span className="text-red-400 mt-0.5 shrink-0">⚠</span>
-                                    <span>{item}</span>
-                                  </li>
+                          {/* Actor Objectives */}
+                          <div className="space-y-2 md:col-span-2">
+                            <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🎭 Actor Objectives</h3>
+                            <p className="text-xs text-muted-foreground -mt-1">What each character is trying to DO — actable goals</p>
+                            {selectedAnalysis.directing_vision?.actor_objectives && Object.keys(selectedAnalysis.directing_vision.actor_objectives).length > 0 ? (
+                              <div className="space-y-2">
+                                {Object.entries(selectedAnalysis.directing_vision.actor_objectives).map(([character, objective]) => (
+                                  <div key={character} className="bg-muted/30 rounded-lg p-3 text-sm flex items-start gap-3">
+                                    <span className="font-bold text-primary uppercase shrink-0">{character}:</span>
+                                    <span className="text-foreground">{objective as string}</span>
+                                  </div>
                                 ))}
-                              </ul>
+                              </div>
                             ) : (
-                              <p className="text-sm text-muted-foreground italic">Not analyzed - click Re-analyze to generate</p>
+                              <div className="bg-muted/30 rounded-lg p-3">
+                                <p className="text-sm text-muted-foreground italic">Not analyzed</p>
+                              </div>
                             )}
                           </div>
                         </div>
 
-                        {/* Creative Questions */}
-                        <div className="space-y-2 md:col-span-2">
-                          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">❓ Creative Questions</h3>
-                          <p className="text-xs text-muted-foreground -mt-1">Discuss before shooting</p>
-                          <div className="bg-purple-500/5 border border-purple-500/20 rounded-lg p-4">
-                            {selectedAnalysis.directing_vision?.creative_questions && selectedAnalysis.directing_vision.creative_questions.length > 0 ? (
-                              <ol className="space-y-2">
-                                {selectedAnalysis.directing_vision.creative_questions.map((question: string, idx: number) => (
-                                  <li key={idx} className="text-sm text-foreground flex items-start gap-3">
-                                    <span className="text-purple-400 font-semibold text-xs mt-0.5 shrink-0">{idx + 1}.</span>
-                                    <span className="leading-relaxed">{question}</span>
-                                  </li>
-                                ))}
-                              </ol>
-                            ) : (
-                              <p className="text-sm text-muted-foreground italic">Not analyzed - click Re-analyze to generate</p>
-                            )}
-                          </div>
-                        </div>
+                        {/* ── Layer 3: Full Detail (collapsed by default) ── */}
+                        {(() => {
+                          const dirDetailSections = [
+                            selectedAnalysis.directing_vision?.tone_and_mood?.shift && 'Tone Shifts',
+                            selectedAnalysis.directing_vision?.scene_rhythm?.tempo && 'Scene Rhythm',
+                            selectedAnalysis.directing_vision?.tone_reference && 'Tone Reference',
+                            selectedAnalysis.directing_vision?.visual_strategy && 'Visual Strategy',
+                            selectedAnalysis.directing_vision?.performance_notes && Object.keys(selectedAnalysis.directing_vision.performance_notes).length > 0 && 'Performance Notes',
+                            selectedAnalysis.story_analysis?.subtext && 'Subtext',
+                            selectedAnalysis.story_analysis?.conflict && 'Conflict',
+                            selectedAnalysis.directing_vision?.what_not_to_do?.length && 'What NOT To Do',
+                            selectedAnalysis.directing_vision?.creative_questions?.length && 'Creative Questions',
+                          ].filter(Boolean);
+                          if (dirDetailSections.length === 0) return null;
+                          return (
+                            <>
+                              <button
+                                onClick={() => setShowFullDirecting(!showFullDirecting)}
+                                className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-border bg-muted/20 hover:bg-muted/40 transition-colors text-sm text-muted-foreground"
+                              >
+                                {showFullDirecting ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                {showFullDirecting ? 'Hide full analysis' : `Show full analysis (${dirDetailSections.length} more sections)`}
+                              </button>
+                              {showFullDirecting && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  {/* Tone Shifts */}
+                                  {(selectedAnalysis.directing_vision?.tone_and_mood?.shift || selectedAnalysis.directing_vision?.tone_and_mood?.closing) && (
+                                    <div className="space-y-2">
+                                      <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🎨 Tone Shifts</h3>
+                                      <div className="bg-muted/30 rounded-lg p-3 text-sm space-y-1">
+                                        {selectedAnalysis.directing_vision?.tone_and_mood?.shift && (
+                                          <p><span className="text-muted-foreground">Shifts:</span> {selectedAnalysis.directing_vision.tone_and_mood.shift}</p>
+                                        )}
+                                        {selectedAnalysis.directing_vision?.tone_and_mood?.closing && (
+                                          <p><span className="text-muted-foreground">Closes:</span> {selectedAnalysis.directing_vision.tone_and_mood.closing}</p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Scene Rhythm */}
+                                  {selectedAnalysis.directing_vision?.scene_rhythm?.tempo && (
+                                    <div className="space-y-2">
+                                      <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🥁 Scene Rhythm</h3>
+                                      <div className="bg-muted/30 rounded-lg p-3 text-sm space-y-2">
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-muted-foreground">Tempo:</span>
+                                          <span className="px-2 py-0.5 bg-primary/20 border border-primary/30 rounded-full text-xs font-semibold text-primary">
+                                            {selectedAnalysis.directing_vision.scene_rhythm.tempo}
+                                          </span>
+                                        </div>
+                                        {selectedAnalysis.directing_vision.scene_rhythm.breaths && (
+                                          <p><span className="text-muted-foreground">Breaths:</span> {selectedAnalysis.directing_vision.scene_rhythm.breaths}</p>
+                                        )}
+                                        {selectedAnalysis.directing_vision.scene_rhythm.acceleration_points && (
+                                          <p><span className="text-muted-foreground">Accelerates:</span> {selectedAnalysis.directing_vision.scene_rhythm.acceleration_points}</p>
+                                        )}
+                                        {selectedAnalysis.directing_vision.scene_rhythm.holds && (
+                                          <p><span className="text-muted-foreground">Holds:</span> {selectedAnalysis.directing_vision.scene_rhythm.holds}</p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Tone Reference */}
+                                  {selectedAnalysis.directing_vision?.tone_reference && (
+                                    <div className="space-y-2 md:col-span-2">
+                                      <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🎬 Tone Reference</h3>
+                                      <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg p-3">
+                                        <p className="text-sm text-foreground italic">"{selectedAnalysis.directing_vision.tone_reference}"</p>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Visual Strategy */}
+                                  {selectedAnalysis.directing_vision?.visual_strategy && (
+                                    <div className="space-y-2">
+                                      <h3 className="text-sm font-semibold text-primary flex items-center gap-2">📷 Visual Strategy</h3>
+                                      <div className="bg-muted/30 rounded-lg p-3 text-sm space-y-1">
+                                        <p><span className="text-muted-foreground">Approach:</span> {selectedAnalysis.directing_vision.visual_strategy.approach || selectedAnalysis.directing_vision?.visual_approach || 'Not specified'}</p>
+                                        {selectedAnalysis.directing_vision.visual_strategy.cameraPersonality && (
+                                          <p><span className="text-muted-foreground">Camera:</span> {selectedAnalysis.directing_vision.visual_strategy.cameraPersonality}</p>
+                                        )}
+                                        {selectedAnalysis.directing_vision.visual_strategy.lightingMood && (
+                                          <p><span className="text-muted-foreground">Lighting:</span> {selectedAnalysis.directing_vision.visual_strategy.lightingMood}</p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Performance Notes */}
+                                  {selectedAnalysis.directing_vision?.performance_notes && Object.keys(selectedAnalysis.directing_vision.performance_notes).length > 0 && (
+                                    <div className="space-y-2 md:col-span-2">
+                                      <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🎬 Performance Notes</h3>
+                                      <div className="space-y-3">
+                                        {Object.entries(selectedAnalysis.directing_vision.performance_notes).map(([character, notes]) => {
+                                          const n = notes as { physical_state?: string; emotional_undercurrent?: string; arc_in_scene?: string };
+                                          return (
+                                            <div key={character} className="bg-muted/30 border border-border rounded-lg p-3">
+                                              <h4 className="text-sm font-bold text-primary uppercase mb-2">{character}</h4>
+                                              <div className="text-sm space-y-1">
+                                                {n.physical_state && (
+                                                  <p><span className="text-muted-foreground">Physical State:</span> {n.physical_state}</p>
+                                                )}
+                                                {n.emotional_undercurrent && (
+                                                  <p><span className="text-muted-foreground">Undercurrent:</span> {n.emotional_undercurrent}</p>
+                                                )}
+                                                {n.arc_in_scene && (
+                                                  <p><span className="text-muted-foreground">Arc:</span> {n.arc_in_scene}</p>
+                                                )}
+                                              </div>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Subtext */}
+                                  {selectedAnalysis.story_analysis?.subtext && (
+                                    <div className="space-y-2">
+                                      <h3 className="text-sm font-semibold text-primary flex items-center gap-2">💭 Subtext</h3>
+                                      <div className="bg-muted/30 rounded-lg p-3 text-sm space-y-2">
+                                        {selectedAnalysis.story_analysis.subtext.what_they_say_vs_want && (
+                                          <p><span className="text-muted-foreground">Say vs Want:</span> {selectedAnalysis.story_analysis.subtext.what_they_say_vs_want}</p>
+                                        )}
+                                        {selectedAnalysis.story_analysis.subtext.power_dynamic && (
+                                          <p><span className="text-muted-foreground">Power:</span> {selectedAnalysis.story_analysis.subtext.power_dynamic}</p>
+                                        )}
+                                        {selectedAnalysis.story_analysis.subtext.emotional_turn && (
+                                          <p><span className="text-muted-foreground">Emotional Arc:</span> {selectedAnalysis.story_analysis.subtext.emotional_turn}</p>
+                                        )}
+                                        {selectedAnalysis.story_analysis.subtext.revelation_or_realization && (
+                                          <p><span className="text-muted-foreground">Revelation:</span> {selectedAnalysis.story_analysis.subtext.revelation_or_realization}</p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Conflict */}
+                                  {selectedAnalysis.story_analysis?.conflict && (
+                                    <div className="space-y-2">
+                                      <h3 className="text-sm font-semibold text-primary flex items-center gap-2">⚔️ Conflict</h3>
+                                      <div className="bg-muted/30 rounded-lg p-3 text-sm space-y-2">
+                                        {selectedAnalysis.story_analysis.conflict.type && (
+                                          <div className="flex flex-wrap gap-1 mb-2">
+                                            {(Array.isArray(selectedAnalysis.story_analysis.conflict.type)
+                                              ? selectedAnalysis.story_analysis.conflict.type
+                                              : String(selectedAnalysis.story_analysis.conflict.type).split('|')
+                                            ).map((t: string, i: number) => (
+                                              <Badge key={i} variant="outline" className="text-xs">{String(t).trim()}</Badge>
+                                            ))}
+                                          </div>
+                                        )}
+                                        {(selectedAnalysis.story_analysis.conflict.what_characters_want?.length ?? 0) > 0 && (
+                                          <p><span className="text-muted-foreground">Wants:</span> {selectedAnalysis.story_analysis.conflict.what_characters_want!.join('; ')}</p>
+                                        )}
+                                        {(selectedAnalysis.story_analysis.conflict.obstacles?.length ?? 0) > 0 && (
+                                          <p><span className="text-muted-foreground">Obstacles:</span> {selectedAnalysis.story_analysis.conflict.obstacles!.join('; ')}</p>
+                                        )}
+                                        {(selectedAnalysis.story_analysis.conflict.tactics?.length ?? 0) > 0 && (
+                                          <p><span className="text-muted-foreground">Tactics:</span> {selectedAnalysis.story_analysis.conflict.tactics!.join('; ')}</p>
+                                        )}
+                                        {selectedAnalysis.story_analysis.conflict.winner && (
+                                          <p><span className="text-muted-foreground">Outcome:</span> {selectedAnalysis.story_analysis.conflict.winner}</p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* What NOT To Do */}
+                                  {(selectedAnalysis.directing_vision?.what_not_to_do?.length ?? 0) > 0 && (
+                                    <div className="space-y-2 md:col-span-2">
+                                      <h3 className="text-sm font-semibold text-primary flex items-center gap-2">🚫 What NOT To Do</h3>
+                                      <div className="bg-red-500/5 border border-red-500/20 rounded-lg p-4">
+                                        <ul className="space-y-2">
+                                          {selectedAnalysis.directing_vision!.what_not_to_do!.map((item: string, idx: number) => (
+                                            <li key={idx} className="text-sm text-foreground flex items-start gap-2">
+                                              <span className="text-red-400 mt-0.5 shrink-0">⚠</span>
+                                              <span>{item}</span>
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Creative Questions */}
+                                  {(selectedAnalysis.directing_vision?.creative_questions?.length ?? 0) > 0 && (
+                                    <div className="space-y-2 md:col-span-2">
+                                      <h3 className="text-sm font-semibold text-primary flex items-center gap-2">❓ Creative Questions</h3>
+                                      <p className="text-xs text-muted-foreground -mt-1">Discuss before shooting</p>
+                                      <div className="bg-purple-500/5 border border-purple-500/20 rounded-lg p-4">
+                                        <ol className="space-y-2">
+                                          {selectedAnalysis.directing_vision!.creative_questions!.map((question: string, idx: number) => (
+                                            <li key={idx} className="text-sm text-foreground flex items-start gap-3">
+                                              <span className="text-purple-400 font-semibold text-xs mt-0.5 shrink-0">{idx + 1}.</span>
+                                              <span className="leading-relaxed">{question}</span>
+                                            </li>
+                                          ))}
+                                        </ol>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
                       )}
                       </>
@@ -1563,8 +1718,12 @@ const ProjectDetails = () => {
                       </div>
                     ) : (
                       <>
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm text-muted-foreground">{selectedAnalysis.shot_list.length} shots {isEditMode && <span className="text-primary">(Editing)</span>}</p>
+                        {/* ── Layer 1: Shot count summary ── */}
+                        <div className="flex items-center justify-between bg-muted/30 rounded-lg p-4">
+                          <div className="flex items-center gap-3">
+                            <span className="text-2xl font-bold text-primary">{selectedAnalysis.shot_list.length}</span>
+                            <span className="text-sm text-muted-foreground">shots {isEditMode && <span className="text-primary">(Editing)</span>}</span>
+                          </div>
                           <Button
                             variant="outline"
                             size="sm"
@@ -1574,12 +1733,6 @@ const ProjectDetails = () => {
                             Storyboard PDF
                           </Button>
                         </div>
-                        {selectedAnalysis.shot_list_rationale && (
-                          <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-                            <span className="text-xs font-semibold text-amber-600 uppercase tracking-wider">Shot Count Rationale</span>
-                            <p className="text-sm text-foreground/80 mt-1">{selectedAnalysis.shot_list_rationale}</p>
-                          </div>
-                        )}
                         <div className="space-y-3">
                           {(editedScenes[selectedScene.id]?.shot_list || selectedAnalysis.shot_list).map((shot, idx) => {
                             if (isShotListItem(shot)) {
