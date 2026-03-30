@@ -186,7 +186,12 @@ export default function AdminCredits() {
           <Shield className="h-8 w-8 text-netflix-red" />
           <div>
             <h1 className="text-3xl font-bold">Admin: Credit Management</h1>
-            <p className="text-muted-foreground">Grant, remove, and view user credit balances</p>
+            <p className="text-muted-foreground">
+              Grant, remove, and view user credit balances &middot;{" "}
+              <a href="/admin/users" className="text-netflix-red hover:underline">
+                View All Users
+              </a>
+            </p>
           </div>
         </div>
 

@@ -173,6 +173,11 @@ app.get("/api/admin/list-all-projects", async (req, res) => {
   await apiHandler(req, res, join(__dirname, "api/admin/list-all-projects.ts"));
 });
 
+// Admin: List all users with activity
+app.get("/api/admin/users", async (req, res) => {
+  await apiHandler(req, res, join(__dirname, "api/admin/users.ts"));
+});
+
 // Visual profile endpoint
 app.post("/api/visual-profile", async (req, res) => {
   await apiHandler(req, res, join(__dirname, "api/visual-profile.ts"));
