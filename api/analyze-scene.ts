@@ -758,11 +758,18 @@ export default async function handler(
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // CALL 1: Story Analysis
+    // CALLS 1+2: Story Analysis + Producing Logistics (PARALLEL)
+    // Story and Producing are independent — run them concurrently
+    // to cut ~25 seconds off each scene analysis.
     // ═══════════════════════════════════════════════════════════════
-    logger.log("analyze-scene", `\n📖 [${invocationId}] STEP 1/3: Story Analysis...`)
-    const storyResult = await analyzeStory(anthropicKey, sceneText, characters, invocationId, storyLogicContext, callTimeoutMs)
+    logger.log("analyze-scene", `\n📖🎬 [${invocationId}] STEP 1/3: Story + Producing (parallel)...`)
 
+    const [storyResult, producingResult] = await Promise.all([
+      analyzeStory(anthropicKey, sceneText, characters, invocationId, storyLogicContext, callTimeoutMs),
+      analyzeProducing(anthropicKey, sceneText, sceneHeader, characters, invocationId, callTimeoutMs),
+    ])
+
+    // Handle story result
     if (!storyResult.success) {
       if (jobId) await failJob(jobId, storyResult.error || 'Story analysis failed');
       logger.error("analyze-scene", `❌ [${invocationId}] Story analysis failed: ${storyResult.error}`)
@@ -783,14 +790,6 @@ export default async function handler(
       })
     }
 
-    // Update job progress
-    if (jobId) {
-      await updateJobStatus(jobId, 'PROCESSING', {
-        phase: 'producing',
-        message: 'Story complete, analyzing producing logistics...'
-      });
-    }
-
     logger.log("analyze-scene", `✅ [${invocationId}] Story analysis complete`)
     logger.log("analyze-scene", `   - the_core: "${storyResult.data.the_core?.substring(0, 60)}..."`)
     logger.log("analyze-scene", `   - synopsis: "${storyResult.data.synopsis?.substring(0, 60) || 'MISSING'}..."`)
@@ -799,7 +798,7 @@ export default async function handler(
     logger.log("analyze-scene", `   - the_one_thing: "${storyResult.data.the_one_thing?.substring(0, 60)}..."`)
     logger.log("analyze-scene", `   - alternative_readings: ${storyResult.data.alternative_readings?.length || 0} readings`)
 
-    // Normalize new fields with safe defaults if Claude omitted them
+    // Normalize story fields with safe defaults
     if (!storyResult.data.synopsis) storyResult.data.synopsis = ''
     if (!storyResult.data.scene_obligation) storyResult.data.scene_obligation = ''
     if (!storyResult.data.the_one_thing) storyResult.data.the_one_thing = ''
@@ -810,12 +809,7 @@ export default async function handler(
     if (!storyResult.data.if_this_scene_fails) storyResult.data.if_this_scene_fails = ''
     if (!Array.isArray(storyResult.data.alternative_readings)) storyResult.data.alternative_readings = []
 
-    // ═══════════════════════════════════════════════════════════════
-    // CALL 2: Producing Logistics
-    // ═══════════════════════════════════════════════════════════════
-    logger.log("analyze-scene", `\n🎬 [${invocationId}] STEP 2/3: Producing Logistics...`)
-    const producingResult = await analyzeProducing(anthropicKey, sceneText, sceneHeader, characters, invocationId, callTimeoutMs)
-
+    // Handle producing result
     if (!producingResult.success) {
       logger.error("analyze-scene", `❌ [${invocationId}] Producing analysis failed: ${producingResult.error}`)
       // Continue with empty producing logistics rather than failing entirely
@@ -843,12 +837,12 @@ export default async function handler(
     logger.log("analyze-scene", `   - Est. screen time: ${producingResult.data.estimated_screen_time?.estimated_minutes || 'missing'}`)
     logger.log("analyze-scene", `   - Sound challenges: ${producingResult.data.sound_design?.production_sound_challenges?.length || 0}`)
     logger.log("analyze-scene", `   - Safety concerns: ${producingResult.data.safety_specifics?.concerns?.length || 0}`)
-    
+
     // Update job progress
     if (jobId) {
       await updateJobStatus(jobId, 'PROCESSING', {
         phase: 'directing',
-        message: 'Producing complete, generating shot list...'
+        message: 'Story + Producing complete, generating shot list...'
       });
     }
 
