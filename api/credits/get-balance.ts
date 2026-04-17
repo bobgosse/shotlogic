@@ -21,13 +21,13 @@ export default async function handler(
   }
   
   try {
-    // Get userId from query or header
-    const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string)
-    
+    // Force userId from verified Clerk session — ignore query/header.
+    const userId = (req as any).auth?.userId as string | undefined
+
     if (!userId) {
-      return res.status(400).json({ error: 'userId is required' })
+      return res.status(401).json({ error: 'Authentication required' })
     }
-    
+
     logger.log('get-balance', `[${invocationId}] Getting balance for userId: ${userId}`)
     
     const credits = await getUserCredits(userId)

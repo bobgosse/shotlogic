@@ -20,23 +20,29 @@ export default async function handler(
 
   try {
     const projectData = req.body;
-    
+
     // Basic validation
     if (!projectData || !projectData.name) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Missing project data or name',
-        message: 'The request body must include a project name.' 
+        message: 'The request body must include a project name.'
       });
+    }
+
+    const authUserId = (req as any).auth?.userId as string | undefined;
+    if (!authUserId) {
+      return res.status(401).json({ error: 'Authentication required' });
     }
 
     // 1. Establish database connection
     const db = await getDb();
     const collection = db.collection('projects');
-    
-    // 2. Prepare data for insertion/update
+
+    // 2. Prepare data for insertion/update — force userId from verified session.
     const now = new Date();
     const projectToSave = {
       ...projectData,
+      userId: authUserId,
       updatedAt: now,
       createdAt: projectData.createdAt || now, // Preserve createdAt if it exists
     };

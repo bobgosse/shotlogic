@@ -592,6 +592,8 @@ export default async function handler(
   res: VercelResponse
 ) {
   const invocationId = `${Date.now()}_${Math.random().toString(36).substring(2, 11)}`
+  // Hoisted so the outer catch can call failJob(jobId, …) on early errors.
+  let jobId: string | null = null
 
   logger.log("analyze-scene", `\n🎬 [${invocationId}] ═══ SCENE ANALYSIS (3-CALL ARCHITECTURE) ═══`)
   logger.log("analyze-scene", `📅 Timestamp: ${new Date().toISOString()}`)
@@ -627,24 +629,25 @@ export default async function handler(
     }
 
     const requestBody = req.body as AnalyzeSceneRequest
-    const { userId, sceneText, sceneNumber, totalScenes, customInstructions, storyLogicContext } = requestBody
+    const { userId: bodyUserId, sceneText, sceneNumber, totalScenes, customInstructions, storyLogicContext } = requestBody
     const isRetry = (requestBody as any).isRetry === true
+
+    // Auth: req.auth.userId is the verified Clerk session userId (set by requireAuth middleware).
+    // Reject if body.userId doesn't match — prevents impersonation of other users.
+    const authUserId = (req as any).auth?.userId as string | undefined
+    if (!authUserId) {
+      return res.status(401).json({ error: 'Authentication required', deployMarker: DEPLOY_TIMESTAMP })
+    }
+    if (bodyUserId && bodyUserId !== authUserId) {
+      return res.status(403).json({ error: 'User mismatch', deployMarker: DEPLOY_TIMESTAMP })
+    }
+    const userId = authUserId
 
     logger.log("analyze-scene", `📊 [${invocationId}] Scene: ${sceneNumber}/${totalScenes}`)
     logger.log("analyze-scene", `📊 [${invocationId}] Text length: ${sceneText?.length || 0} chars`)
     logger.log("analyze-scene", `👤 [${invocationId}] UserId: ${userId}`)
     if (storyLogicContext) {
       logger.log("analyze-scene", `📖 [${invocationId}] StoryLogic context present — will inform analysis`)
-    }
-
-    // Validate required fields
-    if (!userId || typeof userId !== 'string') {
-      return res.status(400).json({
-        error: 'MISSING_USER_ID',
-        message: 'userId is required',
-        userMessage: 'User authentication failed',
-        deployMarker: DEPLOY_TIMESTAMP
-      })
     }
     if (!sceneText || typeof sceneText !== 'string' || sceneText.trim().length < 5) {
       return res.status(400).json({
@@ -729,8 +732,8 @@ export default async function handler(
 
     // ═══════════════════════════════════════════════════════════════
     // CREATE JOB: Track progress for frontend polling
+    // (jobId declared at handler scope so outer catch can reference it)
     // ═══════════════════════════════════════════════════════════════
-    let jobId: string | null = null;
     try {
       jobId = await createAnalysisJob({
         userId,

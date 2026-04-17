@@ -28,18 +28,27 @@ export default async function handler(
       });
     }
 
+    const authUserId = (req as any).auth?.userId as string | undefined;
+    if (!authUserId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
     const db = await getDb();
     const collection = db.collection('projects');
-    
-    const project = await collection.findOne({ 
-      _id: new ObjectId(projectId) 
+
+    const project = await collection.findOne({
+      _id: new ObjectId(projectId)
     });
 
     if (!project) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        error: 'Project not found' 
+        error: 'Project not found'
       });
+    }
+
+    if (project.userId && project.userId !== authUserId) {
+      return res.status(403).json({ error: 'Forbidden' });
     }
 
     logger.log("get-by-id", `✅ Project ${projectId} loaded`);

@@ -50,12 +50,21 @@ export default async function handler(
     const objectId = new ObjectId(idString)
     logger.log("get-one", `✅ [${invocationId}] Looking up project: ${objectId.toHexString()}`)
 
+    const authUserId = (req as any).auth?.userId as string | undefined
+    if (!authUserId) {
+      return res.status(401).json({ error: 'Authentication required', deployMarker: DEPLOY_TIMESTAMP })
+    }
+
     const db = await getDb()
     const collection = db.collection('projects')
     const project = await collection.findOne({ _id: objectId })
 
     if (!project) {
       return res.status(404).json({ error: 'Project not found', deployMarker: DEPLOY_TIMESTAMP })
+    }
+
+    if (project.userId && project.userId !== authUserId) {
+      return res.status(403).json({ error: 'Forbidden', deployMarker: DEPLOY_TIMESTAMP })
     }
 
     logger.log("get-one", `✅ [${invocationId}] Project found: ${project.name || 'Untitled'}`)

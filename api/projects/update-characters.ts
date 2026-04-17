@@ -15,17 +15,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!projectId) {
       return res.status(400).json({ error: 'projectId is required' })
     }
-    
+
+    const authUserId = (req as any).auth?.userId as string | undefined
+    if (!authUserId) {
+      return res.status(401).json({ error: 'Authentication required' })
+    }
+
     logger.log("update-characters", "👥 Updating characters for project", projectId)
     logger.log("update-characters", "   Character count:", characters?.length || 0)
-    
+
     const db = await getDb()
     const collection = db.collection('projects')
-    
+    const objectId = new ObjectId(projectId)
+
+    const existing = await collection.findOne({ _id: objectId })
+    if (!existing) {
+      return res.status(404).json({ error: 'Project not found' })
+    }
+    if (existing.userId && existing.userId !== authUserId) {
+      return res.status(403).json({ error: 'Forbidden' })
+    }
+
     const result = await collection.updateOne(
-      { _id: new ObjectId(projectId) },
-      { 
-        $set: { 
+      { _id: objectId },
+      {
+        $set: {
           characters: characters || [],
           updatedAt: new Date()
         }

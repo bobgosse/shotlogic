@@ -11,6 +11,7 @@ import { useUser } from "@clerk/clerk-react"
 import { Navigation } from "@/components/Navigation"
 import { useClerk } from "@clerk/clerk-react"
 import { toast } from "sonner"
+import { api } from "@/utils/apiClient"
 
 const CREDIT_PACKS = [
   {
@@ -63,28 +64,13 @@ export default function BuyCredits() {
     setPurchasingPack(packId)
     
     try {
-      const response = await fetch('/api/credits/create-checkout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId: user.id,
-          pack: packId,
-        }),
-      })
-      
-      if (!response.ok) {
-        throw new Error('Failed to create checkout session')
-      }
-      
-      const { url } = await response.json()
-      
-      // Redirect to Stripe Checkout
+      const { url } = await api.post<{ url: string; sessionId: string }>(
+        '/api/credits/create-checkout',
+        { pack: packId },
+        { context: 'Create checkout' }
+      )
       window.location.href = url
-      
     } catch (error) {
-      console.error('Purchase error:', error)
       toast.error('Failed to start checkout. Please try again.')
       setPurchasingPack(null)
     }

@@ -89,14 +89,27 @@ export default async function handler(
     const db = await getDb()
     const collection = db.collection('projects')
 
+    // Ownership check
+    const authUserId = (req as any).auth?.userId as string | undefined
+    if (!authUserId) {
+      return res.status(401).json({ error: 'Authentication required', deployMarker: DEPLOY_TIMESTAMP })
+    }
+    const existing = await collection.findOne({ _id: objectId })
+    if (!existing) {
+      return res.status(404).json({ error: 'Project not found', deployMarker: DEPLOY_TIMESTAMP })
+    }
+    if (existing.userId && existing.userId !== authUserId) {
+      return res.status(403).json({ error: 'Forbidden', deployMarker: DEPLOY_TIMESTAMP })
+    }
+
     // Update the project name
     const result = await collection.updateOne(
       { _id: objectId },
-      { 
-        $set: { 
+      {
+        $set: {
           name: trimmedName,
           updatedAt: new Date().toISOString()
-        } 
+        }
       }
     )
 

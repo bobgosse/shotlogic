@@ -32,17 +32,22 @@ export default async function handler(
   }
   
   try {
-    const { userId, pack } = req.body
-    
-    if (!userId || !pack) {
-      return res.status(400).json({ error: 'userId and pack are required' })
+    const { pack } = req.body
+
+    // Force userId from verified Clerk session — ignore any body.userId.
+    const userId = (req as any).auth?.userId as string | undefined
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' })
     }
-    
+    if (!pack) {
+      return res.status(400).json({ error: 'pack is required' })
+    }
+
     const packConfig = CREDIT_PACKS[pack as keyof typeof CREDIT_PACKS]
     if (!packConfig) {
       return res.status(400).json({ error: 'Invalid pack type' })
     }
-    
+
     logger.log('create-checkout', `[${invocationId}] Creating checkout for ${userId}, pack: ${pack}`)
     
     // Get the origin for success/cancel URLs

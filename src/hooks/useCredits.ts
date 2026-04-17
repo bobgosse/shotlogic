@@ -3,6 +3,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useUser } from '@clerk/clerk-react'
+import { api } from '@/utils/apiClient'
 
 interface CreditsBalance {
   userId: string
@@ -29,18 +30,7 @@ export function useCredits() {
     queryKey: ['credits', user?.id],
     queryFn: async (): Promise<CreditsBalance> => {
       if (!user?.id) throw new Error('Not authenticated')
-      
-      const response = await fetch(`/api/credits/get-balance`, {
-        headers: {
-          'x-user-id': user.id,
-        },
-      })
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch credits balance')
-      }
-      
-      return response.json()
+      return api.get<CreditsBalance>(`/api/credits/get-balance`, { context: 'Fetch credits' })
     },
     enabled: !!user?.id,
     refetchInterval: 30000, // Refresh every 30 seconds

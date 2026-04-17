@@ -9,8 +9,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Navigation } from "@/components/Navigation"
-import { useClerk, useUser } from "@clerk/clerk-react"
+import { useClerk } from "@clerk/clerk-react"
 import { toast } from "sonner"
+import { api, apiCall } from "@/utils/apiClient"
 
 interface UserCreditsInfo {
   userId: string
@@ -30,7 +31,6 @@ interface UserCreditsInfo {
 }
 
 export default function AdminCredits() {
-  const { user } = useUser()
   const { signOut } = useClerk()
   const [searchUserId, setSearchUserId] = useState("")
   const [userInfo, setUserInfo] = useState<UserCreditsInfo | null>(null)
@@ -53,31 +53,17 @@ export default function AdminCredits() {
     }
     
     setIsSearching(true)
-    
+
     try {
-      const response = await fetch(`/api/admin/manage-credits?userId=${encodeURIComponent(searchUserId)}`, {
-        headers: {
-          'x-user-id': user?.id || '',
-        },
-      })
-      
-      if (!response.ok) {
-        if (response.status === 403) {
-          toast.error("Unauthorized - Admin access required")
-        } else {
-          toast.error("Failed to fetch user data")
-        }
-        setUserInfo(null)
-        return
-      }
-      
-      const data = await response.json()
+      const data = await api.get(`/api/admin/manage-credits?userId=${encodeURIComponent(searchUserId)}`, { context: 'Search user' })
       setUserInfo(data)
       toast.success("User data loaded")
-      
-    } catch (error) {
-      console.error('Search error:', error)
-      toast.error("Failed to search user")
+    } catch (error: any) {
+      if (error?.status === 401 || error?.status === 403) {
+        toast.error("Unauthorized - Admin access required")
+      } else {
+        toast.error("Failed to fetch user data")
+      }
       setUserInfo(null)
     } finally {
       setIsSearching(false)
@@ -94,36 +80,18 @@ export default function AdminCredits() {
     }
     
     setIsGranting(true)
-    
+
     try {
-      const response = await fetch('/api/admin/manage-credits', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': user?.id || '',
-        },
-        body: JSON.stringify({
-          userId: userInfo.userId,
-          credits: amount,
-          reason: grantReason || 'Admin grant',
-        }),
-      })
-      
-      if (!response.ok) {
-        toast.error("Failed to grant credits")
-        return
-      }
-      
-      const data = await response.json()
+      const data = await api.post('/api/admin/manage-credits', {
+        userId: userInfo.userId,
+        credits: amount,
+        reason: grantReason || 'Admin grant',
+      }, { context: 'Grant credits' })
       toast.success(`Granted ${amount} credits. New balance: ${data.newBalance}`)
-      
-      // Refresh user data
       setGrantAmount("")
       setGrantReason("")
       await handleSearch()
-      
     } catch (error) {
-      console.error('Grant error:', error)
       toast.error("Failed to grant credits")
     } finally {
       setIsGranting(false)
@@ -140,36 +108,22 @@ export default function AdminCredits() {
     }
     
     setIsRemoving(true)
-    
+
     try {
-      const response = await fetch('/api/admin/manage-credits', {
+      const data = await apiCall<any>('/api/admin/manage-credits', {
         method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': user?.id || '',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: userInfo.userId,
           credits: amount,
           reason: removeReason || 'Admin adjustment',
         }),
-      })
-      
-      if (!response.ok) {
-        toast.error("Failed to remove credits")
-        return
-      }
-      
-      const data = await response.json()
+      }, { context: 'Remove credits' })
       toast.success(`Removed ${amount} credits. New balance: ${data.newBalance}`)
-      
-      // Refresh user data
       setRemoveAmount("")
       setRemoveReason("")
       await handleSearch()
-      
     } catch (error) {
-      console.error('Remove error:', error)
       toast.error("Failed to remove credits")
     } finally {
       setIsRemoving(false)

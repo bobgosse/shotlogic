@@ -64,7 +64,12 @@ const registerTsx = async () => {
 // Call registration immediately
 await registerTsx();
 
-// API Routes - dynamically import TypeScript handlers  
+// Import auth / rate-limit middleware (tsx-registered so .ts imports resolve)
+const { requireAuth } = await import(join(__dirname, 'api/lib/requireAuth.ts'));
+const { requireApiKey } = await import(join(__dirname, 'api/lib/requireApiKey.ts'));
+const { aiIpLimiter, aiUserLimiter } = await import(join(__dirname, 'api/lib/rateLimit.ts'));
+
+// API Routes - dynamically import TypeScript handlers
 const apiHandler = async (req, res, modulePath) => {
   try {
     const handler = await import(modulePath);
@@ -75,120 +80,107 @@ const apiHandler = async (req, res, modulePath) => {
   }
 };
 
-// Parse screenplay endpoint
-// Parse screenplay endpoint
-app.post('/api/parse-screenplay', async (req, res) => {
+// Parse screenplay endpoint (local parsing, no AI calls — auth + rate limit per spec)
+app.post('/api/parse-screenplay', aiIpLimiter, requireAuth, aiUserLimiter, async (req, res) => {
   await apiHandler(req, res, join(__dirname, 'api/parse-screenplay.ts'));
 });
 
-// Analyze scene endpoint
-app.post('/api/analyze-scene', async (req, res) => {
+// Analyze scene endpoint (Anthropic — full rate-limit chain)
+app.post('/api/analyze-scene', aiIpLimiter, requireAuth, aiUserLimiter, async (req, res) => {
   await apiHandler(req, res, join(__dirname, 'api/analyze-scene.ts'));
 });
 
 // Analyze scene status endpoint (polling)
-app.get('/api/analyze-scene-status', async (req, res) => {
+app.get('/api/analyze-scene-status', requireAuth, async (req, res) => {
   await apiHandler(req, res, join(__dirname, 'api/analyze-scene-status.ts'));
 });
 
-// Project endpoints
-app.get('/api/projects/get-all', async (req, res) => {
+// Project endpoints (all require session; handler enforces ownership)
+app.get('/api/projects/get-all', requireAuth, async (req, res) => {
   await apiHandler(req, res, join(__dirname, 'api/projects/get-all.ts'));
 });
 
-app.get('/api/projects/get-by-id', async (req, res) => {
+app.get('/api/projects/get-by-id', requireAuth, async (req, res) => {
   await apiHandler(req, res, join(__dirname, 'api/projects/get-by-id.ts'));
 });
 
-app.get('/api/projects/get-one', async (req, res) => {
+app.get('/api/projects/get-one', requireAuth, async (req, res) => {
   await apiHandler(req, res, join(__dirname, 'api/projects/get-one.ts'));
 });
 
-app.post('/api/projects/save', async (req, res) => {
+app.post('/api/projects/save', requireAuth, async (req, res) => {
   await apiHandler(req, res, join(__dirname, 'api/projects/save.ts'));
 });
 
-app.delete('/api/projects/delete', async (req, res) => {
+app.delete('/api/projects/delete', requireAuth, async (req, res) => {
   await apiHandler(req, res, join(__dirname, 'api/projects/delete.ts'));
 });
-// Rename project
-app.patch('/api/projects/rename', async (req, res) => {
+app.patch('/api/projects/rename', requireAuth, async (req, res) => {
   await apiHandler(req, res, join(__dirname, 'api/projects/rename.ts'));
 });
-// Claim orphan projects
-app.post('/api/projects/claim-orphans', async (req, res) => {
+app.post('/api/projects/claim-orphans', requireAuth, async (req, res) => {
   await apiHandler(req, res, join(__dirname, 'api/projects/claim-orphans.ts'));
 });
 
-// Save scene edits
-app.post("/api/projects/save-scene", async (req, res) => {
+app.post("/api/projects/save-scene", requireAuth, async (req, res) => {
   await apiHandler(req, res, join(__dirname, "api/projects/save-scene.ts"));
 });
 
-// Update visual style
-app.post("/api/projects/update-style", async (req, res) => {
+app.post("/api/projects/update-style", requireAuth, async (req, res) => {
   await apiHandler(req, res, join(__dirname, "api/projects/update-style.ts"));
 });
 
-// Update characters
-app.post("/api/projects/update-characters", async (req, res) => {
+app.post("/api/projects/update-characters", requireAuth, async (req, res) => {
   await apiHandler(req, res, join(__dirname, "api/projects/update-characters.ts"));
 });
-// Update scene analysis
-app.post("/api/projects/update-scene-analysis", async (req, res) => {
+
+app.post("/api/projects/update-scene-analysis", requireAuth, async (req, res) => {
   await apiHandler(req, res, join(__dirname, "api/projects/update-scene-analysis.ts"));
 });
 
-// Update scene status (for marking scenes as ERROR)
-app.post("/api/projects/update-scene-status", async (req, res) => {
+app.post("/api/projects/update-scene-status", requireAuth, async (req, res) => {
   await apiHandler(req, res, join(__dirname, "api/projects/update-scene-status.ts"));
 });
 
-// Import StoryLogic JSON
-app.post("/api/projects/import-storylogic", async (req, res) => {
+app.post("/api/projects/import-storylogic", requireAuth, async (req, res) => {
   await apiHandler(req, res, join(__dirname, "api/projects/import-storylogic.ts"));
 });
 
-// Admin endpoints
-app.get("/api/admin/analysis-health", async (req, res) => {
+// Admin endpoints (X-API-Key)
+app.get("/api/admin/analysis-health", requireApiKey, async (req, res) => {
   await apiHandler(req, res, join(__dirname, "api/admin/analysis-health.ts"));
 });
-// Use app.all to accept any HTTP method (GET for browser testing, DELETE for proper usage)
-app.delete("/api/admin/delete-project", async (req, res) => {
+app.delete("/api/admin/delete-project", requireApiKey, async (req, res) => {
   await apiHandler(req, res, join(__dirname, "api/admin/delete-project.ts"));
 });
-
-// Admin: Reset project status
-app.post("/api/admin/reset-project-status", async (req, res) => {
+app.post("/api/admin/reset-project-status", requireApiKey, async (req, res) => {
   await apiHandler(req, res, join(__dirname, "api/admin/reset-project-status.ts"));
 });
-
-// Admin: Reassign projects between users
-app.post("/api/admin/reassign-projects", async (req, res) => {
+app.post("/api/admin/reassign-projects", requireApiKey, async (req, res) => {
   await apiHandler(req, res, join(__dirname, "api/admin/reassign-projects.ts"));
 });
-
-// Admin: List all projects
-app.get("/api/admin/list-all-projects", async (req, res) => {
+app.get("/api/admin/reassign-projects", requireApiKey, async (req, res) => {
+  await apiHandler(req, res, join(__dirname, "api/admin/reassign-projects.ts"));
+});
+app.get("/api/admin/list-all-projects", requireApiKey, async (req, res) => {
   await apiHandler(req, res, join(__dirname, "api/admin/list-all-projects.ts"));
 });
-
-// Admin: List all users with activity
-app.get("/api/admin/users", async (req, res) => {
+// Admin: List all users with activity (keeps existing in-handler admin allowlist check)
+app.get("/api/admin/users", requireAuth, async (req, res) => {
   await apiHandler(req, res, join(__dirname, "api/admin/users.ts"));
 });
 
 // Visual profile endpoint
-app.post("/api/visual-profile", async (req, res) => {
+app.post("/api/visual-profile", requireAuth, async (req, res) => {
   await apiHandler(req, res, join(__dirname, "api/visual-profile.ts"));
 });
 
-// Credits endpoints
-app.get("/api/credits/get-balance", async (req, res) => {
+// Credits endpoints (session required; handler reads req.auth.userId)
+app.get("/api/credits/get-balance", requireAuth, async (req, res) => {
   await apiHandler(req, res, join(__dirname, "api/credits/get-balance.ts"));
 });
 
-app.post("/api/credits/create-checkout", async (req, res) => {
+app.post("/api/credits/create-checkout", requireAuth, async (req, res) => {
   await apiHandler(req, res, join(__dirname, "api/credits/create-checkout.ts"));
 });
 
@@ -202,11 +194,11 @@ app.post("/api/webhook/clerk", async (req, res) => {
   await apiHandler(req, res, join(__dirname, "api/webhook/clerk.ts"));
 });
 
-// User onboarding
-app.get("/api/user/onboarding", async (req, res) => {
+// User onboarding (session required; handler reads req.auth.userId)
+app.get("/api/user/onboarding", requireAuth, async (req, res) => {
   await apiHandler(req, res, join(__dirname, "api/user/onboarding.ts"));
 });
-app.post("/api/user/onboarding", async (req, res) => {
+app.post("/api/user/onboarding", requireAuth, async (req, res) => {
   await apiHandler(req, res, join(__dirname, "api/user/onboarding.ts"));
 });
 

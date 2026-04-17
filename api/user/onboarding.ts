@@ -9,12 +9,11 @@ import { logger } from '../lib/logger.js'
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') return res.status(200).end()
 
-  const userId = (req.query.userId as string) ||
-    (req.headers['x-user-id'] as string) ||
-    (req.body?.userId as string)
+  // Force userId from verified Clerk session — ignore query/header/body.
+  const userId = (req as any).auth?.userId as string | undefined
 
   if (!userId) {
-    return res.status(400).json({ error: 'userId is required' })
+    return res.status(401).json({ error: 'Authentication required' })
   }
 
   try {

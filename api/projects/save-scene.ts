@@ -77,6 +77,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(404).json({ error: 'Project not found', deployMarker: DEPLOY_TIMESTAMP })
     }
 
+    const authUserId = (req as any).auth?.userId as string | undefined
+    if (!authUserId) {
+      return res.status(401).json({ error: 'Authentication required', deployMarker: DEPLOY_TIMESTAMP })
+    }
+    if (project.userId && project.userId !== authUserId) {
+      return res.status(403).json({ error: 'Forbidden', deployMarker: DEPLOY_TIMESTAMP })
+    }
+
     // Update scenes with new analysis data - UNIFIED STRING FORMAT
     const updatedScenes = (project.scenes || []).map((scene: any) => {
       const sceneKey = `scene-${scene.number}`

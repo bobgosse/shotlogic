@@ -3,6 +3,25 @@
  */
 import { logger } from "@/utils/logger";
 
+// Bridge from React-world (Clerk's useAuth hook) to module-world. Set once at app init.
+let authTokenGetter: (() => Promise<string | null>) | null = null;
+export function setAuthTokenGetter(fn: (() => Promise<string | null>) | null) {
+  authTokenGetter = fn;
+}
+
+async function buildHeaders(existing: HeadersInit | undefined): Promise<HeadersInit> {
+  const headers = new Headers(existing);
+  if (authTokenGetter) {
+    try {
+      const token = await authTokenGetter();
+      if (token) headers.set('Authorization', `Bearer ${token}`);
+    } catch {
+      // If token fetch fails, fall through — server will 401 and the client surfaces it.
+    }
+  }
+  return headers;
+}
+
 export interface RetryConfig {
   maxRetries?: number;
   initialDelayMs?: number;
@@ -176,7 +195,8 @@ export async function fetchWithRetry(
 
   for (let attempt = 0; attempt <= finalConfig.maxRetries; attempt++) {
     try {
-      const response = await fetchWithTimeout(url, options, finalConfig.timeoutMs);
+      const headers = await buildHeaders(options.headers);
+      const response = await fetchWithTimeout(url, { ...options, headers }, finalConfig.timeoutMs);
 
       // If response is ok, return it
       if (response.ok) {

@@ -68,6 +68,19 @@ export default async function handler(
     const db = await getDb()
     const collection = db.collection('projects')
 
+    // Ownership check — only the project's owner can delete.
+    const authUserId = (req as any).auth?.userId as string | undefined
+    if (!authUserId) {
+      return res.status(401).json({ error: 'Authentication required', deployMarker: DEPLOY_TIMESTAMP })
+    }
+    const existing = await collection.findOne({ _id: objectId })
+    if (!existing) {
+      return res.status(404).json({ error: 'Project not found', deployMarker: DEPLOY_TIMESTAMP })
+    }
+    if (existing.userId && existing.userId !== authUserId) {
+      return res.status(403).json({ error: 'Forbidden', deployMarker: DEPLOY_TIMESTAMP })
+    }
+
     // Delete the project
     const result = await collection.deleteOne({ _id: objectId })
 

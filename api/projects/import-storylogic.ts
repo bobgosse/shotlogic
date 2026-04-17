@@ -36,12 +36,19 @@ export default async function handler(
   }
 
   try {
-    const { storyLogicData, userId } = req.body;
+    const { storyLogicData } = req.body;
 
-    if (!storyLogicData || !userId) {
+    // Force userId from verified session — ignore any userId in the request body.
+    const authUserId = (req as any).auth?.userId as string | undefined;
+    if (!authUserId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    const userId = authUserId;
+
+    if (!storyLogicData) {
       return res.status(400).json({
         error: 'Missing required fields',
-        message: 'storyLogicData and userId are required'
+        message: 'storyLogicData is required'
       });
     }
 

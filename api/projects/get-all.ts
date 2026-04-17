@@ -15,14 +15,14 @@ export default async function handler(
   const invocationId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
   const startTime = Date.now()
 
-  // Get userId from query params
-  const userId = req.query.userId as string | undefined
+  // Auth: force userId from verified session. Ignore any query-param userId.
+  const userId = (req as any).auth?.userId as string | undefined
 
   logger.log("get-all", `\n📁 [${invocationId}] ═══════════════════════════════`)
   logger.log("get-all", `📅 Timestamp: ${new Date().toISOString()}`)
   logger.log("get-all", `🏷️  Deploy: ${DEPLOY_TIMESTAMP}`)
   logger.log("get-all", `📍 Method: ${req.method}`)
-  logger.log("get-all", `👤 UserId: ${userId || 'none (showing all)'}`)
+  logger.log("get-all", `👤 UserId: ${userId || 'none'}`)
 
   // CORS handled by server.mjs middleware
 
@@ -32,6 +32,10 @@ export default async function handler(
 
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method Not Allowed' })
+  }
+
+  if (!userId) {
+    return res.status(401).json({ error: 'Authentication required' })
   }
 
   try {
@@ -44,8 +48,8 @@ export default async function handler(
 
     const collection = db.collection('projects')
 
-    // Build query - filter by userId if provided
-    const query = userId ? { userId } : {}
+    // Always filter by the authenticated user — never fall back to `{}`.
+    const query = { userId }
     logger.log("get-all", `🔍 [${invocationId}] Query filter:`, query)
 
     const projectList = await collection

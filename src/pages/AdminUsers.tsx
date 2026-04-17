@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Navigation } from "@/components/Navigation"
 import { useClerk, useUser } from "@clerk/clerk-react"
+import { api } from "@/utils/apiClient"
 
 interface UserRow {
   userId: string
@@ -46,17 +47,14 @@ export default function AdminUsers() {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch("/api/admin/users", {
-        headers: { "x-user-id": user?.id || "" },
-      })
-      if (!res.ok) {
-        if (res.status === 403) throw new Error("Unauthorized — Admin access required")
-        throw new Error(`Failed to fetch users (${res.status})`)
-      }
-      const data = await res.json()
+      const data = await api.get<{ users: UserRow[] }>("/api/admin/users", { context: 'Fetch users' })
       setUsers(data.users)
     } catch (err: any) {
-      setError(err.message)
+      if (err?.status === 401 || err?.status === 403) {
+        setError("Unauthorized — Admin access required")
+      } else {
+        setError(err.userMessage || err.message || "Failed to fetch users")
+      }
     } finally {
       setLoading(false)
     }

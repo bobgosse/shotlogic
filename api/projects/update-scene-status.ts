@@ -23,6 +23,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     logger.log("update-scene-status", `Updating scene ${sceneNumber} status to ${status} for project ${projectId}`)
 
+    const authUserId = (req as any).auth?.userId as string | undefined
+    if (!authUserId) {
+      return res.status(401).json({ error: 'Authentication required' })
+    }
+
     const db = await getDb()
     const collection = db.collection('projects')
     const objectId = new ObjectId(projectId)
@@ -30,6 +35,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const project = await collection.findOne({ _id: objectId })
     if (!project) {
       return res.status(404).json({ error: 'Project not found' })
+    }
+
+    if (project.userId && project.userId !== authUserId) {
+      return res.status(403).json({ error: 'Forbidden' })
     }
 
     // Update the specific scene's status

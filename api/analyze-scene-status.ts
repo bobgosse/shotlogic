@@ -27,12 +27,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'jobId is required' });
     }
 
+    const authUserId = (req as any).auth?.userId as string | undefined;
+    if (!authUserId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
     logger.log('analyze-scene-status', `📊 Checking status for job ${jobId}`);
 
     const job = await getJobStatus(jobId);
 
     if (!job) {
       return res.status(404).json({ error: 'Job not found' });
+    }
+
+    // Verify the job belongs to the authenticated user — prevents cross-user job enumeration.
+    if (job.userId && job.userId !== authUserId) {
+      return res.status(403).json({ error: 'User mismatch' });
     }
 
     // Return job status
