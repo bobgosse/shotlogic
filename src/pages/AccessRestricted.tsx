@@ -47,10 +47,10 @@ export default function AccessRestricted() {
             To request access, contact:
           </p>
           <a
-            href="mailto:bob@uncsa.edu"
+            href="mailto:support@shotlogic.studio"
             className="text-primary hover:underline font-medium"
           >
-            bob@uncsa.edu
+            support@shotlogic.studio
           </a>
         </div>
 
