@@ -11,6 +11,9 @@ import BuyCredits from './pages/BuyCredits'
 import AdminCredits from './pages/AdminCredits'
 import UserGuide from './pages/UserGuide'
 import AdminUsers from './pages/AdminUsers'
+import Privacy from './pages/Privacy'
+import Terms from './pages/Terms'
+import NotFound from './pages/NotFound'
 import { useAccessControl } from './hooks/useAccessControl'
 import { ErrorBoundary } from './components/ErrorBoundary'
 
@@ -83,6 +86,13 @@ function App() {
             <Route path="/access-restricted" element={
               <SignedIn><AccessRestricted /></SignedIn>
             } />
+
+            {/* Public legal pages - no auth required */}
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Terms />} />
+
+            {/* 404 catch-all - must be last */}
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
       </QueryClientProvider>

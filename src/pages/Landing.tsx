@@ -40,8 +40,17 @@ export default function Landing() {
       </main>
 
       {/* Minimal Footer */}
-      <footer className="px-6 py-5 text-center text-white/20 text-sm">
-        Scene breakdowns • Shot lists • Storyboard exports
+      <footer className="px-6 py-5 text-center text-white/20 text-sm space-y-2">
+        <div>Scene breakdowns • Shot lists • Storyboard exports</div>
+        <div>
+          <span>© 2026 ShotLogic</span>
+          <span className="mx-2">·</span>
+          <Link to="/privacy" className="hover:text-white/40 transition-colors">Privacy</Link>
+          <span className="mx-2">·</span>
+          <Link to="/terms" className="hover:text-white/40 transition-colors">Terms</Link>
+          <span className="mx-2">·</span>
+          <a href="mailto:support@shotlogic.studio" className="hover:text-white/40 transition-colors">Contact</a>
+        </div>
       </footer>
     </div>
   );
