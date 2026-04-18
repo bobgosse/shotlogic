@@ -5,6 +5,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { Webhook } from 'svix'
 import { Resend } from 'resend'
 import { logger } from '../lib/logger.js'
+import { getDb } from '../lib/mongodb.js'
 
 const webhookSecret = process.env.CLERK_WEBHOOK_SECRET
 const resend = new Resend(process.env.RESEND_API_KEY)
@@ -106,8 +107,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Respond immediately — Clerk requires a response within 30s
     res.status(200).json({ received: true })
 
-    // Send notification email in the background (don't block the response)
+    // Background work — don't block the 200 response on Mongo or Resend latency.
     if (event.type === 'user.created') {
+      // Create canonical user doc with starting credits. $setOnInsert means
+      // this is a no-op if a doc already exists (e.g. from onboarding race).
+      ;(async () => {
+        const db = await getDb()
+        await db.collection('users').updateOne(
+          { userId: event.data.id },
+          {
+            $setOnInsert: {
+              userId: event.data.id,
+              credits: 100,
+              purchaseHistory: [],
+              usageHistory: [],
+              createdAt: new Date(),
+              onboardingCompleted: false,
+            },
+          },
+          { upsert: true }
+        )
+        logger.log('clerk-webhook', `[${invocationId}] Ensured user row for ${event.data.id} with 100 starting credits`)
+      })().catch((dbErr: any) => {
+        logger.error('clerk-webhook', `[${invocationId}] Failed to create user row:`, dbErr.message)
+      })
+
       sendSignupEmail(event.data).catch((emailErr: any) => {
         logger.error('clerk-webhook', `[${invocationId}] Failed to send notification email:`, emailErr.message)
       })

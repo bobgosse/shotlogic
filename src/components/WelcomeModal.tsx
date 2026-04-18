@@ -42,7 +42,7 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ open, onClose }) => 
         <div className="space-y-3 py-4">
           <div className="bg-white/5 rounded-lg p-4 space-y-2">
             <p className="text-sm text-white/60">Upload a screenplay (PDF, FDX, or TXT) and ShotLogic will automatically detect your scenes and analyze each one.</p>
-            <p className="text-sm text-white/60">You start with <span className="text-[#D4A843] font-medium">100 free credits</span> — one credit per scene.</p>
+            <p className="text-sm text-white/60">Your account includes <span className="text-[#D4A843] font-medium">free credits</span> to get started — one credit per scene analyzed.</p>
           </div>
         </div>
 

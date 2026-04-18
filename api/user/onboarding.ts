@@ -28,9 +28,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === 'POST') {
+      // $setOnInsert initializes the canonical credit fields so this upsert can't
+      // create a partial user doc that poisons getUserCredits on first analysis.
       await users.updateOne(
         { userId },
-        { $set: { onboardingCompleted: true, onboardingCompletedAt: new Date() } },
+        {
+          $set: { onboardingCompleted: true, onboardingCompletedAt: new Date() },
+          $setOnInsert: {
+            credits: 100,
+            purchaseHistory: [],
+            usageHistory: [],
+            createdAt: new Date(),
+          },
+        },
         { upsert: true }
       )
       logger.log('onboarding', `Marked onboarding complete for ${userId}`)
